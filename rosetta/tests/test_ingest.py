@@ -124,8 +124,7 @@ def test_ingest_error_exit():
     runner = CliRunner()
     result = runner.invoke(cli, ["--input", "/nonexistent/path/file.csv", "--nation", "NOR"])
     assert result.exit_code == 1
-    # Error written to stderr (mixed into output by CliRunner); verify a real message not just non-empty
-    assert "nonexistent" in result.output or "No such file" in result.output
+    assert "nonexistent" in result.stderr or "No such file" in result.stderr
 
 
 def test_ingest_no_sample_data():
@@ -213,3 +212,50 @@ def test_dispatch_unknown_extension():
     src = io.StringIO("<schema/>")
     with pytest.raises(ValueError, match="Cannot auto-detect format"):
         dispatch_parser(src, Path("schema.xml"), None, "NOR")
+
+
+def test_schema_slug_non_ascii_raises():
+    """schema_slug raises ValueError when the title contains only non-ASCII characters."""
+    with pytest.raises(ValueError, match="empty slug"):
+        schema_slug("飞行高度")
+
+
+def test_json_schema_property_ref_raises():
+    """parse_json_schema raises ValueError when a property uses $ref instead of an inline type."""
+    schema = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "Test Schema",
+        "type": "object",
+        "properties": {
+            "target_type": {"$ref": "#/$defs/TargetType"},
+        },
+        "$defs": {
+            "TargetType": {"type": "string", "enum": ["air", "surface"]},
+        },
+    }
+    src = io.StringIO(json.dumps(schema))
+    with pytest.raises(ValueError, match="\\$ref"):
+        parse_json_schema(src, None, "TST")
+
+
+def test_histogram_edges_in_rdf():
+    """fields_to_graph emits rose:histogramEdges triple when numeric stats are present."""
+    from rosetta.core.unit_detect import compute_stats
+    values = ["1.0", "2.0", "3.0", "4.0", "5.0"]
+    numeric_stats, _ = compute_stats(values)
+    fields = [
+        FieldSchema(
+            name="altitude_m",
+            data_type="number",
+            numeric_stats=numeric_stats,
+        )
+    ]
+    g = fields_to_graph(fields, "NOR", "test")
+    subject = URIRef("http://rosetta.interop/field/NOR/test/altitude_m")
+    stats_nodes = list(g.objects(subject, ROSE.stats))
+    assert len(stats_nodes) == 1
+    histogram_edges = list(g.objects(stats_nodes[0], ROSE.histogramEdges))
+    assert len(histogram_edges) == 1, "rose:histogramEdges triple missing from stats blank node"
+    import json as _json
+    edges = _json.loads(str(histogram_edges[0]))
+    assert len(edges) == 11

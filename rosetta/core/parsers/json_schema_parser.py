@@ -56,7 +56,13 @@ def parse_json_schema(src: TextIO, path: Path | None, nation: str) -> tuple[list
 
     fields: list[FieldSchema] = []
     for name, prop in schema["properties"].items():
-        data_type = prop.get("type", "string")
+        if "$ref" in prop:
+            raise ValueError(
+                f"Property {name!r} uses $ref which is not supported in JSON Schema properties; "
+                "inline the type or resolve refs before ingestion."
+            )
+        raw_type = prop.get("type", "string")
+        data_type = raw_type[0] if isinstance(raw_type, list) else raw_type
         description = prop.get("description", "")
         is_required = name in required_fields
 

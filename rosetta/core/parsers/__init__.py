@@ -22,6 +22,11 @@ class FieldSchema:
 def schema_slug(title: str) -> str:
     """Convert a schema title or $id segment to a URL-safe slug."""
     slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
+    if not slug:
+        raise ValueError(
+            f"Schema title {title!r} produced an empty slug after normalisation. "
+            "Use a title containing at least one ASCII letter or digit."
+        )
     return slug
 
 

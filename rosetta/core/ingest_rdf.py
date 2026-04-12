@@ -22,6 +22,7 @@ ROSE_STDDEV = URIRef(_ROSE_BASE + "stddev")
 ROSE_NULL_RATE = URIRef(_ROSE_BASE + "nullRate")
 ROSE_CARDINALITY = URIRef(_ROSE_BASE + "cardinality")
 ROSE_HISTOGRAM = URIRef(_ROSE_BASE + "histogram")
+ROSE_HISTOGRAM_EDGES = URIRef(_ROSE_BASE + "histogramEdges")
 ROSE_DISTINCT_COUNT = URIRef(_ROSE_BASE + "distinctCount")
 
 
@@ -64,6 +65,7 @@ def fields_to_graph(fields: list[FieldSchema], nation: str, slug: str) -> Graph:
             g.add((stats_bn, ROSE_NULL_RATE, Literal(ns["null_rate"], datatype=XSD.double)))
             g.add((stats_bn, ROSE_CARDINALITY, Literal(ns["cardinality"], datatype=XSD.integer)))
             g.add((stats_bn, ROSE_HISTOGRAM, Literal(ns["histogram"])))
+            g.add((stats_bn, ROSE_HISTOGRAM_EDGES, Literal(ns["histogram_edges"])))
             g.add((field_uri, ROSE_STATS, stats_bn))
         elif field.categorical_stats is not None:
             cs = field.categorical_stats

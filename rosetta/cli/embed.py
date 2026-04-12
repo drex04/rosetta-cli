@@ -24,6 +24,12 @@ def cli(input_path, output_path, mode, model, config):
     resolved_model = get_config_value(cfg, "embed", "model", cli_value=model) or "sentence-transformers/LaBSE"
     resolved_mode  = get_config_value(cfg, "embed", "mode",  cli_value=mode)  or "lexical-only"
 
+    if resolved_mode != "lexical-only":
+        click.echo(
+            f"Warning: mode '{resolved_mode}' is not yet implemented; using lexical-only.",
+            err=True,
+        )
+
     try:
         with open_input(input_path) as src:
             g = load_graph(src)

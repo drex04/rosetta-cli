@@ -182,6 +182,21 @@ def test_embed_cli_stdout(tmp_path, mock_sentence_transformer):
     assert len(data) == 2
 
 
+def test_embed_cli_unimplemented_mode_warns(tmp_path, mock_sentence_transformer):
+    """CLI emits a warning to stderr when an unimplemented mode is requested."""
+    from rosetta.cli.embed import cli
+
+    runner = CliRunner()
+    inp = tmp_path / "national.ttl"
+    inp.write_text(_make_national_ttl(2))
+
+    result = runner.invoke(cli, ["--input", str(inp), "--mode", "structural"])
+
+    assert result.exit_code == 0, result.output
+    assert "structural" in result.stderr
+    assert "not yet implemented" in result.stderr
+
+
 # ---------------------------------------------------------------------------
 # Slow test (skipped by default — requires model download)
 # ---------------------------------------------------------------------------
