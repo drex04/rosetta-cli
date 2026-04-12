@@ -1,0 +1,129 @@
+openapi: "3.0.3"
+
+info:
+  title: USA C2 Air Track API
+  version: "1.0.0"
+  description: >
+    US Command & Control air track endpoint providing correlated air picture data
+    in a NATO-interoperable format.
+  contact:
+    name: Rosetta Interop Project
+    url: https://rosetta.interop
+
+paths:
+  /tracks:
+    get:
+      summary: Retrieve active air tracks
+      operationId: listAirTracks
+      responses:
+        "200":
+          description: List of current air tracks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AirTrack"
+
+components:
+  schemas:
+    AirTrack:
+      type: object
+      description: A correlated air contact maintained by the C2 system.
+      required:
+        - track_number
+        - lat_dd
+        - lon_dd
+        - altitude_ft
+        - course_deg
+        - speed_kts
+        - range_nm
+        - timestamp_z
+        - id_status
+      properties:
+        track_number:
+          type: string
+          description: Unique track identifier assigned by the C2 system.
+          example: "USA-7731"
+        lat_dd:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+          description: Latitude in decimal degrees (WGS-84).
+          example: 38.9072
+        lon_dd:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+          description: Longitude in decimal degrees (WGS-84).
+          example: -77.0369
+        altitude_ft:
+          type: number
+          format: double
+          minimum: 0
+          description: Altitude above mean sea level in feet.
+          example: 25000
+        course_deg:
+          type: number
+          format: double
+          minimum: 0
+          exclusiveMaximum: 360
+          description: True course in degrees.
+          example: 045
+        speed_kts:
+          type: number
+          format: double
+          minimum: 0
+          description: Ground speed in knots.
+          example: 420
+        range_nm:
+          type: number
+          format: double
+          minimum: 0
+          description: Slant range from reporting sensor in nautical miles.
+          example: 78.4
+        timestamp_z:
+          type: string
+          format: date-time
+          description: Zulu (UTC) observation time in ISO 8601 format.
+          example: "2026-04-12T10:30:00Z"
+        id_status:
+          type: string
+          enum:
+            - FRIEND
+            - HOSTILE
+            - UNKNOWN
+            - SUSPECT
+            - NEUTRAL
+          description: IFF identification status of the track.
+          example: UNKNOWN
+      examples:
+        - track_number: "USA-7731"
+          lat_dd: 38.9072
+          lon_dd: -77.0369
+          altitude_ft: 25000
+          course_deg: 45
+          speed_kts: 420
+          range_nm: 78.4
+          timestamp_z: "2026-04-12T10:30:00Z"
+          id_status: UNKNOWN
+        - track_number: "USA-7732"
+          lat_dd: 36.1699
+          lon_dd: -115.1398
+          altitude_ft: 35000
+          course_deg: 270
+          speed_kts: 520
+          range_nm: 142.0
+          timestamp_z: "2026-04-12T10:31:15Z"
+          id_status: FRIEND
+        - track_number: "USA-7733"
+          lat_dd: 41.8781
+          lon_dd: -87.6298
+          altitude_ft: 8000
+          course_deg: 180
+          speed_kts: 310
+          range_nm: 35.5
+          timestamp_z: "2026-04-12T10:32:45Z"
+          id_status: HOSTILE

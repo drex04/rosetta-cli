@@ -1,0 +1,11 @@
+[general]
+store_path = "store"
+default_format = "turtle"
+
+[namespaces]
+rose = "http://rosetta.interop/ns/"
+rose_stats = "http://rosetta.interop/ns/stats/"
+
+[embed]
+model = "sentence-transformers/LaBSE"
+mode = "lexical-only"

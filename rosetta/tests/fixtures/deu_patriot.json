@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rosetta.interop/schemas/deu_patriot/v1",
+  "title": "DEU Patriot Air Defense Target Report",
+  "description": "Schema for German Patriot system air defense target data.",
+  "type": "object",
+  "required": [
+    "Ziel_ID",
+    "Breite",
+    "Laenge",
+    "Hoehe_Meter",
+    "Kurs",
+    "Geschwindigkeit_ms",
+    "Entfernung_km",
+    "Zeitstempel",
+    "Bedrohungsstufe"
+  ],
+  "properties": {
+    "Ziel_ID": {
+      "type": "string",
+      "description": "Eindeutige Zielkennung (target identifier).",
+      "examples": ["DEU-PAT-0042"]
+    },
+    "Breite": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Geographische Breite in Dezimalgrad (latitude in decimal degrees).",
+      "examples": [52.3726]
+    },
+    "Laenge": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Geographische Laenge in Dezimalgrad (longitude in decimal degrees).",
+      "examples": [13.4050]
+    },
+    "Hoehe_Meter": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Hoehenangabe ueber MSL in Metern (altitude above MSL in metres).",
+      "examples": [7500]
+    },
+    "Kurs": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 360,
+      "description": "Kurs in Grad (true) (course in degrees true).",
+      "examples": [270]
+    },
+    "Geschwindigkeit_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Geschwindigkeit in Metern pro Sekunde (speed in m/s).",
+      "examples": [220.5]
+    },
+    "Entfernung_km": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Entfernung vom Sensor in Kilometern (range from sensor in km).",
+      "examples": [115.3]
+    },
+    "Zeitstempel": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Beobachtungszeitpunkt in ISO 8601 UTC (observation timestamp ISO 8601 UTC).",
+      "examples": ["2026-04-12T08:00:00Z"]
+    },
+    "Bedrohungsstufe": {
+      "type": "string",
+      "enum": ["FREUND", "FEIND", "UNBEKANNT"],
+      "description": "Freund-Feind-Klassifikation (IFF classification).",
+      "examples": ["UNBEKANNT"]
+    }
+  },
+  "examples": [
+    {
+      "Ziel_ID": "DEU-PAT-0001",
+      "Breite": 52.3726,
+      "Laenge": 13.4050,
+      "Hoehe_Meter": 7500,
+      "Kurs": 270,
+      "Geschwindigkeit_ms": 220.5,
+      "Entfernung_km": 115.3,
+      "Zeitstempel": "2026-04-12T08:00:00Z",
+      "Bedrohungsstufe": "UNBEKANNT"
+    },
+    {
+      "Ziel_ID": "DEU-PAT-0002",
+      "Breite": 48.1351,
+      "Laenge": 11.5820,
+      "Hoehe_Meter": 11200,
+      "Kurs": 90,
+      "Geschwindigkeit_ms": 245.0,
+      "Entfernung_km": 58.7,
+      "Zeitstempel": "2026-04-12T08:01:30Z",
+      "Bedrohungsstufe": "FREUND"
+    },
+    {
+      "Ziel_ID": "DEU-PAT-0003",
+      "Breite": 53.5753,
+      "Laenge": 10.0153,
+      "Hoehe_Meter": 3000,
+      "Kurs": 135,
+      "Geschwindigkeit_ms": 180.0,
+      "Entfernung_km": 32.1,
+      "Zeitstempel": "2026-04-12T08:03:00Z",
+      "Bedrohungsstufe": "FEIND"
+    }
+  ]
+}
