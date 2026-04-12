@@ -9,3 +9,8 @@ rose_stats = "http://rosetta.interop/ns/stats/"
 [embed]
 model = "sentence-transformers/LaBSE"
 mode = "lexical-only"
+
+[suggest]
+top_k = 5
+min_score = 0.0
+anomaly_threshold = 0.3

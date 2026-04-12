@@ -2,17 +2,17 @@
 
 ## Current Position
 
-- **Phase:** 2 (rosetta-ingest)
-- **Plan:** 0 (not yet planned)
-- **Status:** Not started
+- **Phase:** 3 (rosetta-embed + rosetta-suggest)
+- **Plan:** 1 (complete)
+- **Status:** In progress
 
 ## Phase Progress
 
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | Project scaffolding and core setup | Complete |
-| 2 | rosetta-ingest | Not started |
-| 3 | rosetta-embed + rosetta-suggest | Not started |
+| 2 | rosetta-ingest | Complete |
+| 3 | rosetta-embed + rosetta-suggest | In progress |
 | 4 | rosetta-lint | Not started |
 | 5 | rosetta-rml-gen | Not started |
 | 6 | rosetta-provenance | Not started |
@@ -25,6 +25,18 @@
 - **Tests:** 12/12 passing
 - **Completed:** 2026-04-12
 
+## Phase 3 Plan 01 Completion
+
+- **Commit:** 7f0dea1
+- **Tests:** 40/40 passing (8 new embed tests, 1 slow deselected)
+- **Completed:** 2026-04-12
+
+## Phase 3 Plan 02 Completion
+
+- **Commit:** pending
+- **Tests:** 63/63 passing (19 new suggest tests)
+- **Completed:** 2026-04-12
+
 ## Next Action
 
-Run `/fh:plan-work` to plan Phase 2 (rosetta-ingest).
+Run `/fh:plan-work` to plan Phase 3 Plan 03 or proceed to Phase 4 (rosetta-lint).

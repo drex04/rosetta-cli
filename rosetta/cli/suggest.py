@@ -1,9 +1,64 @@
-"""rosetta-suggest: Suggest ontology mappings for schema fields."""
+"""rosetta-suggest: Rank master ontology candidates for source schema fields."""
+
+import json
+import sys
+from pathlib import Path
+
 import click
+import numpy as np
+
+from rosetta.core.config import load_config, get_config_value
+from rosetta.core.io import open_output
+from rosetta.core.similarity import rank_suggestions
 
 
 @click.command()
-@click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
-def cli(config):
-    """Suggest ontology mappings for schema fields using embeddings."""
-    click.echo("Not yet implemented")
+@click.option("--source", required=True, type=click.Path(exists=True), help="Source embeddings JSON")
+@click.option("--master", required=True, type=click.Path(exists=True), help="Master embeddings JSON")
+@click.option("--top-k", default=None, type=int, help="Max suggestions per field")
+@click.option("--min-score", default=None, type=float, help="Minimum cosine score")
+@click.option("--anomaly-threshold", default=None, type=float, help="Anomaly flag threshold")
+@click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
+@click.option("--config", default="rosetta.toml", show_default=True)
+def cli(source, master, top_k, min_score, anomaly_threshold, output, config):
+    """Rank master ontology candidates for source schema fields."""
+    cfg = load_config(config)
+    resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)
+    resolved_min_score = float(get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0)
+    resolved_anomaly_threshold = float(
+        get_config_value(cfg, "suggest", "anomaly_threshold", cli_value=anomaly_threshold) or 0.3
+    )
+
+    try:
+        src_emb = json.loads(Path(source).read_text())
+        master_emb = json.loads(Path(master).read_text())
+
+        if not src_emb:
+            click.echo(f"No embeddings found in source file: {source}", err=True)
+            sys.exit(1)
+        if not master_emb:
+            click.echo(f"No embeddings found in master file: {master}", err=True)
+            sys.exit(1)
+
+        for uri, val in src_emb.items():
+            if "lexical" not in val:
+                raise ValueError(f"Missing 'lexical' key for URI: {uri}")
+        src_uris = list(src_emb)
+        A = np.array([src_emb[u]["lexical"] for u in src_uris], dtype=np.float32)
+
+        for uri, val in master_emb.items():
+            if "lexical" not in val:
+                raise ValueError(f"Missing 'lexical' key for URI: {uri}")
+        master_uris = list(master_emb)
+        B = np.array([master_emb[u]["lexical"] for u in master_uris], dtype=np.float32)
+
+        result = rank_suggestions(
+            src_uris, A, master_uris, B,
+            resolved_top_k, resolved_min_score, resolved_anomaly_threshold,
+        )
+
+        with open_output(output) as fh:
+            json.dump(result, fh, indent=2)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
