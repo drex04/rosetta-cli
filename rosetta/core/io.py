@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator, TextIO
 
 
 @contextmanager
-def open_input(path: str | None) -> Generator[TextIO, None, None]:
+def open_input(path: str | Path | None) -> Generator[TextIO, None, None]:
     """Open *path* for reading; yield stdin if path is None or '-'.
 
     The context manager does NOT close stdin when exiting.
@@ -24,7 +25,7 @@ def open_input(path: str | None) -> Generator[TextIO, None, None]:
 
 
 @contextmanager
-def open_output(path: str | None) -> Generator[TextIO, None, None]:
+def open_output(path: str | Path | None) -> Generator[TextIO, None, None]:
     """Open *path* for writing; yield stdout if path is None or '-'.
 
     The context manager does NOT close stdout when exiting.

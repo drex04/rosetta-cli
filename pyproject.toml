@@ -7,6 +7,7 @@ dependencies = [
     "rdflib>=6.3",
     "click>=8.1",
     "pyyaml>=6.0",
+    "pyshacl>=0.20",
 ]
 
 [project.scripts]
@@ -22,6 +23,8 @@ rosetta-accredit   = "rosetta.cli.accredit:cli"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",
+    "ruff>=0.4",
+    "pytest-cov>=4.1",
 ]
 
 [build-system]

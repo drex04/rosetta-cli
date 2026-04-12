@@ -98,6 +98,16 @@ def test_query_graph() -> None:
     assert "42" in values
 
 
+def test_save_graph_to_filelike() -> None:
+    """save_graph to a file-like object (e.g. stdout) must serialize without error."""
+    g = _make_simple_graph()
+    buf = io.StringIO()
+    save_graph(g, buf)
+    output = buf.getvalue()
+    assert "rosetta.interop" in output
+    assert "hello" in output
+
+
 def test_load_graph_invalid_rdf(tmp_path: Path) -> None:
     """Invalid RDF input must raise ValueError with a clear message."""
     bad_file = tmp_path / "bad.ttl"

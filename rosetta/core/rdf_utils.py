@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TextIO, Union
 
 from rdflib import Graph, Namespace, URIRef, Literal  # noqa: F401 — re-exported
-from rdflib.plugins.parsers.notation3 import BadSyntax
 
 # ---------------------------------------------------------------------------
 # Namespace declarations
@@ -53,11 +52,7 @@ def load_graph(
             g.parse(str(path), format=fmt)
         else:
             # File-like object — read content and parse from string
-            content = path.read()
-            if isinstance(content, bytes):
-                g.parse(data=content, format=fmt)
-            else:
-                g.parse(data=content, format=fmt)
+            g.parse(data=path.read(), format=fmt)
     except Exception as exc:
         source_label = str(path) if isinstance(path, Path) else repr(path)
         raise ValueError(
