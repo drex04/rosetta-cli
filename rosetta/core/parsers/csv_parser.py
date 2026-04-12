@@ -5,7 +5,7 @@ import itertools
 from pathlib import Path
 from typing import TextIO
 
-from rosetta.core.parsers import FieldSchema
+from rosetta.core.parsers import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
 
 
@@ -23,7 +23,7 @@ def parse_csv(
     reader = csv.DictReader(src)
     rows = list(itertools.islice(reader, max_sample_rows))
 
-    slug = path.stem if path is not None else "unknown"
+    slug = schema_slug(path.stem) if path is not None else "unknown"
 
     if not rows:
         return ([], slug)
@@ -50,8 +50,8 @@ def parse_csv(
                     break
 
             if all_numeric:
-                # "integer" only if raw strings contain no decimal point
-                if all("." not in v for v in non_empty):
+                # "integer" only if raw strings have no decimal point or scientific notation
+                if all("." not in v and "e" not in v.lower() for v in non_empty):
                     data_type = "integer"
                 else:
                     data_type = "number"

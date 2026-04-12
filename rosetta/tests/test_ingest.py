@@ -12,10 +12,10 @@ from rdflib import Graph, Namespace, URIRef
 
 from rosetta.cli.ingest import cli
 from rosetta.core.ingest_rdf import fields_to_graph
-from rosetta.core.parsers import FieldSchema, schema_slug
+from rosetta.core.parsers import FieldSchema, dispatch_parser, schema_slug
 from rosetta.core.parsers.json_schema_parser import parse_json_schema
 from rosetta.core.parsers.openapi_parser import parse_openapi
-from rosetta.core.unit_detect import detect_unit
+from rosetta.core.unit_detect import compute_stats, detect_unit
 
 ROSE = Namespace("http://rosetta.interop/ns/")
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -29,9 +29,6 @@ def test_ingest_csv():
     g = Graph()
     g.parse(data=result.output, format="turtle")
 
-    # 11 rose:Field triples
-    fields = list(g.subjects(ROSE.Field, None))
-    # rdflib: (s, rdf:type, rose:Field)
     from rdflib.namespace import RDF
     field_subjects = list(g.subjects(RDF.type, ROSE.Field))
     assert len(field_subjects) == 11
@@ -123,11 +120,12 @@ components:
 
 
 def test_ingest_error_exit():
-    """CLI exits with code 1 and error text when input file does not exist."""
+    """CLI exits with code 1 and a descriptive error message when input file does not exist."""
     runner = CliRunner()
     result = runner.invoke(cli, ["--input", "/nonexistent/path/file.csv", "--nation", "NOR"])
     assert result.exit_code == 1
-    assert len(result.output) > 0
+    # Error written to stderr (mixed into output by CliRunner); verify a real message not just non-empty
+    assert "nonexistent" in result.output or "No such file" in result.output
 
 
 def test_ingest_no_sample_data():
@@ -174,3 +172,44 @@ def test_stdin_missing_format():
     result = runner.invoke(cli, ["--nation", "NOR"], input="col1,col2\n1,2\n")
     assert result.exit_code == 1
     assert "--input-format required" in result.output
+
+
+def test_compute_stats_numeric_full():
+    """compute_stats returns all 8 spec-mandated fields for a numeric column."""
+    values = ["1.0", "2.0", "3.0", "4.0", "5.0"]
+    numeric_stats, cat_stats = compute_stats(values)
+    assert cat_stats is None
+    assert numeric_stats is not None
+    assert set(numeric_stats.keys()) >= {"count", "min", "max", "mean", "stddev", "null_rate", "cardinality", "histogram"}
+    assert numeric_stats["count"] == 5
+    assert isinstance(numeric_stats["count"], int)
+    assert numeric_stats["min"] == pytest.approx(1.0)
+    assert numeric_stats["max"] == pytest.approx(5.0)
+    assert numeric_stats["mean"] == pytest.approx(3.0)
+    assert numeric_stats["stddev"] > 0
+    assert numeric_stats["null_rate"] == pytest.approx(0.0)
+    assert numeric_stats["cardinality"] == 5
+    assert isinstance(numeric_stats["histogram"], str)  # JSON-encoded list of 10 bin counts
+
+
+def test_compute_stats_null_rate():
+    """compute_stats correctly computes null_rate from original sample list."""
+    values = ["1.0", None, "3.0", "", "5.0"]
+    numeric_stats, _ = compute_stats(values)
+    assert numeric_stats is not None
+    # 2 of 5 values are null/empty → null_rate = 0.4
+    assert numeric_stats["null_rate"] == pytest.approx(0.4)
+
+
+def test_unit_detect_from_description():
+    """detect_unit falls through to description patterns when name gives no match."""
+    assert detect_unit("altitude", "Height in metres above sea level") == "meter"
+    assert detect_unit("speed", "Speed in knots") == "knot"
+    assert detect_unit("no_match", "") is None
+
+
+def test_dispatch_unknown_extension():
+    """dispatch_parser raises ValueError for unrecognised file extensions."""
+    src = io.StringIO("<schema/>")
+    with pytest.raises(ValueError, match="Cannot auto-detect format"):
+        dispatch_parser(src, Path("schema.xml"), None, "NOR")

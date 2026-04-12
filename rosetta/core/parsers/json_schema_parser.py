@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
+import warnings
 from pathlib import Path
 from typing import TextIO
-
-import click
 
 from rosetta.core.parsers import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
@@ -17,12 +17,13 @@ def parse_json_schema(src: TextIO, path: Path | None, nation: str) -> tuple[list
     if "properties" not in schema:
         raise ValueError(f"JSON Schema missing 'properties' key in {path!r}")
 
-    # Derive slug: prefer $id path (skipping trailing version segments), then title
+    # Derive slug: prefer $id last path segment (stripping version suffixes) over title.
+    # Rationale: $id encodes the canonical identifier for the schema (e.g. "deu_patriot"),
+    # while title is often a human-readable string that produces unwieldy slugs.
     if "$id" in schema:
         parts = [p for p in schema["$id"].rstrip("/").split("/") if p]
         # skip trailing version-like segments (e.g. "v1", "v2.3")
-        import re as _re
-        while parts and _re.match(r"^v\d", parts[-1], _re.IGNORECASE):
+        while parts and re.match(r"^v\d", parts[-1], re.IGNORECASE):
             parts.pop()
         id_segment = parts[-1] if parts else ""
         if id_segment:
@@ -32,18 +33,18 @@ def parse_json_schema(src: TextIO, path: Path | None, nation: str) -> tuple[list
         else:
             fallback = path.stem if path is not None else "unknown"
             slug = schema_slug(fallback)
-            click.echo(
-                "Warning: no title or $id in JSON Schema; using filename as slug",
-                err=True,
+            warnings.warn(
+                "No title or $id in JSON Schema; using filename as slug",
+                stacklevel=2,
             )
     elif "title" in schema:
         slug = schema_slug(schema["title"])
     else:
         fallback = path.stem if path is not None else "unknown"
         slug = schema_slug(fallback)
-        click.echo(
-            "Warning: no title or $id in JSON Schema; using filename as slug",
-            err=True,
+        warnings.warn(
+            "No title or $id in JSON Schema; using filename as slug",
+            stacklevel=2,
         )
 
     # Collect top-level examples (list of dicts only)

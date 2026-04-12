@@ -31,10 +31,10 @@ def parse_openapi(src: TextIO, path: Path | None, nation: str) -> tuple[list[Fie
     """
     doc = yaml.safe_load(src)
 
-    # Derive slug: use path.stem when available (matches dispatch_parser convention),
-    # fall back to schema_slug of info.title
+    # Derive slug: normalize path.stem through schema_slug to ensure lowercase/safe URIs;
+    # fall back to schema_slug of info.title when no path is available.
     if path is not None:
-        slug = path.stem
+        slug = schema_slug(path.stem)
     else:
         title = doc.get("info", {}).get("title", "unknown")
         slug = schema_slug(title)

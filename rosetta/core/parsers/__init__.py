@@ -56,8 +56,6 @@ def dispatch_parser(
                 f"Cannot auto-detect format from extension '{ext}'; use --input-format {{csv,json-schema,openapi}}"
             )
 
-    slug = path.stem if path is not None else "unknown"
-
     if fmt == "csv":
         from rosetta.core.parsers.csv_parser import parse_csv
         return parse_csv(src, path, nation, max_sample_rows)

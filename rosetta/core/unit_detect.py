@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
+import math
 import re
+import statistics as _statistics
 
 
 # Each entry: (pattern, unit_string, apply_to_name, apply_to_description)
@@ -23,7 +26,7 @@ _DESC_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\bkm/h\b", re.IGNORECASE), "km_per_hour"),
     (re.compile(r"\bkilometer\b", re.IGNORECASE), "kilometer"),
     (re.compile(r"\b(?:feet|foot)\b", re.IGNORECASE), "foot"),
-    (re.compile(r"\bknot\b", re.IGNORECASE), "knot"),
+    (re.compile(r"\bknots?\b", re.IGNORECASE), "knot"),
     (re.compile(r"\bmetres?\b", re.IGNORECASE), "meter"),
     (re.compile(r"\bdegree\b", re.IGNORECASE), "degree"),
     (re.compile(r"\bdBm\b"), "dBm"),
@@ -56,10 +59,13 @@ def compute_stats(
         (numeric_stats, categorical_stats) where exactly one is populated
         (or both None if the input is empty / all-null).
 
-    numeric_stats keys:  count, min, max, mean  (all float)
-    categorical_stats keys: count, distinct_count
+    numeric_stats keys:  count (int), min, max, mean, stddev, null_rate,
+                         cardinality, histogram (JSON-encoded list of 10 bin counts),
+                         histogram_edges (JSON-encoded list of 11 bin edges)
+    categorical_stats keys: count (int), distinct_count, null_rate
     """
-    if not sample_values:
+    total_raw = len(sample_values)
+    if total_raw == 0:
         return (None, None)
 
     # Filter out None and empty strings
@@ -67,6 +73,8 @@ def compute_stats(
 
     if not filtered:
         return (None, None)
+
+    null_rate = (total_raw - len(filtered)) / total_raw
 
     # Try to parse each value as float
     numeric: list[float] = []
@@ -79,12 +87,33 @@ def compute_stats(
     total = len(filtered)
 
     if len(numeric) / total >= 0.5:
-        # Treat as numeric
+        min_val = min(numeric)
+        max_val = max(numeric)
+        mean_val = sum(numeric) / len(numeric)
+        stddev_val = _statistics.stdev(numeric) if len(numeric) >= 2 else 0.0
+
+        # 10-bin equal-width histogram
+        if len(numeric) >= 2 and min_val != max_val:
+            bin_width = (max_val - min_val) / 10
+            edges = [min_val + i * bin_width for i in range(11)]
+            counts = [0] * 10
+            for v in numeric:
+                idx = min(int((v - min_val) / bin_width), 9)
+                counts[idx] += 1
+        else:
+            edges = [min_val] * 11
+            counts = [len(numeric)] + [0] * 9
+
         stats: dict = {
-            "count": float(total),
-            "min": float(min(numeric)),
-            "max": float(max(numeric)),
-            "mean": float(sum(numeric) / len(numeric)),
+            "count": total,
+            "min": float(min_val),
+            "max": float(max_val),
+            "mean": float(mean_val),
+            "stddev": float(stddev_val),
+            "null_rate": float(null_rate),
+            "cardinality": len(set(numeric)),
+            "histogram": json.dumps(counts),
+            "histogram_edges": json.dumps([round(e, 9) for e in edges]),
         }
         return (stats, None)
     else:
@@ -92,5 +121,6 @@ def compute_stats(
         cat_stats: dict = {
             "count": total,
             "distinct_count": len(set(str(v) for v in filtered)),
+            "null_rate": float(null_rate),
         }
         return (None, cat_stats)
