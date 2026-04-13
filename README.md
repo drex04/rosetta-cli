@@ -20,11 +20,11 @@ Parses a national schema file and emits an RDF graph (Turtle by default).
 
 **Supported input formats** (auto-detected from file extension):
 
-| Extension       | Format            |
-|-----------------|-------------------|
-| `.csv`          | CSV with stats    |
-| `.json`         | JSON Schema       |
-| `.yaml` / `.yml`| OpenAPI 3.x       |
+| Extension        | Format         |
+| ---------------- | -------------- |
+| `.csv`           | CSV with stats |
+| `.json`          | JSON Schema    |
+| `.yaml` / `.yml` | OpenAPI 3.x    |
 
 ```
 Usage: rosetta-ingest [OPTIONS]
@@ -45,6 +45,8 @@ Options:
 
 ```bash
 uv run rosetta-ingest -i rosetta/tests/fixtures/nor_radar.csv -n NOR -o nor_radar.ttl
+uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml -n USA -o usa_c2.ttl
+
 ```
 
 ---
@@ -70,7 +72,22 @@ Options:
 
 ```bash
 uv run rosetta-embed -i nor_radar.ttl -o nor_radar_emb.json
+uv run rosetta-embed -i usa_c2.ttl -o usa_c2_emb.json
 ```
+
+To cross-verify with a different model, pass `--model`:
+
+```bash
+# multilingual-E5 (strong on Norwegian and other non-English schemas)
+uv run rosetta-embed -i nor_radar.ttl -o nor_radar_emb_e5.json \
+  --model intfloat/multilingual-e5-base
+
+# Norwegian-specific (National Library of Norway BERT)
+uv run rosetta-embed -i nor_radar.ttl -o nor_radar_emb_nb.json \
+  --model NbAiLab/nb-bert-base
+```
+
+> **E5 models** (`intfloat/multilingual-e5-*`) require a `"passage: "` prefix on indexed texts and `"query: "` on query texts. `rosetta-embed` applies the passage prefix automatically when an E5 model is detected; no extra flags needed.
 
 ---
 
@@ -96,7 +113,7 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-suggest --source deu_patriot_emb.json --master usa_c2_emb.json
+uv run rosetta-suggest --source nor_radar_emb.json --master usa_c2_emb.json --output nor_radar_to_usa_c2_suggestions.json
 ```
 
 **Output format** — one entry per source field:

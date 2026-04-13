@@ -64,14 +64,46 @@ def extract_text_inputs(g: Graph) -> list[tuple[str, str]]:
     return results
 
 
+def _e5_passage_prefix(model_name: str) -> str:
+    """Return the passage prefix required by E5 models, empty string otherwise.
+
+    E5 models (e.g. intfloat/multilingual-e5-*) require all indexed texts to be
+    prefixed with ``"passage: "`` and query texts with ``"query: "``.  Other models
+    (LaBSE, NB-BERT, …) do not use prefixes.
+    """
+    low = model_name.lower()
+    if "e5" in low and "e5se" not in low:  # exclude unrelated models with 'e5' in name
+        return "passage: "
+    return ""
+
+
 class EmbeddingModel:
     """Thin wrapper around a SentenceTransformer model."""
 
     def __init__(self, model_name: str = "sentence-transformers/LaBSE") -> None:
         from sentence_transformers import SentenceTransformer
+        self.model_name = model_name
         self._model = SentenceTransformer(model_name)
+        self._passage_prefix = _e5_passage_prefix(model_name)
+        self._query_prefix = "query: " if self._passage_prefix else ""
 
     def encode(self, texts: list[str]) -> list[list[float]]:
-        """Encode texts; return as list of Python float lists (JSON-serializable)."""
+        """Encode passage texts; return as list of Python float lists (JSON-serializable).
+
+        For E5 models the required ``"passage: "`` prefix is applied automatically.
+        """
+        if self._passage_prefix:
+            texts = [self._passage_prefix + t for t in texts]
         vectors = self._model.encode(texts)  # numpy array shape (n, dim)
+        return [v.tolist() for v in vectors]
+
+    def encode_query(self, texts: list[str]) -> list[list[float]]:
+        """Encode query texts (used at retrieval time, not indexing).
+
+        For E5 models applies ``"query: "`` prefix; for all others identical to
+        :meth:`encode`.
+        """
+        if self._query_prefix:
+            texts = [self._query_prefix + t for t in texts]
+        vectors = self._model.encode(texts)
         return [v.tolist() for v in vectors]
