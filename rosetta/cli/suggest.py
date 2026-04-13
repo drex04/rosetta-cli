@@ -9,6 +9,7 @@ import numpy as np
 
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
+from rosetta.core.models import FieldSuggestions, Suggestion, SuggestionReport
 from rosetta.core.similarity import rank_suggestions
 
 
@@ -68,8 +69,20 @@ def cli(source, master, top_k, min_score, anomaly_threshold, output, config):
             resolved_anomaly_threshold,
         )
 
+        report = SuggestionReport(
+            root={
+                uri: FieldSuggestions(
+                    suggestions=[
+                        Suggestion(target_uri=s["uri"], score=s["score"])
+                        for s in field["suggestions"]
+                    ],
+                    anomaly=field["anomaly"],
+                )
+                for uri, field in result.items()
+            }
+        )
         with open_output(output) as fh:
-            json.dump(result, fh, indent=2)
+            fh.write(report.model_dump_json(indent=2))
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)

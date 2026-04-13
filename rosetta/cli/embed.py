@@ -9,6 +9,7 @@ import click
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.embedding import EmbeddingModel, extract_text_inputs
 from rosetta.core.io import open_input, open_output
+from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 from rosetta.core.rdf_utils import load_graph
 
 
@@ -59,14 +60,16 @@ def cli(input_path, output_path, mode, model, config):
         uris, texts = zip(*pairs)
         vectors = em.encode(list(texts))
 
-        # URIRef → str so json.dumps() doesn't raise TypeError
-        result = {str(uri): {"lexical": vec} for uri, vec in zip(uris, vectors)}
+        # URIRef → str so json.dumps() doesn't raise TypeError; wrap in typed model
+        report = EmbeddingReport(
+            root={str(uri): EmbeddingVectors(lexical=list(vec)) for uri, vec in zip(uris, vectors)}
+        )
 
         # Auto-create output parent directory, then write
         if output_path != "-":
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open_output(output_path) as fh:
-            fh.write(json.dumps(result, indent=2))
+            fh.write(json.dumps(report.model_dump(mode="json"), indent=2))
     except Exception as e:
         click.echo(str(e), err=True)
         sys.exit(1)

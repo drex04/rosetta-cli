@@ -10,6 +10,7 @@ from rdflib.namespace import XSD
 from rdflib.term import Node
 
 from rosetta.core.io import open_output
+from rosetta.core.models import LintFinding, LintReport, LintSummary
 from rosetta.core.units import (
     UNIT_STRING_TO_IRI,
     expand_unit_iri,
@@ -106,7 +107,7 @@ def cli(  # noqa: E501
 ) -> None:
     """Lint mapping files against SHACL shapes and policy rules."""
     # initialised here so exit-code line after except can see it
-    findings: list[dict[str, Any]] = []
+    findings: list[LintFinding] = []
 
     try:
         # 1. Load source TTL
@@ -129,16 +130,14 @@ def cli(  # noqa: E501
             # Issue 1: guard against malformed suggestion entries
             if not isinstance(entry, dict):
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "parse_error",
-                        "source_field": src_uri,
-                        "target_field": None,
-                        "source_unit": None,
-                        "target_unit": None,
-                        "message": f"Suggestions entry for '{src_uri}' is not a dict; skipping.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="parse_error",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=None,
+                        message=f"Suggestions entry for '{src_uri}' is not a dict; skipping.",
+                        fnml_suggestion=None,
+                    )
                 )
                 continue
 
@@ -149,16 +148,14 @@ def cli(  # noqa: E501
             top = sug_list[0]
             if not isinstance(top, dict):
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "parse_error",
-                        "source_field": src_uri,
-                        "target_field": None,
-                        "source_unit": None,
-                        "target_unit": None,
-                        "message": f"First suggestion entry for '{src_uri}' is not a dict; skipping.",  # noqa: E501
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="parse_error",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=None,
+                        message=f"First suggestion entry for '{src_uri}' is not a dict; skipping.",  # noqa: E501
+                        fnml_suggestion=None,
+                    )
                 )
                 continue
 
@@ -174,16 +171,14 @@ def cli(  # noqa: E501
 
             if unit_str is None or unit_str not in UNIT_STRING_TO_IRI:
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "unit_not_detected",
-                        "source_field": src_uri,
-                        "target_field": tgt_uri,
-                        "source_unit": unit_str,
-                        "target_unit": None,
-                        "message": f"No detectable unit on source field '{src_uri}'.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="unit_not_detected",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=tgt_uri,
+                        message=f"No detectable unit on source field '{src_uri}'.",
+                        fnml_suggestion=None,
+                    )
                 )
                 # Still run datatype check below — fall through after continue-skip
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
@@ -193,16 +188,14 @@ def cli(  # noqa: E501
             if src_iri is None:
                 # Known unmappable unit (e.g. dBm)
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "unit_not_detected",
-                        "source_field": src_uri,
-                        "target_field": tgt_uri,
-                        "source_unit": unit_str,
-                        "target_unit": None,
-                        "message": f"Unit '{unit_str}' has no QUDT IRI mapping.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="unit_not_detected",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=tgt_uri,
+                        message=f"Unit '{unit_str}' has no QUDT IRI mapping.",
+                        fnml_suggestion=None,
+                    )
                 )
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
                 continue
@@ -215,16 +208,14 @@ def cli(  # noqa: E501
             )
             if tgt_unit_node is None:
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "master_unit_missing",
-                        "source_field": src_uri,
-                        "target_field": tgt_uri,
-                        "source_unit": src_iri,
-                        "target_unit": None,
-                        "message": f"No qudt:unit on master field '{tgt_uri}'.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="master_unit_missing",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=tgt_uri,
+                        message=f"No qudt:unit on master field '{tgt_uri}'.",
+                        fnml_suggestion=None,
+                    )
                 )
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
                 continue
@@ -238,47 +229,41 @@ def cli(  # noqa: E501
 
             if compat is False:
                 findings.append(
-                    {
-                        "severity": "BLOCK",
-                        "rule": "unit_dimension_mismatch",
-                        "source_field": src_uri,
-                        "target_field": tgt_uri,
-                        "source_unit": src_iri,
-                        "target_unit": tgt_iri,
-                        "message": "Incompatible unit dimensions.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="unit_dimension_mismatch",
+                        severity="BLOCK",
+                        source_uri=src_uri,
+                        target_uri=tgt_uri,
+                        message="Incompatible unit dimensions.",
+                        fnml_suggestion=None,
+                    )
                 )
             elif compat is True:
                 # Normalise both to full IRI for equality check
                 if expand_unit_iri(src_iri) != expand_unit_iri(tgt_iri):
                     fnml = suggest_fnml(src_iri, tgt_iri, qudt_graph)
                     findings.append(
-                        {
-                            "severity": "WARNING",
-                            "rule": "unit_conversion_required",
-                            "source_field": src_uri,
-                            "target_field": tgt_uri,
-                            "source_unit": src_iri,
-                            "target_unit": tgt_iri,
-                            "message": "Units are compatible but differ; conversion needed.",
-                            "fnml_suggestion": fnml,
-                        }
+                        LintFinding(
+                            rule="unit_conversion_required",
+                            severity="WARNING",
+                            source_uri=src_uri,
+                            target_uri=tgt_uri,
+                            message="Units are compatible but differ; conversion needed.",
+                            fnml_suggestion=fnml,
+                        )
                     )
                 # else: identical units — no finding
             else:
                 # compat is None → dimension vector missing
                 findings.append(
-                    {
-                        "severity": "INFO",
-                        "rule": "unit_vector_missing",
-                        "source_field": src_uri,
-                        "target_field": tgt_uri,
-                        "source_unit": src_iri,
-                        "target_unit": tgt_iri,
-                        "message": "Dimension vector missing for one or both units.",
-                        "fnml_suggestion": None,
-                    }
+                    LintFinding(
+                        rule="unit_vector_missing",
+                        severity="INFO",
+                        source_uri=src_uri,
+                        target_uri=tgt_uri,
+                        message="Dimension vector missing for one or both units.",
+                        fnml_suggestion=None,
+                    )
                 )
 
             # ----------------------------------------------------------------
@@ -290,22 +275,26 @@ def cli(  # noqa: E501
         # 7. --strict: re-classify WARNINGs → BLOCKs
         # --------------------------------------------------------------------
         if strict:
+            upgraded: list[LintFinding] = []
             for f in findings:
-                if f["severity"] == "WARNING":
-                    f["severity"] = "BLOCK"
+                if f.severity == "WARNING":
+                    upgraded.append(f.model_copy(update={"severity": "BLOCK"}))
+                else:
+                    upgraded.append(f)
+            findings = upgraded
 
-        # 8. Recount summary using final severities
-        summary = {"block": 0, "warning": 0, "info": 0}
-        for f in findings:
-            sev = f["severity"].lower()
-            if sev in summary:
-                summary[sev] += 1
-
-        result = {"findings": findings, "summary": summary}
+        # 8. Build summary and report
+        summary = LintSummary(
+            block=sum(1 for f in findings if f.severity == "BLOCK"),
+            warning=sum(1 for f in findings if f.severity == "WARNING"),
+            info=sum(1 for f in findings if f.severity == "INFO"),
+        )
+        report = LintReport(findings=findings, summary=summary)
+        output_json = json.dumps(report.model_dump(mode="json"), indent=2)
 
         # 9. Write output
         with open_output(output) as fh:
-            json.dump(result, fh, indent=2)
+            fh.write(output_json)
 
     except Exception as e:
         # Issue 2: always emit valid JSON to stdout so piped consumers don't break
@@ -320,12 +309,12 @@ def cli(  # noqa: E501
         sys.exit(1)
 
     # 10. Exit code AFTER writing output
-    has_block = any(f["severity"] == "BLOCK" for f in findings)
+    has_block = any(f.severity == "BLOCK" for f in findings)
     sys.exit(1 if has_block else 0)
 
 
 def _run_datatype_check(
-    findings: list[dict[str, Any]],
+    findings: list[LintFinding],
     src_graph: rdflib.Graph,
     mst_graph: rdflib.Graph,
     src_uri: str,
@@ -350,14 +339,12 @@ def _run_datatype_check(
     mismatch = (src_numeric and tgt_string) or (src_string and tgt_numeric)
     if mismatch:
         findings.append(
-            {
-                "severity": "WARNING",
-                "rule": "datatype_mismatch",
-                "source_field": src_uri,
-                "target_field": tgt_uri,
-                "source_unit": None,
-                "target_unit": None,
-                "message": f"Datatype mismatch: source '{src_dt}' vs master '{tgt_dt}'.",
-                "fnml_suggestion": None,
-            }
+            LintFinding(
+                rule="datatype_mismatch",
+                severity="WARNING",
+                source_uri=src_uri,
+                target_uri=tgt_uri,
+                message=f"Datatype mismatch: source '{src_dt}' vs master '{tgt_dt}'.",
+                fnml_suggestion=None,
+            )
         )

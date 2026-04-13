@@ -7,6 +7,8 @@ from importlib.resources import files
 
 import rdflib
 
+from rosetta.core.models import FnmlSuggestion
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -113,7 +115,7 @@ SELECT ?fn ?label ?multiplier ?offset WHERE {
 """
 
 
-def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> dict[str, object] | None:
+def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> FnmlSuggestion | None:
     """Query the merged policy graph for a conversion function between two unit IRIs.
 
     Both qudt_units.ttl and fnml_registry.ttl must already be merged in *qudt_graph*
@@ -145,9 +147,9 @@ def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> dict[s
     off_val = row.offset  # pyright: ignore[reportAttributeAccessIssue]
     multiplier = float(mult_val) if mult_val is not None else None
     offset = float(off_val) if off_val is not None else None
-    return {
-        "fnml_function": str(fn_val),
-        "label": str(label_val),
-        "multiplier": multiplier,
-        "offset": offset,
-    }
+    return FnmlSuggestion(
+        fnml_function=str(fn_val),
+        label=str(label_val) if label_val is not None else None,
+        multiplier=multiplier,
+        offset=offset,
+    )
