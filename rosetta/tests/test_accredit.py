@@ -60,9 +60,17 @@ def test_revoke_accredited_succeeds() -> None:
     assert entry.status == "revoked"
 
 
-def test_revoke_wrong_state_raises() -> None:
+def test_revoke_pending_succeeds() -> None:
     ledger = Ledger()
     submit_mapping(ledger, SRC, TGT, actor="alice")
+    entry = revoke_mapping(ledger, SRC, TGT)
+    assert entry.status == "revoked"
+
+
+def test_revoke_already_revoked_raises() -> None:
+    ledger = Ledger()
+    submit_mapping(ledger, SRC, TGT, actor="alice")
+    revoke_mapping(ledger, SRC, TGT)
     with pytest.raises(ValueError, match="Cannot revoke"):
         revoke_mapping(ledger, SRC, TGT)
 

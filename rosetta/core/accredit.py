@@ -73,14 +73,15 @@ def approve_mapping(ledger: Ledger, source_uri: str, target_uri: str) -> LedgerE
 
 
 def revoke_mapping(ledger: Ledger, source_uri: str, target_uri: str) -> LedgerEntry:
-    """Transition accredited → revoked. Raise ValueError if entry not found or wrong state.
+    """Transition pending → revoked or accredited → revoked.
 
+    Raise ValueError if entry not found or already revoked.
     Mutates in-place. Returns updated entry.
     """
     entry = find_entry(ledger, source_uri, target_uri)
     if entry is None:
         raise ValueError(f"No entry found for ({source_uri}, {target_uri})")
-    if entry.status != "accredited":
-        raise ValueError(f"Cannot revoke: entry has status={entry.status!r}, expected 'accredited'")
+    if entry.status == "revoked":
+        raise ValueError(f"Cannot revoke: entry is already revoked")
     entry.status = "revoked"
     return entry

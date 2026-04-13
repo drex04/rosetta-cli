@@ -73,7 +73,7 @@ def approve(ctx: click.Context, source: str, target: str) -> None:
 @click.option("--target", required=True)
 @click.pass_context
 def revoke(ctx: click.Context, source: str, target: str) -> None:
-    """Revoke an accredited mapping."""
+    """Revoke a pending or accredited mapping (denial or withdrawal)."""
     ledger_path: Path = ctx.obj["ledger_path"]
     try:
         led = load_ledger(ledger_path)

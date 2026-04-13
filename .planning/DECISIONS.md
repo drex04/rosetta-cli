@@ -192,12 +192,12 @@ is immediately useful without requiring the full pipeline to be run.
 
 ## D-09-02: State machine transitions
 
-**Decision:** Linear state machine: `pending → accredited → revoked`. No resurrection from revoked.
+**Decision:** Two paths to revoked: `pending → accredited → revoked` (approve then withdraw) and `pending → revoked` (denial by accreditation authority). No resurrection from revoked.
 - `submit` creates a `pending` entry (errors if pair already exists in any state)
 - `approve` moves `pending → accredited` (errors on wrong state)
-- `revoke` moves `accredited → revoked` (errors on wrong state)
+- `revoke` moves `pending → revoked` or `accredited → revoked` (errors only if already revoked)
 - `status` prints current state for a given pair (or all pairs if no filter)
-**Why:** Simplest machine that satisfies REQ-22/REQ-23 and enables feedback loop. Resurrection paths add complexity without clear requirement.
+**Why:** Accreditation authorities need to deny submissions outright without first approving them. Denial and post-approval withdrawal land in the same terminal state — both mean the mapping must not be used. Resurrection paths add complexity without clear requirement.
 
 ## D-09-03: Feedback loop mechanism in rosetta-suggest
 
