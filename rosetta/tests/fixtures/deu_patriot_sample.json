@@ -10,12 +10,15 @@
 			"geschwindigkeit_kmh": 833,
 			"kurs_grad": 87,
 			"identifikation": {
-				"typ": "FEINDLICH",
+				"typ": ["FEINDLICH"],
 				"sicherheit": 0.91
 			},
 			"spurqualitaet": 0.88,
 			"radar": "ADLER-2000-ALPHA",
-			"land": "DEU",
+			"land": [
+				{ "code": "DEU", "name": "Deutschland" },
+				{ "code": "EU", "name": "Europa" }
+			],
 			"zeitstempel": "2026-04-07T09:15:05Z"
 		},
 		{
@@ -28,12 +31,15 @@
 			"geschwindigkeit_kmh": 555,
 			"kurs_grad": 312,
 			"identifikation": {
-				"typ": "FREUNDLICH",
+				"typ": ["FREUNDLICH", "NATO"],
 				"sicherheit": 0.97
 			},
 			"spurqualitaet": 0.95,
 			"radar": "ADLER-2000-BRAVO",
-			"land": "DEU",
+			"land": [
+				{ "code": "DEU", "name": "Deutschland" },
+				{ "code": "EU", "name": "Europa" }
+			],
 			"zeitstempel": "2026-04-07T09:15:08Z"
 		},
 		{
@@ -46,12 +52,15 @@
 			"geschwindigkeit_kmh": 222,
 			"kurs_grad": 198,
 			"identifikation": {
-				"typ": "NEUTRAL",
+				"typ": ["NEUTRAL", "ZIVILES"],
 				"sicherheit": 0.63
 			},
 			"spurqualitaet": 0.59,
 			"radar": "ADLER-2000-ALPHA",
-			"land": "DEU",
+			"land": [
+				{ "code": "DEU", "name": "Deutschland" },
+				{ "code": "EU", "name": "Europa" }
+			],
 			"zeitstempel": "2026-04-07T09:15:19Z"
 		},
 		{
@@ -64,12 +73,15 @@
 			"geschwindigkeit_kmh": 926,
 			"kurs_grad": 44,
 			"identifikation": {
-				"typ": "UNBEKANNT",
+				"typ": ["UNBEKANNT"],
 				"sicherheit": 0.38
 			},
 			"spurqualitaet": 0.34,
 			"radar": "ADLER-2000-CHARLIE",
-			"land": "DEU",
+			"land": [
+				{ "code": "DEU", "name": "Deutschland" },
+				{ "code": "EU", "name": "Europa" }
+			],
 			"zeitstempel": "2026-04-07T09:15:27Z"
 		},
 		{
@@ -82,12 +94,15 @@
 			"geschwindigkeit_kmh": 741,
 			"kurs_grad": 172,
 			"identifikation": {
-				"typ": "FREUNDLICH",
+				"typ": ["FREUNDLICH", "DEUTSCHE"],
 				"sicherheit": 0.95
 			},
 			"spurqualitaet": 0.92,
 			"radar": "ADLER-2000-BRAVO",
-			"land": "DEU",
+			"land": [
+				{ "code": "DEU", "name": "Deutschland" },
+				{ "code": "EU", "name": "Europa" }
+			],
 			"zeitstempel": "2026-04-07T09:15:39Z"
 		}
 	]

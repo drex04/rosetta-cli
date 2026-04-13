@@ -207,7 +207,24 @@ def test_json_sample_multi_key_envelope() -> None:
 
     targets = next(f for f in fields if f.name == "targets")
     metadata = next(f for f in fields if f.name == "metadata")
-    assert targets.data_type == "object"
+    assert targets.data_type == "array[object]"
     assert targets.children != []
-    assert metadata.data_type == "object"
+    assert metadata.data_type == "array[object]"
     assert metadata.children != []
+
+
+def test_json_sample_array_of_scalars() -> None:
+    """Array-of-scalars field gets data_type 'array' and flattened sample_values."""
+    data = {
+        "erkannte_ziele": [
+            {"typ": ["FEINDLICH"], "speed": 833},
+            {"typ": ["FREUNDLICH", "NATO"], "speed": 555},
+        ]
+    }
+    src = io.StringIO(json.dumps(data))
+    fields, _ = parse_json_sample(src, None, "TST")
+
+    typ_field = next(f for f in fields if f.name == "typ")
+    assert typ_field.data_type == "array"
+    assert typ_field.children == []
+    assert set(typ_field.sample_values) == {"FEINDLICH", "FREUNDLICH", "NATO"}

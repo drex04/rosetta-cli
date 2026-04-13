@@ -20,7 +20,9 @@ def _infer_data_type(values: list[Any]) -> str:
     if all(isinstance(v, dict) for v in non_null):
         return "object"
     if all(isinstance(v, list) and any(isinstance(i, dict) for i in v) for v in non_null):
-        return "object"  # list-of-dicts: each list key is a nested object collection
+        return "array[object]"  # list-of-dicts: array of nested objects
+    if all(isinstance(v, list) for v in non_null):
+        return "array"  # list of scalars (strings, numbers, booleans)
     if all(isinstance(v, int) and not isinstance(v, bool) for v in non_null):
         return "integer"
     if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in non_null):
@@ -45,7 +47,7 @@ def _build_fields(
         children: list[FieldSchema] = []
         sample_values: list[str | float | int | bool | None] = []
 
-        if data_type == "object" and depth < max_depth:
+        if data_type in ("object", "array[object]") and depth < max_depth:
             if all(isinstance(v, dict) for v in values if v is not None):
                 # plain dict values (normal nested object)
                 nested = [v for v in values if isinstance(v, dict)]
@@ -59,6 +61,15 @@ def _build_fields(
                     if isinstance(item, dict)
                 ]
             children = _build_fields(nested, depth=depth + 1, max_depth=max_depth)
+        elif data_type == "array":
+            # flatten scalar items from all list values
+            sample_values = [
+                item
+                for v in values
+                if isinstance(v, list)
+                for item in v
+                if not isinstance(item, (dict, list))
+            ]
         else:
             sample_values = [v for v in values if not isinstance(v, (dict, list))]
 
