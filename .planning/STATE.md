@@ -28,10 +28,12 @@ progress:
 | 3 | rosetta-embed + rosetta-suggest | Complete |
 | 4 | rosetta-lint | Complete |
 | 5 | Code quality infrastructure | Complete |
-| 6 | rosetta-rml-gen | Not started |
+| 6 | rosetta-rml-gen | Complete |
 | 7 | rosetta-provenance | Not started |
 | 8 | rosetta-validate | Complete |
 | 9 | rosetta-accredit + feedback loop | Complete |
+| 10 | rosetta-translate | Not started |
+| 11 | rosetta-ingest extensions (XSD + JSON sample) | Not started |
 
 ## Phase 1 Completion
 
@@ -81,6 +83,12 @@ progress:
 - **Tests:** 7/7 integration tests passing; 165/165 total
 - **Completed:** 2026-04-13
 
+## Phase 6 Plan 01 Completion
+
+- **Commit:** 4e76f65 (pre-existing — all artifacts already committed)
+- **Tests:** 9/9 rml-gen tests passing; 175/175 total
+- **Completed:** 2026-04-13
+
 ## Next Action
 
-All phases complete. Milestone 3 (rosetta-accredit + feedback loop) is done.
+Phase 6 complete. Next: Phase 7 (rosetta-provenance).
