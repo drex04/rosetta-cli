@@ -423,10 +423,9 @@ def test_provenance_cli_shows_help():
     assert "stamp" in result.output or "query" in result.output
 
 
-def test_rml_gen_stub_exits_1():
-    """rosetta-rml-gen stub exits with code 1 (not implemented)."""
+def test_rml_gen_help():
+    """rosetta-rml-gen CLI is implemented and shows help."""
     runner = CliRunner()
-    result = runner.invoke(rml_gen_cli, [])
-    assert result.exit_code == 1
-    out = result.output.lower()
-    assert "not yet implemented" in out or "not implemented" in out
+    result = runner.invoke(rml_gen_cli, ["--help"])
+    assert result.exit_code == 0
+    assert "--decisions" in result.output

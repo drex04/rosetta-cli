@@ -118,3 +118,15 @@ class LedgerEntry(BaseModel):
 
 class Ledger(BaseModel):
     mappings: list[LedgerEntry] = []
+
+
+# --- RML Generation ---
+
+
+class MappingDecision(BaseModel):
+    source_uri: str
+    target_uri: str
+    field_ref: str | None = None  # rml:reference value; defaults to URI last segment
+    fnml_function: str | None = None  # set in Plan 02
+    multiplier: float | None = None
+    offset: float | None = None
