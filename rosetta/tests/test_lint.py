@@ -198,7 +198,7 @@ _MST_UNKNOWN_UNIT = """\
 _SUGGESTIONS = json.dumps(
     {
         "http://example.org/field/alt": {
-            "suggestions": [{"uri": "http://example.org/master/altitude", "score": 0.95}]
+            "suggestions": [{"target_uri": "http://example.org/master/altitude", "score": 0.95}]
         }
     }
 )
@@ -381,10 +381,10 @@ _MST_MULTI = """\
 _SUGGESTIONS_MULTI = json.dumps(
     {
         "http://example.org/field/alt": {
-            "suggestions": [{"uri": "http://example.org/master/altitude", "score": 0.95}]
+            "suggestions": [{"target_uri": "http://example.org/master/altitude", "score": 0.95}]
         },
         "http://example.org/field/lat": {
-            "suggestions": [{"uri": "http://example.org/master/latitude", "score": 0.90}]
+            "suggestions": [{"target_uri": "http://example.org/master/latitude", "score": 0.90}]
         },
     }
 )

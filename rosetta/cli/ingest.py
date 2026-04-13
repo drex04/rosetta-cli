@@ -56,7 +56,15 @@ from rosetta.core.rdf_utils import save_graph
     help="Max rows read from CSV for stats computation.",
 )
 @click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
-def cli(input_path, output_path, fmt, input_fmt, nation, max_sample_rows, config):
+def cli(
+    input_path: str,
+    output_path: str,
+    fmt: str,
+    input_fmt: str | None,
+    nation: str,
+    max_sample_rows: int,
+    config: str | None,
+) -> None:
     """Ingest a national schema into the RDF store."""
     load_config(config)
     # Guard: stdin without explicit format

@@ -159,7 +159,7 @@ def cli(  # noqa: E501
                 )
                 continue
 
-            tgt_uri = top.get("uri", "")
+            tgt_uri = top.get("target_uri", "")
             if not tgt_uri:
                 continue
 
@@ -290,21 +290,12 @@ def cli(  # noqa: E501
             info=sum(1 for f in findings if f.severity == "INFO"),
         )
         report = LintReport(findings=findings, summary=summary)
-        output_json = json.dumps(report.model_dump(mode="json"), indent=2)
 
         # 9. Write output
         with open_output(output) as fh:
-            fh.write(output_json)
+            fh.write(report.model_dump_json(indent=2))
 
     except Exception as e:
-        # Issue 2: always emit valid JSON to stdout so piped consumers don't break
-        error_result = {
-            "findings": [],
-            "summary": {"block": 0, "warning": 0, "info": 0},
-            "error": str(e),
-        }
-        with open_output(output) as fh:
-            json.dump(error_result, fh, indent=2)
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 

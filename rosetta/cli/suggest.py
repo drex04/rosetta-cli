@@ -25,7 +25,15 @@ from rosetta.core.similarity import rank_suggestions
 @click.option("--anomaly-threshold", default=None, type=float, help="Anomaly flag threshold")
 @click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
 @click.option("--config", default="rosetta.toml", show_default=True)
-def cli(source, master, top_k, min_score, anomaly_threshold, output, config):
+def cli(
+    source: str,
+    master: str,
+    top_k: int | None,
+    min_score: float | None,
+    anomaly_threshold: float | None,
+    output: str | None,
+    config: str,
+) -> None:
     """Rank master ontology candidates for source schema fields."""
     cfg = load_config(config)
     resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)

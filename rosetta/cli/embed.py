@@ -1,6 +1,5 @@
 """rosetta-embed: Embed RDF schema attributes using LaBSE."""
 
-import json
 import sys
 from pathlib import Path
 
@@ -33,7 +32,13 @@ from rosetta.core.rdf_utils import load_graph
 @click.option("--mode", default=None, help="Embedding mode (default: lexical-only).")
 @click.option("--model", default=None, help="Model name (default: sentence-transformers/LaBSE).")
 @click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
-def cli(input_path, output_path, mode, model, config):
+def cli(
+    input_path: str,
+    output_path: str,
+    mode: str | None,
+    model: str | None,
+    config: str | None,
+) -> None:
     """Embed RDF schema attributes using LaBSE."""
     cfg = load_config(config)
     resolved_model = (
@@ -69,7 +74,7 @@ def cli(input_path, output_path, mode, model, config):
         if output_path != "-":
             Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open_output(output_path) as fh:
-            fh.write(json.dumps(report.model_dump(mode="json"), indent=2))
+            fh.write(report.model_dump_json(indent=2))
     except Exception as e:
         click.echo(str(e), err=True)
         sys.exit(1)
