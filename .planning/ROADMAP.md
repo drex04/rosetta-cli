@@ -125,3 +125,35 @@
 - Full Milestone 3 test: approve NOR mapping → German suggestions improve; revoke → disappears
 
 **Requirements:** REQ-22, REQ-23, REQ-24, REQ-25
+
+---
+
+## Phase 10: rosetta-translate
+**Goal:** Normalise non-English field labels to English via DeepL before embedding,
+enabling English-to-English vector comparisons with a higher-quality English-specialized
+model (intfloat/e5-large-v2). The tool is a clean passthrough for English-source schemas.
+
+**Delivers:**
+- `rosetta/cli/translate.py` — new `rosetta-translate` CLI tool
+- `rosetta/core/translation.py` — DeepL wrapper + passthrough logic
+- Dual-label audit trail: `rdfs:label` updated to English, `rose:originalLabel` preserves original
+- `--source-lang EN` passthrough: no API call, output TTL identical to input
+- `rosetta.toml` updated: `[translate]` section + `[embed].model = intfloat/e5-large-v2`
+
+**Requirements:** REQ-TRANSLATE-01
+
+---
+
+## Phase 11: rosetta-ingest extensions
+**Goal:** Extend `rosetta-ingest` with two new input modes: XSD schema parsing and
+JSON sample-data deduction.
+
+**Delivers:**
+- `rosetta/core/parsers/xsd_parser.py` — full XSD vocabulary support (complexType, sequence,
+  choice, extension, restriction, attributes); `.xsd` auto-detected from extension
+- `rosetta/core/parsers/json_sample_parser.py` — infer JSON Schema from instance data via
+  `genson`, pipe through existing `parse_json_schema`; `--input-format json-sample` required
+- Updated `dispatch_parser` wiring for both new formats
+- Tests, fixtures, README updates for both formats
+
+**Requirements:** REQ-INGEST-XSD-01, REQ-INGEST-SAMPLE-01

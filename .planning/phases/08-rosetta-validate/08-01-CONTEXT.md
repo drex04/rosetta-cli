@@ -22,6 +22,10 @@ created: 2026-04-13
 - [review] All path options use `click.Path(exists=True)` with `dir_okay=False` / `file_okay=False` as appropriate. Fail fast before rdflib touches the filesystem.
 - [review] Pydantic `# --- Validate ---` section appended after `# --- Provenance ---` (not after Embeddings — phase 7 already appended Provenance there).
 
+- [review] Malformed Turtle inputs (--data, --shapes) and pyshacl.validate() exceptions are all caught by the catch-all block → exit 1 + stderr. Dedicated tests are absent but not required — no CRITICAL gap since the catch-all is in place. If the catch-all is ever narrowed, these three tests must be added first.
+- [review] test_validate_finding_message_none tests that violations are NOT dropped when sh:message is absent. In practice pySHACL always generates sh:resultMessage, so message is never None at runtime; the OPTIONAL clause and str|None model are spec-compliance guards for non-pySHACL callers.
+- [review] --shapes + --shapes-dir combined: zero-triple guard fires inside the shapes_dir block only; if --shapes already loaded triples, the guard correctly does not raise. No test needed — correct by construction.
+
 ## Deferred Ideas
 
 - Warning/Info severity threshold flag (`--severity-filter`) — deferred, not in REQ-20/21 scope.

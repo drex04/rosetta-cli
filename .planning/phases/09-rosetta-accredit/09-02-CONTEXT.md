@@ -20,7 +20,9 @@ generated_by: plan-review
 - [review] Top-level imports only in `suggest.py` (`load_ledger`, `apply_ledger_feedback`). Inline imports inside the `if ledger is not None:` block fail ruff `PLC0415`.
 - [review] `uv run python -c` not `python3 -c` in `pipeline.sh`. System `python3` may not have rosetta installed.
 - [review] `test_boost_cap_at_1` must NOT declare `tmp_path` — unused fixture parameter triggers ruff `ARG001`.
-- [review] 8 integration tests, not 5. Added: `test_empty_candidates` and `test_suggest_cli_with_ledger` (CliRunner end-to-end).
+- [review] 7 integration tests (not 8 and not 5). Corrected Done-when criterion and quality gate comment in PLAN.md.
+- [review] `datetime.utcnow()` in `accredit.py:submit_mapping()` must be replaced with `datetime.now(datetime.UTC)` — produces 6 DeprecationWarning lines in every test run, degrading pytest output signal.
+- [review] `test_suggest_cli_with_ledger` assertion simplified to `assert tgt["score"] >= 1.0` — the `or tgt["score"] > 0.9` disjunct was dead code (unreachable when first condition holds).
 
 ## Deferred Ideas
 

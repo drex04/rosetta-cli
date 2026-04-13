@@ -159,3 +159,24 @@ data_graph + shapes_graph ──► pyshacl.validate() ──► (conforms, resu
 | Unresolved decisions | 0                                           |
 +====================================================================+
 ```
+
+---
+
+## Second Review Pass (post-build, 2026-04-13)
+
+**Gate: PASS** — implementation complete and correct. No CRITICAL gaps remain.
+
+### New findings (WARNINGs only)
+
+| # | Finding | Severity | Action |
+|---|---------|----------|--------|
+| W1 | `rdflib.ParseError` on `--data` untested — catch-all exits 1, correct, no test | WARNING | Deferred |
+| W2 | `rdflib.ParseError` on `--shapes` untested — catch-all exits 1, correct, no test | WARNING | Deferred |
+| W3 | `pyshacl.validate()` exception untested — catch-all exits 1, correct, no test | WARNING | Deferred |
+| W4 | Plan prose for `test_validate_finding_message_none` says "message=None" — pySHACL always provides sh:resultMessage; test correctly asserts "field exists" | Minor prose | Documented |
+
+All three WARNINGs are rescued by the same broad `except Exception` block. Risk materialises only if that block is narrowed in a future refactor — at that point, add tests for these three paths first.
+
+### --shapes + --shapes-dir combined: NOT A GAP
+
+Zero-triple guard fires inside the `if shapes_dir is not None:` block only. If `--shapes` already loaded triples, `len(shapes_g) == 0` is False and no error raises. Correct by construction; no test needed.

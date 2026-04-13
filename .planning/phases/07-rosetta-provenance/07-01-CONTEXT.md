@@ -20,6 +20,9 @@
 - [review] CLI stamp summary (stderr) uses an actual `ProvenanceRecord` instance + `.model_dump(mode="json")`, not a bare dict. Consistent with CLAUDE.md "construct model instances in the CLI."
 - [review] Artifact URI heuristic (`ROSE_NS[stem]`) is documented in `--help` text: "Artifact URI is derived as `rose:<stem>` from the input filename."
 - [review] Concurrent stamps are not safe (last-writer-wins on in-place overwrite). Documented as a known limitation; no locking mechanism in v1.
+- [review] RDF.type (not PROV.type) is required for PROV-O type assertions. `PROV.type` evaluates to `http://www.w3.org/ns/prov#type`; `RDF.type` evaluates to `rdf:type`. All three type-assertion triples must use `RDF.type`. Requires `from rdflib.namespace import RDF` in provenance.py. Tests 3–5 must be updated to assert `RDF.type` predicates or they mask the bug.
+- [review] Stamp CLI stderr summary uses a synthetic `activity_uri` (`rose:activity/summary`), not the real UUID activity URI written to the graph. Accepted as a known inaccuracy for the informational summary. To fix properly: change stamp_artifact return type to tuple[int, str] (version, activity_uri). Tracked as tech debt.
+- [review] Artifact URI stem collision: two files with the same stem in different directories share an artifact URI (ROSE_NS[stem] heuristic). Documented as known limitation; no mitigation in v1. Documented in --help text.
 - [review] Test count updated from 16 to 18 — two new tests added: `test_cli_stamp_invalid_input` (exit 1 on bad TTL) and `test_cli_query_no_records` (exit 0 when no stamps).
 - [review] `test_query_returns_two_records_after_two_stamps` must assert `version == 2` on both records (not 1 and 2).
 

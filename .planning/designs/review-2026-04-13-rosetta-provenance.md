@@ -109,6 +109,39 @@ CLI query
 
 ---
 
+---
+
+## Second Review Pass — 2026-04-13 (post-implementation)
+
+Implementation was committed in `4e76f65`. This second pass reviews the actual code against plan truths.
+
+### CRITICAL: `PROV.type` used instead of `RDF.type`
+
+**Files:** `rosetta/core/provenance.py:89,96,98`, `rosetta/tests/test_provenance.py:68,73,80`
+
+The implementation uses `PROV.type` (`http://www.w3.org/ns/prov#type`) as the predicate for all three type assertions instead of `RDF.type` (`rdf:type`). Generated Turtle contains:
+
+```turtle
+rose:activity/uuid prov:type prov:Activity .   # WRONG
+```
+instead of:
+```turtle
+rose:activity/uuid a prov:Activity .           # CORRECT
+```
+
+Root cause: `RDF` is not imported in `provenance.py`. Tests 3–5 also use `PROV.type`, masking the bug. The `# type: ignore[attr-defined]` comments are the signal. Fix: add `RDF` to imports, replace 3× `PROV.type` with `RDF.type`, update tests 3–5.
+
+New truths added to PLAN.md:
+- `[review] stamp_artifact MUST use RDF.type (rdf:type) — not PROV.type — for type assertions`
+- `[review] test_cli_stamp_writes_valid_turtle must assert PROV-O content, not merely len(g) > 0`
+- `[review] A test must cover the write-failure path (unwritable output path → exit 1)`
+
+### WARNING: Synthetic `activity_uri` in stamp CLI summary
+
+`rosetta/cli/provenance.py:75` constructs the stderr ProvenanceRecord with `activity_uri="rose:activity/summary"` — a placeholder, not the real UUID activity URI. Tracked as tech debt. Fix: return `(int, str)` from `stamp_artifact`.
+
+---
+
 ## Dream State Delta
 
 This plan lands PROV-O stamping for v1. Known gaps vs ideal:
