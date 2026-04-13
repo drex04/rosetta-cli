@@ -21,80 +21,81 @@
 **Core Logic (Domain):**
 - Purpose: Implement semantic mapping, embedding, linting, and RDF manipulation
 - Contains: Algorithm implementations (similarity ranking, unit compatibility, RDF SPARQL queries)
-- Location: `rosetta/core/{rdf_utils,embedding,similarity,units,unit_detect,ingest_rdf,config,io}.py`
-- Depends on: rdflib, sentence-transformers, numpy, pyyaml, pyshacl
+- Location: `rosetta/core/{rdf_utils,embedding,similarity,units,unit_detect,ingest_rdf,config,io,models,provenance,accredit,rml_builder}.py`
+- Depends on: rdflib, sentence-transformers, numpy, pyyaml, pyshacl, pydantic
 - Used by: All CLI tools
+
+**Parser Subsystem:**
+- Purpose: Normalize heterogeneous national schemas (CSV, JSON Schema, OpenAPI) to a common field list
+- Contains: Format-specific parsers dispatched by file extension or `--input-format`
+- Location: `rosetta/core/parsers/{csv_parser,json_schema_parser,openapi_parser,_types}.py`; `__init__.py` exposes `dispatch_parser()`
+- Used by: `rosetta/cli/ingest.py`
 
 **Policies (Knowledge Base):**
 - Purpose: Static RDF graphs for QUDT units and FnML registry
 - Contains: TTL files (qudt_units.ttl, fnml_registry.ttl); no Python logic
-- Location: `rosetta/policies/{qudt_units,fnml_registry}.ttl`
+- Location: `rosetta/policies/`
 - Depends on: None
 - Used by: `rosetta.core.units.load_qudt_graph()`
 
 **Tests:**
 - Purpose: Pytest fixtures and unit/integration tests
-- Contains: Conftest with synthetic RDF fixtures, test files per module
 - Location: `rosetta/tests/{conftest,test_*.py}`
 - Depends on: pytest, core modules
-- Used by: `uv run pytest`
 
 ## Data Flow
 
-**rosetta-lint (representative end-to-end flow):**
-1. CLI entry: `rosetta/cli/lint.py:cli()` parses `--source`, `--master`, `--suggestions`
-2. Load graphs: `rdflib.Graph().parse(source, format="turtle")` → Load RDF into memory
-3. SPARQL queries: `_sparql_one()` executes unit/datatype detection queries against source & master
-4. Unit compatibility: `rosetta.core.units.units_compatible()` compares dimension vectors from QUDT policy graph
-5. Lint rules: Iterate suggestions JSON, check for datatype mismatches (numeric vs string), unit conflicts
-6. Output: JSON findings or N-Triples violations to `rosetta.core.io.open_output()`
-7. Exit: code 0 if no findings, 1 if --strict and WARNINGs present
+**rosetta-ingest (canonical flow):**
+1. `cli/ingest.py:cli()` opens stdin/file via `core/io.open_input()`
+2. `core/parsers.dispatch_parser()` detects format → returns `list[FieldRecord]`
+3. `core/ingest_rdf.fields_to_graph()` converts field list → `rdflib.Graph`
+4. `core/rdf_utils.save_graph()` serializes → Turtle/N-Triples to stdout/file
 
-**rosetta-embed:**
-1. Load graph: `rosetta.core.rdf_utils.load_graph(input_path)` → parses Turtle
-2. Extract text: `rosetta.core.embedding.extract_text_inputs(g)` → SPARQL SELECT to find Attributes or Fields
-3. Embed: `EmbeddingModel.encode(texts)` → LaBSE model produces float32 vectors
-4. Output: JSON {uri_string → {"lexical": [vector]}} to stdout/file
+**rosetta-lint (representative pipeline):**
+1. Load source + master Turtle graphs via rdflib
+2. SPARQL queries extract unit/datatype info; None-guard OPTIONAL vars
+3. `rosetta.core.units.units_compatible()` compares QUDT dimension vectors
+4. Emit `LintReport` Pydantic model → JSON stdout; exit 1 if --strict + warnings
 
-**rosetta-suggest:**
-1. Load embeddings: JSON {uri → {"lexical": array}} from source and master files
-2. Build matrices: NumPy arrays A (source vectors), B (master vectors)
-3. Rank: `rosetta.core.similarity.rank_suggestions()` → cosine similarity, top-k filtering, anomaly detection
-4. Output: JSON suggestions with scores and anomaly flags
+**rosetta-suggest (embedding pipeline):**
+1. Load embeddings JSON {uri → {"lexical": array}} for source and master
+2. Build NumPy matrices → `rosetta.core.similarity.rank_suggestions()` (cosine similarity, top-k)
+3. Wrap in `SuggestionReport` Pydantic model → JSON stdout
 
 ## Key Abstractions
 
-**RDF Graph (rdflib.Graph):**
-- Purpose: Canonical in-memory representation of all semantic data
-- Examples: `rosetta/cli/lint.py:96-100`, `rosetta/core/rdf_utils.py:49`
-- Contract: All graphs bound with standard namespaces via `bind_namespaces()`
+**FieldRecord (`core/parsers/_types.py`):**
+- Purpose: Normalized field representation before RDF conversion
+- Contract: All parsers return `list[FieldRecord]`; consistent keys across formats
 
-**Config Precedence (3-tier):**
-- Purpose: Allow runtime override of settings from rosetta.toml
-- Examples: `rosetta/core/config.py:37-67`, `rosetta/cli/embed.py:23-25`
-- Contract: CLI value beats env var (ROSETTA_SECTION_KEY) beats config file
+**rdflib.Graph:**
+- Purpose: Universal in-memory representation for all semantic data
+- Contract: Always bind namespaces via `bind_namespaces()`; use broad `rdflib.term.Node | None` at function boundaries
 
-**SPARQL Queries (parameterized):**
-- Purpose: Extract entities and relationships from RDF without hard-coding triple patterns
-- Examples: `rosetta/cli/lint.py:30-60`, `rosetta/core/embedding.py:11-33`
-- Contract: Return typed rdflib terms; use None-guards for OPTIONAL results
+**Pydantic output models (`core/models.py`):**
+- Purpose: Type-safe JSON output for lint (`LintReport`), suggest (`SuggestionReport`), embed (`EmbeddingReport`)
+- Contract: Construct in CLI layer; serialize via `model.model_dump(mode="json")` before `json.dumps()`
+
+**Config precedence (`core/config.py`):**
+- Purpose: Allow runtime override of rosetta.toml settings
+- Contract: CLI flag > env var (ROSETTA_SECTION_KEY) > config file
 
 ## Entry Points
-**rosetta-ingest:** `rosetta/cli/ingest.py:cli` — Load national schema TTL → store RDF
-**rosetta-embed:** `rosetta/cli/embed.py:cli` — Extract text from RDF → LaBSE embeddings JSON
-**rosetta-suggest:** `rosetta/cli/suggest.py:cli` — Compare embeddings → ranked candidates JSON
-**rosetta-lint:** `rosetta/cli/lint.py:cli` — Validate units/datatypes against master → findings JSON
-**rosetta-validate:** `rosetta/cli/validate.py:cli` — SHACL shape validation
-**rosetta-rml-gen:** `rosetta/cli/rml_gen.py:cli` — Generate RML mappings
-**rosetta-provenance:** `rosetta/cli/provenance.py:cli` — Track mapping provenance
-**rosetta-accredit:** `rosetta/cli/accredit.py:cli` — Accredit mapping quality
+**rosetta-ingest:** `rosetta/cli/ingest.py:cli` — parse national schema → RDF Turtle
+**rosetta-embed:** `rosetta/cli/embed.py:cli` — extract RDF field labels → LaBSE embeddings JSON
+**rosetta-suggest:** `rosetta/cli/suggest.py:cli` — cosine similarity → ranked mapping candidates JSON
+**rosetta-lint:** `rosetta/cli/lint.py:cli` — unit/datatype semantic lint → LintReport JSON
+**rosetta-validate:** `rosetta/cli/validate.py:cli` — SHACL shape validation → exit code
+**rosetta-rml-gen:** `rosetta/cli/rml_gen.py:cli` — generate RML mapping rules
+**rosetta-provenance:** `rosetta/cli/provenance.py:cli` — stamp/query mapping provenance
+**rosetta-accredit:** `rosetta/cli/accredit.py:cli` — manage accreditation state machine
 
 ## Error Handling
-**Strategy:** Unix convention — exit 0 on success, 1 on errors
-- CLI layer wraps core logic in try/except, logs to stderr via click.echo(..., err=True)
-- Core layer raises ValueError with human-readable message; no exception recovery
-- RDF parsing failures: wrap rdflib exceptions in ValueError with source label
-- Missing SPARQL results: return None, caller decides if error or info
+**Strategy:** Unix convention — exit 0 on success, 1 on errors/violations
+- CLI wraps core logic in `try/except Exception as e: click.echo(str(e), err=True); sys.exit(1)`
+- Core raises `ValueError` with human-readable message; no internal recovery
+- SHACL violations: exit 1 without exception; findings written to output before exit
+- Missing SPARQL OPTIONAL results: return `None`; caller decides if error or info
 
 ---
 *Architecture analysis: 2026-04-13*

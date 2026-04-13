@@ -3,45 +3,60 @@
 **Analysis Date:** 2026-04-13
 
 ## Test Framework
-**Runner:** pytest 9.0.3+ (from `pyproject.toml` dev dependencies)
-**Config:** `.pytest.ini_options` in `pyproject.toml` (line 39); marker for `slow` tests available
+**Runner:** pytest 9.0.3+ (dev dependency in `pyproject.toml`)
 **Run Commands:**
 ```bash
-uv run pytest               # all tests
-uv run pytest -k name      # filter by name
-uv run pytest -m "not slow"  # exclude slow tests
+uv run pytest                # all tests
+uv run pytest -m "not slow"  # fast tests (CI regression guard)
+uv run pytest -k test_name   # filter by name
 ```
 
 ## Test File Organization
-**Location:** `rosetta/tests/` — one test file per core module
-**Naming:** `test_<module>.py` (e.g., `test_lint.py`, `test_ingest.py`, `test_embed.py`)
-**Fixtures:** Stored in `rosetta/tests/fixtures/` (CSV, JSON, YAML test data files)
+**Location:** `rosetta/tests/` — one file per tool/module
+**Naming:** `test_<module>.py` (e.g., `test_lint.py`, `test_accredit.py`, `test_ingest.py`)
+**Stub tests:** Put `test_<tool>_stub_exits_1` in the tool's own test file — not in an unrelated file.
 
 ## Test Structure
-**Patterns:** Pure pytest with descriptive test names starting with `test_`; no BDD frameworks
-**Fixtures:** `@pytest.fixture` for shared setup — module-scoped fixtures (e.g., `qudt_graph`) load once per file
-**Parametrize:** Use `@pytest.mark.parametrize()` for multiple test cases (e.g., unit detection patterns in `test_ingest.py` line 84)
+**Pattern:** Plain pytest functions with descriptive names — `test_submit_creates_pending`, `test_approve_wrong_state_raises`
+**Return types:** All test functions annotated `-> None`
+**Assertions:** Direct `assert` statements; use `pytest.raises(ValueError, match="pattern")` for error paths
+**Sections:** Group related tests with comment banners (`# --- Section 1 ---`)
+
+## Fixtures
+**Shared fixtures:** `rosetta/tests/conftest.py` — `tmp_graph`, `sample_ttl`, `config_dir`
+**Local fixtures:** Defined in test file when module-scoped (e.g., `qudt_graph` in `test_lint.py` loads QUDT once per module via `scope="module"`)
+**tmp_path:** Use pytest's built-in `tmp_path: Path` for CLI tests that write output files
 
 ## Mocking
-**Framework:** `unittest.mock` (standard library); `monkeypatch` (pytest built-in)
-**Pattern:** Use `monkeypatch.setattr()` for module-level replacements (e.g., mocking `SentenceTransformer` in `test_embed.py` line 26)
+**Framework:** `monkeypatch` (pytest built-in) for module-level replacements
+**Pattern:** `monkeypatch.setattr("rosetta.core.embedding.SentenceTransformer", MockTransformer)`
 
-## Fixtures and Factories
-**Location:** `rosetta/tests/fixtures/` contains:
-- `nor_radar.csv` — 11 fields with unit metadata
-- `deu_patriot.json` — JSON schema with 9 fields
+## CLI Testing
+**Pattern:** `from click.testing import CliRunner` — invoke CLI in-process
+```python
+runner = CliRunner()
+result = runner.invoke(cli, ["--input", str(path), "--nation", "NOR"])
+assert result.exit_code == 0, result.output
+```
+**JSON output:** Parse with `json.loads(result.output)` then assert fields
+**RDF output:** Parse with `Graph().parse(data=result.output, format="turtle")` then query
+
+## Fixtures and Test Data
+**Location:** `rosetta/tests/fixtures/`
+**Contents:**
+- `nor_radar.csv` — 11 fields with unit metadata (CSV format)
+- `deu_patriot.json` — 9-field JSON schema
 - `usa_c2.yaml` — OpenAPI spec with 9 fields
-
-**Test data creation:** Inline TOML/TTL strings in test functions (see `test_lint.py` lines 117–201 for RDF test data)
-**Temporary files:** Use `tmp_path` fixture for CLI tests that write output
+**Inline data:** Turtle/TOML strings constructed inline for lint/validate tests; use `tmp_path` to write them
 
 ## Coverage
-**Requirements:** No coverage enforcement; `pytest-cov>=4.1` available but not enforced
+**Requirements:** No enforced threshold. `pytest-cov>=4.1` available but not required in CI.
+**Markers:** `@pytest.mark.slow` for expensive tests (model loading); deselect with `-m "not slow"`.
 
-## Test Types
-**Unit:** Core logic tests (e.g., unit detection, QUDT dimension vectors) — see `test_lint.py` lines 32–105
-**Integration:** CLI tests using `CliRunner` from click.testing; invoke CLI with temp files and assert exit codes + output (see `test_lint.py` lines 204–443)
-**CLI tests:** Pattern: create temp fixtures, invoke with `runner.invoke(cli, args)`, parse JSON/Turtle output, assert exit code (0 for success, 1 for errors/blocks)
+## Type Annotations in Tests
+**Policy:** Annotate fixture return types and non-obvious variables (basic pyright mode).
+**Suppression:** Use `# pyright: ignore[reportArgumentType]` — not `# type: ignore[arg-type]`.
+**rdflib SPARQL:** `# pyright: ignore[reportAttributeAccessIssue]` at every row attribute access.
 
 ---
 *Testing analysis: 2026-04-13*
