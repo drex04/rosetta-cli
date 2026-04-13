@@ -1,0 +1,35 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix rose: <http://rosetta.interop/ns/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# Every rose:Field must have rdfs:label (string) and rose:dataType
+rose:FieldShape
+    a sh:NodeShape ;
+    sh:targetClass rose:Field ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:minCount 1 ;
+        sh:datatype xsd:string ;
+        sh:message "rose:Field must have an rdfs:label of type xsd:string." ;
+    ] ;
+    sh:property [
+        sh:path rose:dataType ;
+        sh:minCount 1 ;
+        sh:message "rose:Field must declare rose:dataType." ;
+    ] .
+
+# Every rose:Mapping must link source and target
+rose:MappingShape
+    a sh:NodeShape ;
+    sh:targetClass rose:Mapping ;
+    sh:property [
+        sh:path rose:sourceField ;
+        sh:minCount 1 ;
+        sh:message "rose:Mapping must have rose:sourceField." ;
+    ] ;
+    sh:property [
+        sh:path rose:targetField ;
+        sh:minCount 1 ;
+        sh:message "rose:Mapping must have rose:targetField." ;
+    ] .

@@ -78,3 +78,26 @@ class ProvenanceRecord(BaseModel):
     started_at: str  # ISO 8601 datetime string
     ended_at: str  # ISO 8601 datetime string
     version: int  # current rose:version of the artifact at query time
+
+
+# --- Validate ---
+
+
+class ValidationFinding(BaseModel):
+    focus_node: str
+    severity: Literal["Violation", "Warning", "Info"]
+    constraint: str
+    source_shape: str | None = None
+    message: str | None = None  # sh:resultMessage is optional per SHACL spec
+
+
+class ValidationSummary(BaseModel):
+    violation: int
+    warning: int
+    info: int
+    conforms: bool
+
+
+class ValidationReport(BaseModel):
+    findings: list[ValidationFinding]
+    summary: ValidationSummary

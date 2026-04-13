@@ -409,13 +409,11 @@ components:
 # ---------------------------------------------------------------------------
 
 
-def test_validate_stub_exits_1():
-    """rosetta-validate stub exits with code 1 (not implemented)."""
+def test_validate_cli_requires_data():
+    """rosetta-validate exits non-zero when --data is missing."""
     runner = CliRunner()
     result = runner.invoke(validate_cli, [])
-    assert result.exit_code == 1
-    out = result.output.lower()
-    assert "not yet implemented" in out or "not implemented" in out
+    assert result.exit_code != 0
 
 
 def test_provenance_cli_shows_help():
