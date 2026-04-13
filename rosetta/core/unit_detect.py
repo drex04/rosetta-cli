@@ -16,7 +16,7 @@ _NAME_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?:^|_)km$", re.IGNORECASE), "kilometer"),
     (re.compile(r"(?:^|_)ft$", re.IGNORECASE), "foot"),
     (re.compile(r"(?:^|_)kts$", re.IGNORECASE), "knot"),
-    (re.compile(r"(?:^|_)(?:deg|grader)$", re.IGNORECASE), "degree"),
+    (re.compile(r"(?:^|_)(?:deg|grad|grader)$", re.IGNORECASE), "degree"),
     (re.compile(r"(?:^|_)dbm$", re.IGNORECASE), "dBm"),
 ]
 

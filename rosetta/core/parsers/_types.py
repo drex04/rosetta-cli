@@ -17,6 +17,7 @@ class FieldSchema:
     sample_values: list[str | float | int | bool | None] = field(default_factory=list)
     numeric_stats: dict[str, Any] | None = None  # populated by compute_stats()
     categorical_stats: dict[str, Any] | None = None  # populated by compute_stats()
+    children: list[FieldSchema] = field(default_factory=list)
 
 
 def schema_slug(title: str) -> str:

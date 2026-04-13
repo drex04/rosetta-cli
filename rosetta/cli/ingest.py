@@ -44,7 +44,9 @@ from rosetta.core.rdf_utils import save_graph
     "--input-format",
     "input_fmt",
     default=None,
-    type=click.Choice(["csv", "json-schema", "openapi"], case_sensitive=False),
+    type=click.Choice(
+        ["csv", "json-schema", "openapi", "xsd", "json-sample"], case_sensitive=False
+    ),
     help="Input format (auto-detected from extension if omitted).",
 )
 @click.option("--nation", "-n", required=True, help="Nation code (e.g. NOR, DEU, USA). Required.")

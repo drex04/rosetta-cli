@@ -27,7 +27,8 @@ def dispatch_parser(
     if fmt is None:
         if path is None:
             raise ValueError(
-                "Cannot auto-detect format from stdin; use --input-format {csv,json-schema,openapi}"
+                "Cannot auto-detect format from stdin; "
+                "use --input-format {csv,json-schema,openapi,xsd,json-sample}"
             )
         ext = path.suffix.lower()
         if ext == ".csv":
@@ -36,10 +37,12 @@ def dispatch_parser(
             fmt = "json-schema"
         elif ext in (".yaml", ".yml"):
             fmt = "openapi"
+        elif ext == ".xsd":
+            fmt = "xsd"
         else:
             raise ValueError(
                 f"Cannot auto-detect format from extension '{ext}';"
-                " use --input-format {csv,json-schema,openapi}"
+                " use --input-format {csv,json-schema,openapi,xsd,json-sample}"
             )
 
     if fmt == "csv":
@@ -54,5 +57,15 @@ def dispatch_parser(
         from rosetta.core.parsers.openapi_parser import parse_openapi
 
         return parse_openapi(src, path, nation)
+    elif fmt == "xsd":
+        from rosetta.core.parsers.xsd_parser import parse_xsd
+
+        return parse_xsd(src, path, nation)
+    elif fmt == "json-sample":
+        from rosetta.core.parsers.json_sample_parser import parse_json_sample
+
+        return parse_json_sample(src, path, nation, max_sample_rows)
     else:
-        raise ValueError(f"Unknown input format: {fmt!r}. Use csv, json-schema, or openapi.")
+        raise ValueError(
+            f"Unknown input format: {fmt!r}. Use csv, json-schema, openapi, xsd, or json-sample."
+        )

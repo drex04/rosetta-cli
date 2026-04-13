@@ -18,11 +18,22 @@ All tools are available via `uv run <tool>` after syncing.
 
 Parses a national schema file and emits an RDF graph (Turtle by default). Input format is auto-detected from the file extension.
 
-| Extension | Format |
-|-----------|--------|
-| `.csv` | CSV with statistical annotations |
-| `.json` | JSON Schema |
-| `.yaml` / `.yml` | OpenAPI 3.x |
+#### Supported formats
+
+| Extension / `--input-format` | Format | Notes |
+|------------------------------|--------|-------|
+| `.csv` | CSV with statistical annotations | Auto-detected |
+| `.json` / `json-schema` | JSON Schema | Auto-detected from `.json` |
+| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x | Auto-detected |
+| `.xsd` / `xsd` | XML Schema | Auto-detected |
+| `json-sample` | JSON sample data | **Must pass `--input-format json-sample`** — no extension auto-detect |
+
+**json-sample** accepts three input shapes:
+- Top-level array: `[{"field": value, ...}, ...]`
+- Flat object (treated as single-row sample): `{"field": value, ...}`
+- Single-key envelope: `{"key": [{"field": value, ...}, ...]}`
+
+Nested objects are preserved as `rose:hasChild` relationships in the Turtle output. Leaf field statistics (count, min, max, mean, stddev, histogram) are computed from the actual sample values.
 
 ```
 Usage: rosetta-ingest [OPTIONS]
@@ -31,9 +42,9 @@ Options:
   -i, --input PATH         Input file (default: stdin)
   -o, --output PATH        Output file (default: stdout)
   -f, --format TEXT        Output RDF serialization: turtle, nt  [default: turtle]
-  --input-format TEXT      Force input format: csv, json-schema, openapi
+  --input-format TEXT      Force input format: csv, json-schema, openapi, xsd, json-sample
   -n, --nation TEXT        Nation code (e.g. NOR, DEU, USA)  [required]
-  --max-sample-rows INT    Max CSV rows for statistics  [default: 1000]
+  --max-sample-rows INT    Max rows read from sample for statistics  [default: 1000]
   -c, --config PATH        Path to rosetta.toml
 ```
 
@@ -43,6 +54,7 @@ Options:
 uv run rosetta-ingest -i rosetta/tests/fixtures/nor_radar.csv    -n NOR -o nor.ttl
 uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot.json -n DEU -o deu.ttl
 uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml      -n USA -o usa.ttl
+uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot_sample.json -n DEU --input-format json-sample -o deu_sample.ttl
 ```
 
 **Exit codes:** 0 on success, 1 on parse or I/O error.
