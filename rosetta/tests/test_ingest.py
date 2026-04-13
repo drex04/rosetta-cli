@@ -418,13 +418,12 @@ def test_validate_stub_exits_1():
     assert "not yet implemented" in out or "not implemented" in out
 
 
-def test_provenance_stub_exits_1():
-    """rosetta-provenance stub exits with code 1 (not implemented)."""
+def test_provenance_cli_shows_help():
+    """rosetta-provenance CLI group shows help when invoked with no subcommand."""
     runner = CliRunner()
-    result = runner.invoke(provenance_cli, [])
-    assert result.exit_code == 1
-    out = result.output.lower()
-    assert "not yet implemented" in out or "not implemented" in out
+    result = runner.invoke(provenance_cli, ["--help"])
+    assert result.exit_code == 0
+    assert "stamp" in result.output or "query" in result.output
 
 
 def test_rml_gen_stub_exits_1():

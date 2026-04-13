@@ -66,3 +66,15 @@ class EmbeddingVectors(BaseModel):
 
 class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
     pass
+
+
+# --- Provenance ---
+
+
+class ProvenanceRecord(BaseModel):
+    activity_uri: str
+    agent_uri: str
+    label: str | None = None
+    started_at: str  # ISO 8601 datetime string
+    ended_at: str  # ISO 8601 datetime string
+    version: int  # current rose:version of the artifact at query time
