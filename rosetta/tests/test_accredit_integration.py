@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.accredit import cli as accredit_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.accredit import (
     approve_mapping,
