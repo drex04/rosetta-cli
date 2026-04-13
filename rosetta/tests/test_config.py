@@ -8,9 +8,7 @@ from rosetta.core.config import get_config_value, load_config
 def test_load_config(tmp_path):
     """load_config reads a valid rosetta.toml and returns the parsed dict."""
     toml_file = tmp_path / "rosetta.toml"
-    toml_file.write_text(
-        '[embed]\nmodel = "sentence-transformers/LaBSE"\nmode = "lexical-only"\n'
-    )
+    toml_file.write_text('[embed]\nmodel = "sentence-transformers/LaBSE"\nmode = "lexical-only"\n')
     config = load_config(toml_file)
     assert config["embed"]["model"] == "sentence-transformers/LaBSE"
     assert config["embed"]["mode"] == "lexical-only"

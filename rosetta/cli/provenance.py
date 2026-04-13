@@ -1,4 +1,5 @@
 """rosetta-provenance: Record and query provenance metadata."""
+
 import sys
 
 import click

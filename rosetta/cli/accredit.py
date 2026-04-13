@@ -1,4 +1,5 @@
 """rosetta-accredit: Accredit mappings for operational use."""
+
 import sys
 
 import click

@@ -1,4 +1,5 @@
 """rosetta-rml-gen: Generate RML mapping documents."""
+
 import sys
 
 import click

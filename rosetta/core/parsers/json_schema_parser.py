@@ -6,7 +6,7 @@ import warnings
 from pathlib import Path
 from typing import TextIO
 
-from rosetta.core.parsers import FieldSchema, schema_slug
+from rosetta.core.parsers._types import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
 
 
@@ -70,24 +70,22 @@ def parse_json_schema(src: TextIO, path: Path | None, nation: str) -> tuple[list
         is_required = name in required_fields
 
         # Collect sample values from top-level examples only
-        sample_values = [
-            ex[name]
-            for ex in top_examples
-            if isinstance(ex, dict) and name in ex
-        ]
+        sample_values = [ex[name] for ex in top_examples if isinstance(ex, dict) and name in ex]
 
         detected_unit = detect_unit(name, description)
         numeric_stats, categorical_stats = compute_stats(sample_values)
 
-        fields.append(FieldSchema(
-            name=name,
-            data_type=data_type,
-            description=description,
-            required=is_required,
-            detected_unit=detected_unit,
-            sample_values=sample_values,
-            numeric_stats=numeric_stats,
-            categorical_stats=categorical_stats,
-        ))
+        fields.append(
+            FieldSchema(
+                name=name,
+                data_type=data_type,
+                description=description,
+                required=is_required,
+                detected_unit=detected_unit,
+                sample_values=sample_values,
+                numeric_stats=numeric_stats,
+                categorical_stats=categorical_stats,
+            )
+        )
 
     return fields, slug

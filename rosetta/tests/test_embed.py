@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
 import numpy as np
 import pytest
-from pathlib import Path
 from click.testing import CliRunner
-from rdflib import Graph, Namespace, RDF, RDFS, Literal, URIRef
+from rdflib import RDF, RDFS, Graph, Literal, Namespace, URIRef
 
 ROSE = Namespace("http://rosetta.interop/ns/")
 
 # ---------------------------------------------------------------------------
 # Shared fake model + fixture
 # ---------------------------------------------------------------------------
+
 
 class _FakeModel:
     def encode(self, texts):
@@ -23,12 +25,14 @@ class _FakeModel:
 @pytest.fixture
 def mock_sentence_transformer(monkeypatch):
     import sentence_transformers
+
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: _FakeModel())
 
 
 # ---------------------------------------------------------------------------
 # Unit tests (no CLI runner)
 # ---------------------------------------------------------------------------
+
 
 def test_extract_national_fields():
     """extract_text_inputs returns 2 pairs for a graph with 2 rose:Field nodes."""
@@ -101,6 +105,7 @@ def test_embedding_model_encode_shape(mock_sentence_transformer):
 
 class _FakeModelCapture:
     """Fake model that captures the texts passed to encode."""
+
     def __init__(self):
         self.last_texts = None
 
@@ -111,8 +116,9 @@ class _FakeModelCapture:
 
 def test_encode_query_e5_prefix(monkeypatch):
     """encode_query applies 'query: ' prefix for E5 models."""
-    from rosetta.core.embedding import EmbeddingModel
     import sentence_transformers
+
+    from rosetta.core.embedding import EmbeddingModel
 
     fake = _FakeModelCapture()
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
@@ -125,8 +131,9 @@ def test_encode_query_e5_prefix(monkeypatch):
 
 def test_encode_passage_e5_prefix(monkeypatch):
     """encode applies 'passage: ' prefix for E5 models."""
-    from rosetta.core.embedding import EmbeddingModel
     import sentence_transformers
+
+    from rosetta.core.embedding import EmbeddingModel
 
     fake = _FakeModelCapture()
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
@@ -139,8 +146,9 @@ def test_encode_passage_e5_prefix(monkeypatch):
 
 def test_encode_query_non_e5_no_prefix(monkeypatch):
     """encode_query does NOT apply prefix for non-E5 models."""
-    from rosetta.core.embedding import EmbeddingModel
     import sentence_transformers
+
+    from rosetta.core.embedding import EmbeddingModel
 
     fake = _FakeModelCapture()
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
@@ -154,6 +162,7 @@ def test_encode_query_non_e5_no_prefix(monkeypatch):
 # ---------------------------------------------------------------------------
 # CLI tests
 # ---------------------------------------------------------------------------
+
 
 def _make_national_ttl(n: int = 3) -> str:
     """Return Turtle source with *n* rose:Field nodes."""
@@ -263,11 +272,17 @@ def test_embed_cli_real_model_master_ttl():
 
     runner = CliRunner()
     with runner.isolated_filesystem():
-        result = runner.invoke(cli, [
-            "--input", str(MASTER_TTL),
-            "--output", "out.json",
-            "--model", "sentence-transformers/all-MiniLM-L6-v2",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--input",
+                str(MASTER_TTL),
+                "--output",
+                "out.json",
+                "--model",
+                "sentence-transformers/all-MiniLM-L6-v2",
+            ],
+        )
         assert result.exit_code == 0
         data = json.loads(Path("out.json").read_text())
         assert len(data) > 0

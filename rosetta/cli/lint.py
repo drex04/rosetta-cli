@@ -1,29 +1,35 @@
 """rosetta-lint: Validate unit and datatype compatibility in field mappings."""
+
 import json
 import sys
-from pathlib import Path
+from typing import Any
 
 import click
 import rdflib
+from rdflib.namespace import XSD
+from rdflib.term import Node
 
 from rosetta.core.io import open_output
 from rosetta.core.units import (
     UNIT_STRING_TO_IRI,
     expand_unit_iri,
     load_qudt_graph,
-    units_compatible,
     suggest_fnml,
+    units_compatible,
 )
 
 ROSE = rdflib.Namespace("http://rosetta.interop/ns/")
 QUDT = rdflib.Namespace("http://qudt.org/schema/qudt/")
-XSD  = rdflib.namespace.XSD
-RDFS = rdflib.namespace.RDFS
 
 # XSD numeric types — mismatch against xsd:string triggers datatype_mismatch WARNING
 _NUMERIC_XSD = {
-    str(XSD.integer), str(XSD.int), str(XSD.float), str(XSD.double),
-    str(XSD.decimal), str(XSD.long), str(XSD.short),
+    str(XSD.integer),
+    str(XSD.int),
+    str(XSD.float),
+    str(XSD.double),
+    str(XSD.decimal),
+    str(XSD.long),
+    str(XSD.short),
 }
 _STRING_XSD = {str(XSD.string)}
 
@@ -63,32 +69,44 @@ LIMIT 1
 def _sparql_one(
     graph: rdflib.Graph,
     query: str,
-    bindings: dict | None = None,
-) -> rdflib.term.Node | None:
+    bindings: dict[str, Any] | None = None,
+) -> Node | None:
     """Run a SPARQL SELECT returning one row/one var; return that value or None."""
     results = list(graph.query(query, initBindings=bindings or {}))
     if not results:
         return None
     row = results[0]
-    return row[0] if row[0] is not None else None
+    val = row[0]  # pyright: ignore[reportIndexIssue]
+    return val if val is not None else None
 
 
 @click.command()
-@click.option("--source", required=True, type=click.Path(exists=True),
-              help="National schema RDF (Turtle).")
-@click.option("--master", required=True, type=click.Path(exists=True),
-              help="Master ontology RDF (Turtle).")
-@click.option("--suggestions", required=True, type=click.Path(exists=True),
-              help="Suggestions JSON from rosetta-suggest.")
-@click.option("--output", default=None, type=click.Path(),
-              help="Output file (default: stdout).")
-@click.option("--strict", is_flag=True, default=False,
-              help="Treat WARNINGs as BLOCKs.")
-@click.option("--config", default="rosetta.toml", show_default=True,
-              help="Path to rosetta.toml.")
-def cli(source, master, suggestions, output, strict, config):
+@click.option(
+    "--source", required=True, type=click.Path(exists=True), help="National schema RDF (Turtle)."
+)
+@click.option(
+    "--master", required=True, type=click.Path(exists=True), help="Master ontology RDF (Turtle)."
+)
+@click.option(
+    "--suggestions",
+    required=True,
+    type=click.Path(exists=True),
+    help="Suggestions JSON from rosetta-suggest.",
+)
+@click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout).")
+@click.option("--strict", is_flag=True, default=False, help="Treat WARNINGs as BLOCKs.")
+@click.option("--config", default="rosetta.toml", show_default=True, help="Path to rosetta.toml.")
+def cli(  # noqa: E501
+    source: str,
+    master: str,
+    suggestions: str,
+    output: str | None,
+    strict: bool,
+    config: str,
+) -> None:
     """Lint mapping files against SHACL shapes and policy rules."""
-    findings: list[dict] = []  # initialised here so exit-code line after except can see it
+    # initialised here so exit-code line after except can see it
+    findings: list[dict[str, Any]] = []
 
     try:
         # 1. Load source TTL
@@ -100,8 +118,8 @@ def cli(source, master, suggestions, output, strict, config):
         mst_graph.parse(master, format="turtle")
 
         # 3. Load suggestions JSON
-        with open(suggestions, "r", encoding="utf-8") as fh:
-            data: dict = json.load(fh)
+        with open(suggestions, encoding="utf-8") as fh:
+            data: dict[str, Any] = json.load(fh)
 
         # 4. Load QUDT + FnML policy graph
         qudt_graph = load_qudt_graph()
@@ -110,16 +128,18 @@ def cli(source, master, suggestions, output, strict, config):
         for src_uri, entry in data.items():
             # Issue 1: guard against malformed suggestion entries
             if not isinstance(entry, dict):
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "parse_error",
-                    "source_field": src_uri,
-                    "target_field": None,
-                    "source_unit": None,
-                    "target_unit": None,
-                    "message": f"Suggestions entry for '{src_uri}' is not a dict; skipping.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "parse_error",
+                        "source_field": src_uri,
+                        "target_field": None,
+                        "source_unit": None,
+                        "target_unit": None,
+                        "message": f"Suggestions entry for '{src_uri}' is not a dict; skipping.",
+                        "fnml_suggestion": None,
+                    }
+                )
                 continue
 
             sug_list = entry.get("suggestions", [])
@@ -128,16 +148,18 @@ def cli(source, master, suggestions, output, strict, config):
 
             top = sug_list[0]
             if not isinstance(top, dict):
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "parse_error",
-                    "source_field": src_uri,
-                    "target_field": None,
-                    "source_unit": None,
-                    "target_unit": None,
-                    "message": f"First suggestion entry for '{src_uri}' is not a dict; skipping.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "parse_error",
+                        "source_field": src_uri,
+                        "target_field": None,
+                        "source_unit": None,
+                        "target_unit": None,
+                        "message": f"First suggestion entry for '{src_uri}' is not a dict; skipping.",  # noqa: E501
+                        "fnml_suggestion": None,
+                    }
+                )
                 continue
 
             tgt_uri = top.get("uri", "")
@@ -151,16 +173,18 @@ def cli(source, master, suggestions, output, strict, config):
             unit_str = str(unit_node) if unit_node is not None else None
 
             if unit_str is None or unit_str not in UNIT_STRING_TO_IRI:
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "unit_not_detected",
-                    "source_field": src_uri,
-                    "target_field": tgt_uri,
-                    "source_unit": unit_str,
-                    "target_unit": None,
-                    "message": f"No detectable unit on source field '{src_uri}'.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "unit_not_detected",
+                        "source_field": src_uri,
+                        "target_field": tgt_uri,
+                        "source_unit": unit_str,
+                        "target_unit": None,
+                        "message": f"No detectable unit on source field '{src_uri}'.",
+                        "fnml_suggestion": None,
+                    }
+                )
                 # Still run datatype check below — fall through after continue-skip
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
                 continue
@@ -168,34 +192,40 @@ def cli(source, master, suggestions, output, strict, config):
             src_iri = UNIT_STRING_TO_IRI[unit_str]
             if src_iri is None:
                 # Known unmappable unit (e.g. dBm)
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "unit_not_detected",
-                    "source_field": src_uri,
-                    "target_field": tgt_uri,
-                    "source_unit": unit_str,
-                    "target_unit": None,
-                    "message": f"Unit '{unit_str}' has no QUDT IRI mapping.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "unit_not_detected",
+                        "source_field": src_uri,
+                        "target_field": tgt_uri,
+                        "source_unit": unit_str,
+                        "target_unit": None,
+                        "message": f"Unit '{unit_str}' has no QUDT IRI mapping.",
+                        "fnml_suggestion": None,
+                    }
+                )
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
                 continue
 
             # ----------------------------------------------------------------
             # d. Unit check — master side
             # ----------------------------------------------------------------
-            tgt_unit_node = _sparql_one(mst_graph, _TGT_UNIT_QUERY, {"subject": rdflib.URIRef(tgt_uri)})
+            tgt_unit_node = _sparql_one(
+                mst_graph, _TGT_UNIT_QUERY, {"subject": rdflib.URIRef(tgt_uri)}
+            )
             if tgt_unit_node is None:
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "master_unit_missing",
-                    "source_field": src_uri,
-                    "target_field": tgt_uri,
-                    "source_unit": src_iri,
-                    "target_unit": None,
-                    "message": f"No qudt:unit on master field '{tgt_uri}'.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "master_unit_missing",
+                        "source_field": src_uri,
+                        "target_field": tgt_uri,
+                        "source_unit": src_iri,
+                        "target_unit": None,
+                        "message": f"No qudt:unit on master field '{tgt_uri}'.",
+                        "fnml_suggestion": None,
+                    }
+                )
                 _run_datatype_check(findings, src_graph, mst_graph, src_uri, tgt_uri)
                 continue
 
@@ -207,43 +237,49 @@ def cli(source, master, suggestions, output, strict, config):
             compat = units_compatible(src_iri, tgt_iri, qudt_graph)
 
             if compat is False:
-                findings.append({
-                    "severity": "BLOCK",
-                    "rule": "unit_dimension_mismatch",
-                    "source_field": src_uri,
-                    "target_field": tgt_uri,
-                    "source_unit": src_iri,
-                    "target_unit": tgt_iri,
-                    "message": "Incompatible unit dimensions.",
-                    "fnml_suggestion": None,
-                })
-            elif compat is True:
-                # Normalise both to full IRI for equality check
-                if expand_unit_iri(src_iri) != expand_unit_iri(tgt_iri):
-                    fnml = suggest_fnml(src_iri, tgt_iri, qudt_graph)
-                    findings.append({
-                        "severity": "WARNING",
-                        "rule": "unit_conversion_required",
+                findings.append(
+                    {
+                        "severity": "BLOCK",
+                        "rule": "unit_dimension_mismatch",
                         "source_field": src_uri,
                         "target_field": tgt_uri,
                         "source_unit": src_iri,
                         "target_unit": tgt_iri,
-                        "message": "Units are compatible but differ; conversion needed.",
-                        "fnml_suggestion": fnml,
-                    })
+                        "message": "Incompatible unit dimensions.",
+                        "fnml_suggestion": None,
+                    }
+                )
+            elif compat is True:
+                # Normalise both to full IRI for equality check
+                if expand_unit_iri(src_iri) != expand_unit_iri(tgt_iri):
+                    fnml = suggest_fnml(src_iri, tgt_iri, qudt_graph)
+                    findings.append(
+                        {
+                            "severity": "WARNING",
+                            "rule": "unit_conversion_required",
+                            "source_field": src_uri,
+                            "target_field": tgt_uri,
+                            "source_unit": src_iri,
+                            "target_unit": tgt_iri,
+                            "message": "Units are compatible but differ; conversion needed.",
+                            "fnml_suggestion": fnml,
+                        }
+                    )
                 # else: identical units — no finding
             else:
                 # compat is None → dimension vector missing
-                findings.append({
-                    "severity": "INFO",
-                    "rule": "unit_vector_missing",
-                    "source_field": src_uri,
-                    "target_field": tgt_uri,
-                    "source_unit": src_iri,
-                    "target_unit": tgt_iri,
-                    "message": "Dimension vector missing for one or both units.",
-                    "fnml_suggestion": None,
-                })
+                findings.append(
+                    {
+                        "severity": "INFO",
+                        "rule": "unit_vector_missing",
+                        "source_field": src_uri,
+                        "target_field": tgt_uri,
+                        "source_unit": src_iri,
+                        "target_unit": tgt_iri,
+                        "message": "Dimension vector missing for one or both units.",
+                        "fnml_suggestion": None,
+                    }
+                )
 
             # ----------------------------------------------------------------
             # f. Datatype check (always runs unless we already continued above)
@@ -289,7 +325,7 @@ def cli(source, master, suggestions, output, strict, config):
 
 
 def _run_datatype_check(
-    findings: list[dict],
+    findings: list[dict[str, Any]],
     src_graph: rdflib.Graph,
     mst_graph: rdflib.Graph,
     src_uri: str,
@@ -307,19 +343,21 @@ def _run_datatype_check(
     tgt_dt = str(tgt_dt_node)
 
     src_numeric = src_dt in _NUMERIC_XSD
-    src_string  = src_dt in _STRING_XSD
+    src_string = src_dt in _STRING_XSD
     tgt_numeric = tgt_dt in _NUMERIC_XSD
-    tgt_string  = tgt_dt in _STRING_XSD
+    tgt_string = tgt_dt in _STRING_XSD
 
     mismatch = (src_numeric and tgt_string) or (src_string and tgt_numeric)
     if mismatch:
-        findings.append({
-            "severity": "WARNING",
-            "rule": "datatype_mismatch",
-            "source_field": src_uri,
-            "target_field": tgt_uri,
-            "source_unit": None,
-            "target_unit": None,
-            "message": f"Datatype mismatch: source '{src_dt}' vs master '{tgt_dt}'.",
-            "fnml_suggestion": None,
-        })
+        findings.append(
+            {
+                "severity": "WARNING",
+                "rule": "datatype_mismatch",
+                "source_field": src_uri,
+                "target_field": tgt_uri,
+                "source_unit": None,
+                "target_unit": None,
+                "message": f"Datatype mismatch: source '{src_dt}' vs master '{tgt_dt}'.",
+                "fnml_suggestion": None,
+            }
+        )

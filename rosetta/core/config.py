@@ -9,9 +9,10 @@ from __future__ import annotations
 import os
 import tomllib
 from pathlib import Path
+from typing import Any
 
 
-def load_config(config_path: Path | None = None) -> dict:
+def load_config(config_path: Path | None = None) -> dict[str, Any]:
     """Load rosetta.toml from the given path or CWD/rosetta.toml.
 
     Returns an empty dict if the file is not found.
@@ -29,18 +30,16 @@ def load_config(config_path: Path | None = None) -> dict:
         with config_path.open("rb") as fh:
             return tomllib.load(fh)
     except tomllib.TOMLDecodeError as exc:
-        raise ValueError(
-            f"Failed to parse config file '{config_path}': {exc}"
-        ) from exc
+        raise ValueError(f"Failed to parse config file '{config_path}': {exc}") from exc
 
 
 def get_config_value(
-    config: dict,
+    config: dict[str, Any],
     section: str,
     key: str,
-    cli_value=None,
+    cli_value: Any | None = None,  # Click injects this
     env_prefix: str = "ROSETTA",
-):
+) -> Any:
     """Return a config value with 3-tier precedence (CLI > env var > config file).
 
     Args:

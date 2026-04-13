@@ -7,14 +7,18 @@ from pathlib import Path
 import click
 import numpy as np
 
-from rosetta.core.config import load_config, get_config_value
+from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.similarity import rank_suggestions
 
 
 @click.command()
-@click.option("--source", required=True, type=click.Path(exists=True), help="Source embeddings JSON")
-@click.option("--master", required=True, type=click.Path(exists=True), help="Master embeddings JSON")
+@click.option(
+    "--source", required=True, type=click.Path(exists=True), help="Source embeddings JSON"
+)
+@click.option(
+    "--master", required=True, type=click.Path(exists=True), help="Master embeddings JSON"
+)
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
 @click.option("--anomaly-threshold", default=None, type=float, help="Anomaly flag threshold")
@@ -24,7 +28,9 @@ def cli(source, master, top_k, min_score, anomaly_threshold, output, config):
     """Rank master ontology candidates for source schema fields."""
     cfg = load_config(config)
     resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)
-    resolved_min_score = float(get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0)
+    resolved_min_score = float(
+        get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
+    )
     resolved_anomaly_threshold = float(
         get_config_value(cfg, "suggest", "anomaly_threshold", cli_value=anomaly_threshold) or 0.3
     )
@@ -53,8 +59,13 @@ def cli(source, master, top_k, min_score, anomaly_threshold, output, config):
         B = np.array([master_emb[u]["lexical"] for u in master_uris], dtype=np.float32)
 
         result = rank_suggestions(
-            src_uris, A, master_uris, B,
-            resolved_top_k, resolved_min_score, resolved_anomaly_threshold,
+            src_uris,
+            A,
+            master_uris,
+            B,
+            resolved_top_k,
+            resolved_min_score,
+            resolved_anomaly_threshold,
         )
 
         with open_output(output) as fh:

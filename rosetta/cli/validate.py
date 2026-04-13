@@ -1,4 +1,5 @@
 """rosetta-validate: Validate RDF graphs against SHACL constraints."""
+
 import sys
 
 import click

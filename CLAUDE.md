@@ -45,3 +45,35 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - Roadmap: `.planning/ROADMAP.md`
 - Architecture decisions: `.planning/DECISIONS.md`
 - Full implementation plan: `PLAN.md`
+
+## Code Quality
+
+### Mandatory checks — run before every commit
+
+- `uv run ruff format .` — auto-format
+- `uv run ruff check .` — lint (rules: E, W, F, I, UP)
+- `uv run basedpyright` — static type check (strict: source, basic: tests)
+- `uv run pytest -m "not slow"` — regression guard
+
+CI enforces all four on every push/PR (`.github/workflows/ci.yml`).
+
+### Type annotation rules
+
+- All functions in `rosetta/core/` and `rosetta/cli/` must have explicit parameter and return annotations.
+- Use **broad rdflib types**: `rdflib.term.Node | None`, `rdflib.Graph` — do not narrow to `URIRef`/`Literal` at function boundaries.
+- Use `list[dict[str, Any]]` only for internal transient structures. User-facing JSON outputs must use Pydantic models (see below).
+- Tests are annotated (basic mode) — annotate fixture return types and non-obvious variables.
+
+### Pydantic models (rosetta/core/models.py)
+
+User-facing JSON outputs are typed via Pydantic v2:
+
+| Output | Model |
+|--------|-------|
+| `rosetta-lint` | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
+| `rosetta-suggest` | `SuggestionReport` (RootModel) |
+| `rosetta-embed` | `EmbeddingReport` (RootModel) |
+
+- Construct model instances in the CLI, not bare dicts.
+- Serialise with `model.model_dump(mode="json")` before `json.dumps()`.
+- New structured outputs must define a model in `rosetta/core/models.py` first.

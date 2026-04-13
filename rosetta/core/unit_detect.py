@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-import math
 import re
 import statistics as _statistics
-
+from typing import Any
 
 # Each entry: (pattern, unit_string, apply_to_name, apply_to_description)
 # Order matters — more specific patterns must come before less specific ones.
@@ -51,8 +50,8 @@ def detect_unit(name: str, description: str) -> str | None:
 
 
 def compute_stats(
-    sample_values: list,
-) -> tuple[dict | None, dict | None]:
+    sample_values: list[Any],
+) -> tuple[dict[str, object] | None, dict[str, object] | None]:
     """Compute numeric or categorical statistics for a list of sample values.
 
     Returns:
@@ -104,7 +103,7 @@ def compute_stats(
             edges = [min_val] * 11
             counts = [len(numeric)] + [0] * 9
 
-        stats: dict = {
+        stats: dict[str, object] = {
             "count": total,
             "min": float(min_val),
             "max": float(max_val),
@@ -118,7 +117,7 @@ def compute_stats(
         return (stats, None)
     else:
         # Treat as categorical
-        cat_stats: dict = {
+        cat_stats: dict[str, object] = {
             "count": total,
             "distinct_count": len(set(str(v) for v in filtered)),
             "null_rate": float(null_rate),

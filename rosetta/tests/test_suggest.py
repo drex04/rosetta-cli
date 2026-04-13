@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
+
 import numpy as np
 import pytest
-from pathlib import Path
 from click.testing import CliRunner
 
 # ---------------------------------------------------------------------------
@@ -14,11 +14,11 @@ from click.testing import CliRunner
 
 SOURCE_EMB = {
     "http://rosetta.interop/field/NOR/nor_radar/hoyde_m": {"lexical": [1.0, 0.0, 0.0]},
-    "http://rosetta.interop/field/NOR/nor_radar/azimut":  {"lexical": [0.0, 1.0, 0.0]},
+    "http://rosetta.interop/field/NOR/nor_radar/azimut": {"lexical": [0.0, 1.0, 0.0]},
 }
 MASTER_EMB = {
     "http://rosetta.interop/master/attr/altitude": {"lexical": [0.9, 0.1, 0.0]},
-    "http://rosetta.interop/master/attr/bearing":  {"lexical": [0.1, 0.9, 0.0]},
+    "http://rosetta.interop/master/attr/bearing": {"lexical": [0.1, 0.9, 0.0]},
 }
 
 
@@ -39,6 +39,7 @@ def mst_file(tmp_path):
 # ---------------------------------------------------------------------------
 # Unit tests — cosine_matrix
 # ---------------------------------------------------------------------------
+
 
 def test_cosine_matrix_shape():
     """cosine_matrix returns shape (n, m) for inputs of shape (n, d) and (m, d)."""
@@ -93,6 +94,7 @@ def test_cosine_matrix_dim_mismatch():
 # ---------------------------------------------------------------------------
 # Unit tests — rank_suggestions
 # ---------------------------------------------------------------------------
+
 
 def test_rank_suggestions_order():
     """Highest score has rank 1."""
@@ -189,12 +191,8 @@ def test_rank_suggestions_anomaly_pre_filter():
     from rosetta.core.similarity import rank_suggestions
 
     src_uris = ["http://src/a"]
-    # Near-identical vectors: cosine ~0.99
-    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
     master_uris = ["http://m/a"]
-    B = np.array([[0.9999, 0.0001, 0.0]], dtype=np.float32)
 
-    # min_score=0.999 is higher than actual score (~0.9999... let's use 1.0 to be safe)
     # Use a vector that scores ~0.98 but min_score=0.999 excludes it
     A2 = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
     B2 = np.array([[0.98, 0.2, 0.0]], dtype=np.float32)  # score will be < 1.0
@@ -210,6 +208,7 @@ def test_rank_suggestions_anomaly_pre_filter():
 # CLI tests
 # ---------------------------------------------------------------------------
 
+
 def test_suggest_cli_basic(src_file, mst_file):
     """CLI with pre-baked JSON fixture exits 0, valid JSON output."""
     from rosetta.cli.suggest import cli
@@ -217,7 +216,8 @@ def test_suggest_cli_basic(src_file, mst_file):
     runner = CliRunner()
     result = runner.invoke(cli, ["--source", src_file, "--master", mst_file])
 
-    assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")
+    err_detail = result.output + (str(result.exception) if result.exception else "")
+    assert result.exit_code == 0, err_detail
     data = json.loads(result.output)
     for uri in SOURCE_EMB:
         assert uri in data
@@ -310,14 +310,22 @@ def test_suggest_cli_config_precedence(tmp_path):
     toml_cfg.write_text("[suggest]\ntop_k = 10\n")
 
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "--source", str(src),
-        "--master", str(mst),
-        "--config", str(toml_cfg),
-        "--top-k", "1",
-    ])
+    result = runner.invoke(
+        cli,
+        [
+            "--source",
+            str(src),
+            "--master",
+            str(mst),
+            "--config",
+            str(toml_cfg),
+            "--top-k",
+            "1",
+        ],
+    )
 
-    assert result.exit_code == 0, result.output + (str(result.exception) if result.exception else "")
+    err_detail = result.output + (str(result.exception) if result.exception else "")
+    assert result.exit_code == 0, err_detail
     data = json.loads(result.output)
     for uri in SOURCE_EMB:
         assert len(data[uri]["suggestions"]) <= 1
@@ -326,6 +334,7 @@ def test_suggest_cli_config_precedence(tmp_path):
 # ---------------------------------------------------------------------------
 # Regression: top-k with min_score must return up to top_k qualifying entries
 # ---------------------------------------------------------------------------
+
 
 def test_rank_suggestions_top_k_with_min_score_returns_all_qualifying():
     """top_k=3 with min_score filtering should still return 3 results when 3+ qualify.
@@ -344,13 +353,16 @@ def test_rank_suggestions_top_k_with_min_score_returns_all_qualifying():
         "http://m/d",  # score ~0.90
         "http://m/e",  # score ~0.85
     ]
-    B = np.array([
-        [0.0, 1.0, 0.0, 0.0, 0.0],  # a: orthogonal
-        [0.0, 0.0, 1.0, 0.0, 0.0],  # b: orthogonal
-        [0.95, 0.05, 0.0, 0.0, 0.0],  # c: high
-        [0.90, 0.10, 0.0, 0.0, 0.0],  # d: high
-        [0.85, 0.15, 0.0, 0.0, 0.0],  # e: high
-    ], dtype=np.float32)
+    B = np.array(
+        [
+            [0.0, 1.0, 0.0, 0.0, 0.0],  # a: orthogonal
+            [0.0, 0.0, 1.0, 0.0, 0.0],  # b: orthogonal
+            [0.95, 0.05, 0.0, 0.0, 0.0],  # c: high
+            [0.90, 0.10, 0.0, 0.0, 0.0],  # d: high
+            [0.85, 0.15, 0.0, 0.0, 0.0],  # e: high
+        ],
+        dtype=np.float32,
+    )
 
     result = rank_suggestions(src_uris, A, master_uris, B, top_k=3, min_score=0.5)
     suggestions = result["http://src/a"]["suggestions"]
