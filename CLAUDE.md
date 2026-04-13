@@ -77,3 +77,14 @@ User-facing JSON outputs are typed via Pydantic v2:
 - Construct model instances in the CLI, not bare dicts.
 - Serialise with `model.model_dump(mode="json")` before `json.dumps()`.
 - New structured outputs must define a model in `rosetta/core/models.py` first.
+- Define Pydantic models only after the underlying function return shape is finalized — or write a failing test first. Redesigning mid-phase is costly.
+
+## Gotchas
+
+- **Orchestrator plan naming:** After `/fh:auto`, check `.planning/phases/NN-*/` for files named `plan0N-*.md`. If present, rename to `NN-01-PLAN.md` — the orchestrator expects this exact format and will fail plan-work on every resume if it doesn't find it. *(learnings: 2026-04-13)*
+- **basedpyright in tests:** `# type: ignore[arg-type]` may not suppress errors in test files. Use `# pyright: ignore[reportArgumentType]` instead. *(learnings: 2026-04-13)*
+- **rdflib SPARQL boundaries:** `row.attribute` access on query results is untyped — use `# pyright: ignore[reportAttributeAccessIssue]` at every access point. Standard solution for untyped library integration. *(learnings: 2026-04-13)*
+
+## Conventions
+
+- **Stub tests belong in the tool's own test file** — don't put `test_<tool>_stub_exits_1` in `test_ingest.py`. When the real implementation lands, the stub test should be in the right file to update, not delete. *(learnings: 2026-04-13)*
