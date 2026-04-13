@@ -1,0 +1,29 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: uv run ruff format
+        types: [python]
+
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: uv run ruff check --fix
+        types: [python]
+
+      - id: basedpyright
+        name: basedpyright
+        language: system
+        entry: uv run basedpyright
+        pass_filenames: false
+        types: [python]
+
+      - id: pytest
+        name: pytest (not slow)
+        language: system
+        entry: uv run pytest -m "not slow"
+        pass_filenames: false
+        types: [python]
+        stages: [pre-push]
