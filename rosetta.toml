@@ -7,8 +7,12 @@ rose = "http://rosetta.interop/ns/"
 rose_stats = "http://rosetta.interop/ns/stats/"
 
 [embed]
-model = "sentence-transformers/LaBSE"
+model = "intfloat/e5-large-v2"
 mode = "lexical-only"
+
+[translate]
+# source_lang: "auto" = DeepL server-side detection; "EN" = passthrough
+source_lang = "auto"
 
 [suggest]
 top_k = 5

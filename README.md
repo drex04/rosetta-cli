@@ -49,11 +49,51 @@ uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml      -n USA -o usa.t
 
 ---
 
+### rosetta-translate
+
+Normalises non-English field labels to English via DeepL before embedding.
+
+**Synopsis**
+
+```bash
+rosetta-translate [OPTIONS]
+```
+
+**Options**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--input FILE`, `-i FILE` | `-` (stdin) | Turtle input file |
+| `--output FILE`, `-o FILE` | `-` (stdout) | Turtle output (English-normalised TTL) |
+| `--source-lang LANG` | `auto` | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
+| `--config FILE`, `-c FILE` | `rosetta.toml` | Config file path |
+
+**Requirements**
+
+Set `DEEPL_API_KEY` to your DeepL API key. For English-source schemas, use `--source-lang EN` to bypass DeepL entirely.
+
+**Pipeline example**
+
+```bash
+rosetta-ingest nor_radar.csv --nation NOR -o nor.ttl
+rosetta-translate nor.ttl nor_en.ttl --source-lang NO
+rosetta-embed nor_en.ttl nor_embeddings.json
+rosetta-suggest nor_embeddings.json master_embeddings.json -o suggestions.json
+```
+
+For English schemas, `--source-lang EN` keeps the pipeline uniform:
+
+```bash
+rosetta-translate eng_schema.ttl eng_schema_en.ttl --source-lang EN
+```
+
+---
+
 ### rosetta-embed
 
-Reads a Turtle file and computes LaBSE embeddings for every schema attribute. Outputs a JSON map of attribute URI → embedding vector.
+Reads a Turtle file and computes embeddings for every schema attribute. Outputs a JSON map of attribute URI → embedding vector.
 
-> **Note:** The first run downloads the LaBSE model (~900 MB) from HuggingFace. Subsequent runs use the local cache.
+> **Note:** The first run downloads the model (~1.2 GB) from HuggingFace. Subsequent runs use the local cache.
 
 ```
 Usage: rosetta-embed [OPTIONS]
@@ -62,7 +102,7 @@ Options:
   -i, --input PATH    Turtle input file  (default: stdin)
   -o, --output PATH   JSON output file   (default: stdout)
   --mode TEXT         Embedding mode  [default: lexical-only]
-  --model TEXT        Sentence-transformer model  [default: sentence-transformers/LaBSE]
+  --model TEXT        Sentence-transformer model  [default: intfloat/e5-large-v2]
   -c, --config PATH   Path to rosetta.toml
 ```
 
@@ -229,7 +269,7 @@ Usage: rosetta-rml-gen [OPTIONS]
 Options:
   --decisions PATH      Approved decisions JSON  [required]
   --source-file TEXT    Data file path to embed in rml:logicalSource (referenced, not read)  [required]
-  --source-format TEXT  Reference formulation: json, csv  [default: json]
+  --source-format [json|csv]  Reference formulation: json, csv  [default: json]
   --base-uri TEXT       Subject template base URI  [default: http://rosetta.interop/record]
   --output PATH         Output file  (default: stdout)
 ```
@@ -243,12 +283,14 @@ Options:
   },
   "http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
     "target_uri": "http://rosetta.interop/ns/master/speed",
-    "conversion_fn": "http://rosetta.interop/fn/knot-to-metre-per-second"
+    "field_ref": "speed_kn"
   }
 }
 ```
 
-`conversion_fn` is optional. Include it when `rosetta-lint` reports `unit_conversion_required` and provides an FnML suggestion — the generated Turtle will wrap that field in an `fnml:functionValue` block.
+`field_ref` is optional — defaults to the last path segment of the source URI. FnML unit-conversion support (`fnml_function`) is added in a later phase.
+
+**Subject field convention:** The generated `rr:subjectMap` uses `{base-uri}/{id}` as the subject template. Your source data must contain an `id` field (JSON key or CSV column) for RMLMapper to construct subject IRIs.
 
 **Example:**
 
@@ -412,7 +454,7 @@ store_path     = "store"
 default_format = "turtle"
 
 [embed]
-model = "sentence-transformers/LaBSE"
+model = "intfloat/e5-large-v2"
 mode  = "lexical-only"
 
 [suggest]

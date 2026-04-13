@@ -1,4 +1,4 @@
-"""rosetta-embed: Embed RDF schema attributes using LaBSE."""
+"""rosetta-embed: Embed RDF schema attributes using E5-large-v2."""
 
 import sys
 from pathlib import Path
@@ -30,7 +30,7 @@ from rosetta.core.rdf_utils import load_graph
     help="JSON output file (default: stdout).",
 )
 @click.option("--mode", default=None, help="Embedding mode (default: lexical-only).")
-@click.option("--model", default=None, help="Model name (default: sentence-transformers/LaBSE).")
+@click.option("--model", default=None, help="Model name (default: intfloat/e5-large-v2).")
 @click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
 def cli(
     input_path: str,
@@ -39,10 +39,10 @@ def cli(
     model: str | None,
     config: str | None,
 ) -> None:
-    """Embed RDF schema attributes using LaBSE."""
+    """Embed RDF schema attributes using E5-large-v2."""
     cfg = load_config(Path(config) if config is not None else None)
     resolved_model = (
-        get_config_value(cfg, "embed", "model", cli_value=model) or "sentence-transformers/LaBSE"
+        get_config_value(cfg, "embed", "model", cli_value=model) or "intfloat/e5-large-v2"
     )
     resolved_mode = get_config_value(cfg, "embed", "mode", cli_value=mode) or "lexical-only"
 

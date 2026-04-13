@@ -11,6 +11,7 @@ dependencies = [
     "sentence-transformers>=3.0",
     "numpy>=1.26",
     "pydantic>=2.13.0",
+    "deepl>=1.18,<2",
 ]
 
 [project.scripts]
@@ -22,6 +23,7 @@ rosetta-validate   = "rosetta.cli.validate:cli"
 rosetta-rml-gen    = "rosetta.cli.rml_gen:cli"
 rosetta-provenance = "rosetta.cli.provenance:cli"
 rosetta-accredit   = "rosetta.cli.accredit:cli"
+rosetta-translate  = "rosetta.cli.translate:cli"
 
 [project.optional-dependencies]
 dev = [
