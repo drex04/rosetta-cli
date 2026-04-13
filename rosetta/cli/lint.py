@@ -6,10 +6,10 @@ from pathlib import Path
 import click
 import rdflib
 
-from rosetta.core.config import load_config
 from rosetta.core.io import open_output
 from rosetta.core.units import (
     UNIT_STRING_TO_IRI,
+    expand_unit_iri,
     load_qudt_graph,
     units_compatible,
     suggest_fnml,
@@ -30,7 +30,7 @@ _STRING_XSD = {str(XSD.string)}
 _SRC_UNIT_QUERY = """
 PREFIX rose: <http://rosetta.interop/ns/>
 SELECT ?unit WHERE {
-    <%s> rose:detectedUnit ?unit .
+    ?subject rose:detectedUnit ?unit .
 }
 LIMIT 1
 """
@@ -38,7 +38,7 @@ LIMIT 1
 _TGT_UNIT_QUERY = """
 PREFIX qudt: <http://qudt.org/schema/qudt/>
 SELECT ?unit WHERE {
-    <%s> qudt:unit ?unit .
+    ?subject qudt:unit ?unit .
 }
 LIMIT 1
 """
@@ -46,7 +46,7 @@ LIMIT 1
 _SRC_DTYPE_QUERY = """
 PREFIX rose: <http://rosetta.interop/ns/>
 SELECT ?dtype WHERE {
-    <%s> rose:dataType ?dtype .
+    ?subject rose:dataType ?dtype .
 }
 LIMIT 1
 """
@@ -54,15 +54,19 @@ LIMIT 1
 _TGT_DTYPE_QUERY = """
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT ?dtype WHERE {
-    <%s> rdfs:range ?dtype .
+    ?subject rdfs:range ?dtype .
 }
 LIMIT 1
 """
 
 
-def _sparql_one(graph: rdflib.Graph, query: str) -> rdflib.term.Node | None:
+def _sparql_one(
+    graph: rdflib.Graph,
+    query: str,
+    bindings: dict | None = None,
+) -> rdflib.term.Node | None:
     """Run a SPARQL SELECT returning one row/one var; return that value or None."""
-    results = list(graph.query(query))
+    results = list(graph.query(query, initBindings=bindings or {}))
     if not results:
         return None
     row = results[0]
@@ -84,7 +88,7 @@ def _sparql_one(graph: rdflib.Graph, query: str) -> rdflib.term.Node | None:
               help="Path to rosetta.toml.")
 def cli(source, master, suggestions, output, strict, config):
     """Lint mapping files against SHACL shapes and policy rules."""
-    cfg = load_config(config)  # noqa: F841 — available for future use
+    findings: list[dict] = []  # initialised here so exit-code line after except can see it
 
     try:
         # 1. Load source TTL
@@ -102,15 +106,40 @@ def cli(source, master, suggestions, output, strict, config):
         # 4. Load QUDT + FnML policy graph
         qudt_graph = load_qudt_graph()
 
-        findings: list[dict] = []
-
         # 5. Iterate source fields
         for src_uri, entry in data.items():
+            # Issue 1: guard against malformed suggestion entries
+            if not isinstance(entry, dict):
+                findings.append({
+                    "severity": "INFO",
+                    "rule": "parse_error",
+                    "source_field": src_uri,
+                    "target_field": None,
+                    "source_unit": None,
+                    "target_unit": None,
+                    "message": f"Suggestions entry for '{src_uri}' is not a dict; skipping.",
+                    "fnml_suggestion": None,
+                })
+                continue
+
             sug_list = entry.get("suggestions", [])
-            if not sug_list:
+            if not isinstance(sug_list, list) or not sug_list:
                 continue  # no suggestions → nothing to lint
 
             top = sug_list[0]
+            if not isinstance(top, dict):
+                findings.append({
+                    "severity": "INFO",
+                    "rule": "parse_error",
+                    "source_field": src_uri,
+                    "target_field": None,
+                    "source_unit": None,
+                    "target_unit": None,
+                    "message": f"First suggestion entry for '{src_uri}' is not a dict; skipping.",
+                    "fnml_suggestion": None,
+                })
+                continue
+
             tgt_uri = top.get("uri", "")
             if not tgt_uri:
                 continue
@@ -118,7 +147,7 @@ def cli(source, master, suggestions, output, strict, config):
             # ----------------------------------------------------------------
             # c. Unit check — source side
             # ----------------------------------------------------------------
-            unit_node = _sparql_one(src_graph, _SRC_UNIT_QUERY % src_uri)
+            unit_node = _sparql_one(src_graph, _SRC_UNIT_QUERY, {"subject": rdflib.URIRef(src_uri)})
             unit_str = str(unit_node) if unit_node is not None else None
 
             if unit_str is None or unit_str not in UNIT_STRING_TO_IRI:
@@ -155,7 +184,7 @@ def cli(source, master, suggestions, output, strict, config):
             # ----------------------------------------------------------------
             # d. Unit check — master side
             # ----------------------------------------------------------------
-            tgt_unit_node = _sparql_one(mst_graph, _TGT_UNIT_QUERY % tgt_uri)
+            tgt_unit_node = _sparql_one(mst_graph, _TGT_UNIT_QUERY, {"subject": rdflib.URIRef(tgt_uri)})
             if tgt_unit_node is None:
                 findings.append({
                     "severity": "INFO",
@@ -190,10 +219,7 @@ def cli(source, master, suggestions, output, strict, config):
                 })
             elif compat is True:
                 # Normalise both to full IRI for equality check
-                def _to_full(iri: str) -> str:
-                    return "http://qudt.org/vocab/unit/" + iri[5:] if iri.startswith("unit:") else iri
-
-                if _to_full(src_iri) != _to_full(tgt_iri):
+                if expand_unit_iri(src_iri) != expand_unit_iri(tgt_iri):
                     fnml = suggest_fnml(src_iri, tgt_iri, qudt_graph)
                     findings.append({
                         "severity": "WARNING",
@@ -246,6 +272,14 @@ def cli(source, master, suggestions, output, strict, config):
             json.dump(result, fh, indent=2)
 
     except Exception as e:
+        # Issue 2: always emit valid JSON to stdout so piped consumers don't break
+        error_result = {
+            "findings": [],
+            "summary": {"block": 0, "warning": 0, "info": 0},
+            "error": str(e),
+        }
+        with open_output(output) as fh:
+            json.dump(error_result, fh, indent=2)
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
@@ -262,8 +296,8 @@ def _run_datatype_check(
     tgt_uri: str,
 ) -> None:
     """Append a datatype_mismatch WARNING if numeric vs string mismatch detected."""
-    src_dt_node = _sparql_one(src_graph, _SRC_DTYPE_QUERY % src_uri)
-    tgt_dt_node = _sparql_one(mst_graph, _TGT_DTYPE_QUERY % tgt_uri)
+    src_dt_node = _sparql_one(src_graph, _SRC_DTYPE_QUERY, {"subject": rdflib.URIRef(src_uri)})
+    tgt_dt_node = _sparql_one(mst_graph, _TGT_DTYPE_QUERY, {"subject": rdflib.URIRef(tgt_uri)})
 
     # None-guard before any string coercion
     if src_dt_node is None or tgt_dt_node is None:

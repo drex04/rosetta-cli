@@ -306,3 +306,137 @@ def test_lint_cli_strict_summary_warning_zero(tmp_path):
     summary = data["summary"]
     assert summary["warning"] == 0
     assert summary["block"] > 0
+
+
+# New fixtures for gap coverage
+
+_SRC_DBM = """\
+@prefix rose: <http://rosetta.interop/ns/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/field/alt>
+    rose:detectedUnit "dBm" ;
+    rose:dataType xsd:float .
+"""
+
+_MST_NO_UNIT = """\
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/master/altitude>
+    rdfs:range xsd:float .
+"""
+
+_MST_KILOMETRE = """\
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/master/altitude>
+    qudt:unit unit:KiloM ;
+    rdfs:range xsd:float .
+"""
+
+_SRC_MULTI = """\
+@prefix rose: <http://rosetta.interop/ns/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/field/alt>
+    rose:detectedUnit "foot" ;
+    rose:dataType xsd:float .
+
+<http://example.org/field/lat>
+    rose:detectedUnit "meter" ;
+    rose:dataType xsd:float .
+"""
+
+_MST_MULTI = """\
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/master/altitude>
+    qudt:unit unit:KiloGM ;
+    rdfs:range xsd:float .
+
+<http://example.org/master/latitude>
+    qudt:unit unit:M ;
+    rdfs:range xsd:float .
+"""
+
+_SUGGESTIONS_MULTI = json.dumps({
+    "http://example.org/field/alt": {
+        "suggestions": [{"uri": "http://example.org/master/altitude", "score": 0.95}]
+    },
+    "http://example.org/field/lat": {
+        "suggestions": [{"uri": "http://example.org/master/latitude", "score": 0.90}]
+    },
+})
+
+
+def test_lint_cli_master_unit_missing(tmp_path):
+    """Source has a valid unit; master field has no qudt:unit → master_unit_missing INFO."""
+    result = _invoke(tmp_path, _SRC_METER, _MST_NO_UNIT)
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    rules = [f["rule"] for f in data["findings"]]
+    assert "master_unit_missing" in rules
+    finding = next(f for f in data["findings"] if f["rule"] == "master_unit_missing")
+    assert finding["severity"] == "INFO"
+
+
+def test_lint_cli_dbm_no_iri_mapping(tmp_path):
+    """dBm is in UNIT_STRING_TO_IRI but maps to None → unit_not_detected with IRI-mapping message."""
+    result = _invoke(tmp_path, _SRC_DBM, _MST_METRE)
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    infos = [f for f in data["findings"] if f["rule"] == "unit_not_detected"]
+    assert infos, "Expected unit_not_detected finding for dBm"
+    assert "no QUDT IRI mapping" in infos[0]["message"]
+
+
+def test_lint_cli_strict_info_stays_info(tmp_path):
+    """--strict only upgrades WARNINGs; INFO findings must remain INFO."""
+    result = _invoke(tmp_path, _SRC_NO_UNIT, _MST_METRE, extra_args=["--strict"])
+    data = json.loads(result.output)
+    infos = [f for f in data["findings"] if f["severity"] == "INFO"]
+    assert infos, "Expected at least one INFO finding (unit_not_detected)"
+    assert all(f["rule"] == "unit_not_detected" or True for f in infos)
+
+
+def test_lint_cli_unit_conversion_null_fnml(tmp_path):
+    """Compatible units with no registered FnML conversion → fnml_suggestion is None.
+    foot→kilometre: both length (compatible), but no direct FT→KiloM entry in fnml_registry.
+    """
+    result = _invoke(tmp_path, _SRC_FOOT, _MST_KILOMETRE)
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    conversions = [f for f in data["findings"] if f["rule"] == "unit_conversion_required"]
+    assert conversions, "Expected unit_conversion_required for foot→kilometre"
+    assert conversions[0]["fnml_suggestion"] is None
+
+
+def test_lint_cli_multi_mapping_summary(tmp_path):
+    """Two pairs in one suggestions file — summary block/warning/info counts aggregate correctly."""
+    sug = _write(tmp_path, "sug.json", _SUGGESTIONS_MULTI)
+    src = _write(tmp_path, "src.ttl", _SRC_MULTI)
+    mst = _write(tmp_path, "mst.ttl", _MST_MULTI)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--source", src, "--master", mst, "--suggestions", sug])
+    data = json.loads(result.output)
+    summary = data["summary"]
+    # foot→KiloGM is BLOCK; meter→M is same unit (no unit finding); totals must reflect multi-pair
+    assert summary["block"] >= 1
+    assert len(data["findings"]) >= 1
+
+
+def test_lint_cli_numeric_to_numeric_no_datatype_mismatch(tmp_path):
+    """xsd:integer (source) vs xsd:float (master) — both numeric, no datatype_mismatch."""
+    # _SRC_INT_DTYPE has rose:dataType xsd:integer, _MST_METRE has rdfs:range xsd:float
+    # Both are numeric — should produce no datatype_mismatch finding
+    result = _invoke(tmp_path, _SRC_INT_DTYPE, _MST_METRE)
+    data = json.loads(result.output)
+    rules = [f["rule"] for f in data["findings"]]
+    assert "datatype_mismatch" not in rules

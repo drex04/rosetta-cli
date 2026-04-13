@@ -82,6 +82,15 @@ def units_compatible(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> bo
 
 
 # ---------------------------------------------------------------------------
+# IRI expansion helper
+# ---------------------------------------------------------------------------
+
+def expand_unit_iri(iri: str) -> str:
+    """Expand a short-form ``"unit:X"`` IRI to its full QUDT equivalent."""
+    return UNIT_NS + iri[5:] if iri.startswith("unit:") else iri
+
+
+# ---------------------------------------------------------------------------
 # FnML conversion function suggestion
 # ---------------------------------------------------------------------------
 
@@ -108,11 +117,8 @@ def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> dict |
     Returns a dict with keys ``fnml_function``, ``label``, ``multiplier``, ``offset``
     or None if no matching conversion function is found.
     """
-    def to_full(iri: str) -> str:
-        return UNIT_NS + iri[5:] if iri.startswith("unit:") else iri
-
-    src_full = to_full(src_iri)
-    tgt_full = to_full(tgt_iri)
+    src_full = expand_unit_iri(src_iri)
+    tgt_full = expand_unit_iri(tgt_iri)
 
     results = list(qudt_graph.query(
         _FNML_QUERY,
