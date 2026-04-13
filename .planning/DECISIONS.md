@@ -242,3 +242,11 @@ is immediately useful without requiring the full pipeline to be run.
 **Decision:** After calling `apply_ledger_feedback` in `suggest.py`, immediately re-sort the suggestions list by score descending and re-assign 1-based `rank` values.
 **Why:** Boosted items may overtake higher-ranked items; without re-sorting the output order misrepresents the new ranking. The `rank` values from `rank_suggestions` are stale after score mutation.
 **Confidence:** HIGH (plan-review Step B)
+
+### D-001: Speculative plan validated: phase 6
+- **Category:** implementation
+- **Status:** ACTIVE
+- **Confidence:** HIGH
+- **Context:** No file overlap with predecessor phases (none)
+- **Decision:** Plan proceeds as-is (VALID)
+- **Affects:** Phase 6
