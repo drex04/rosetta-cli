@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, RootModel
@@ -101,3 +102,19 @@ class ValidationSummary(BaseModel):
 class ValidationReport(BaseModel):
     findings: list[ValidationFinding]
     summary: ValidationSummary
+
+
+# --- Accreditation ---
+
+
+class LedgerEntry(BaseModel):
+    source_uri: str
+    target_uri: str
+    status: Literal["pending", "accredited", "revoked"]
+    timestamp: datetime
+    actor: str
+    notes: str = ""
+
+
+class Ledger(BaseModel):
+    mappings: list[LedgerEntry] = []

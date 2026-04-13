@@ -10,7 +10,6 @@ import pytest
 from click.testing import CliRunner
 from rdflib import Graph, Namespace, URIRef
 
-from rosetta.cli.accredit import cli as accredit_cli
 from rosetta.cli.ingest import cli
 from rosetta.cli.provenance import cli as provenance_cli
 from rosetta.cli.rml_gen import cli as rml_gen_cli
@@ -428,15 +427,6 @@ def test_rml_gen_stub_exits_1():
     """rosetta-rml-gen stub exits with code 1 (not implemented)."""
     runner = CliRunner()
     result = runner.invoke(rml_gen_cli, [])
-    assert result.exit_code == 1
-    out = result.output.lower()
-    assert "not yet implemented" in out or "not implemented" in out
-
-
-def test_accredit_stub_exits_1():
-    """rosetta-accredit stub exits with code 1 (not implemented)."""
-    runner = CliRunner()
-    result = runner.invoke(accredit_cli, [])
     assert result.exit_code == 1
     out = result.output.lower()
     assert "not yet implemented" in out or "not implemented" in out

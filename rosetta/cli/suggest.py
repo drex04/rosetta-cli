@@ -7,10 +7,11 @@ from pathlib import Path
 import click
 import numpy as np
 
+from rosetta.core.accredit import load_ledger
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import FieldSuggestions, Suggestion, SuggestionReport
-from rosetta.core.similarity import rank_suggestions
+from rosetta.core.similarity import apply_ledger_feedback, rank_suggestions
 
 
 @click.command()
@@ -24,6 +25,7 @@ from rosetta.core.similarity import rank_suggestions
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
 @click.option("--anomaly-threshold", default=None, type=float, help="Anomaly flag threshold")
 @click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
+@click.option("--ledger", default=None, type=click.Path(), help="Path to accreditation ledger.json")
 @click.option("--config", default="rosetta.toml", show_default=True)
 def cli(
     source: str,
@@ -32,6 +34,7 @@ def cli(
     min_score: float | None,
     anomaly_threshold: float | None,
     output: str | None,
+    ledger: str | None,
     config: str,
 ) -> None:
     """Rank master ontology candidates for source schema fields."""
@@ -76,6 +79,17 @@ def cli(
             resolved_min_score,
             resolved_anomaly_threshold,
         )
+
+        if ledger is not None:
+            led = load_ledger(Path(ledger))
+            for src_uri, field_data in result.items():
+                field_data["suggestions"] = apply_ledger_feedback(
+                    src_uri, field_data["suggestions"], led
+                )
+                # Re-sort by new score descending; re-assign 1-based ranks
+                field_data["suggestions"].sort(key=lambda s: s["score"], reverse=True)
+                for rank_idx, sug in enumerate(field_data["suggestions"], 1):
+                    sug["rank"] = rank_idx
 
         report = SuggestionReport(
             root={

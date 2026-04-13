@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from rosetta.core.models import Ledger
 
 
 def cosine_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -77,4 +80,39 @@ def rank_suggestions(
             "anomaly": anomaly,
         }
 
+    return result
+
+
+def apply_ledger_feedback(
+    source_uri: str,
+    candidates: list[dict[str, Any]],
+    ledger: Ledger,
+    boost_factor: float = 1.2,
+) -> list[dict[str, Any]]:
+    """Apply accreditation ledger feedback to a candidate list.
+
+    - Accredited (source_uri, target_uri): multiply score by boost_factor, cap at 1.0.
+    - Revoked (source_uri, target_uri): remove from candidates.
+
+    candidates: list of {"uri": str, "score": float, "rank": int} (shape from rank_suggestions).
+    All input keys are preserved; only "score" is overridden for accredited entries.
+    Returns a new list (does not mutate input).
+    """
+    # Build O(1) lookup: (source_uri, target_uri) → LedgerEntry
+    index = {(e.source_uri, e.target_uri): e for e in ledger.mappings}
+
+    result: list[dict[str, Any]] = []
+    for c in candidates:
+        target = c["uri"]
+        entry = index.get((source_uri, target))
+        if entry is None:
+            result.append(c)
+        elif entry.status == "revoked":
+            continue  # exclude
+        elif entry.status == "accredited":
+            # Preserve all keys (including rank); only override score
+            result.append({**c, "score": min(c["score"] * boost_factor, 1.0)})
+        else:
+            # pending — no effect
+            result.append(c)
     return result
