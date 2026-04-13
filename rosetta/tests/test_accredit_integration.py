@@ -134,6 +134,6 @@ def test_suggest_cli_with_ledger(tmp_path: Path) -> None:
     data = json.loads(result.output)
     suggestions = data[SRC_URI]["suggestions"]
     tgt = next(s for s in suggestions if s["target_uri"] == TGT_URI)
-    assert tgt["score"] >= 1.0 or tgt["score"] > 0.9, (
-        "Accredited pair must be boosted in CLI output"
+    assert tgt["score"] >= 1.0, (
+        "Accredited pair (cosine=1.0 × boost=1.2 → capped 1.0) must equal 1.0"
     )

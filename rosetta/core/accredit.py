@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rosetta.core.models import Ledger, LedgerEntry
@@ -50,7 +50,7 @@ def submit_mapping(
         source_uri=source_uri,
         target_uri=target_uri,
         status="pending",
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(UTC),
         actor=actor,
         notes=notes,
     )
@@ -82,6 +82,6 @@ def revoke_mapping(ledger: Ledger, source_uri: str, target_uri: str) -> LedgerEn
     if entry is None:
         raise ValueError(f"No entry found for ({source_uri}, {target_uri})")
     if entry.status == "revoked":
-        raise ValueError(f"Cannot revoke: entry is already revoked")
+        raise ValueError("Cannot revoke: entry is already revoked")
     entry.status = "revoked"
     return entry
