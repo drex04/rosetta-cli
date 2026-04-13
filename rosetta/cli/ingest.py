@@ -66,7 +66,7 @@ def cli(
     config: str | None,
 ) -> None:
     """Ingest a national schema into the RDF store."""
-    load_config(config)
+    load_config(Path(config) if config is not None else None)
     # Guard: stdin without explicit format
     if input_path == "-" and input_fmt is None:
         click.echo("--input-format required when reading from stdin", err=True)

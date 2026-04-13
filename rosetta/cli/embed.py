@@ -40,7 +40,7 @@ def cli(
     config: str | None,
 ) -> None:
     """Embed RDF schema attributes using LaBSE."""
-    cfg = load_config(config)
+    cfg = load_config(Path(config) if config is not None else None)
     resolved_model = (
         get_config_value(cfg, "embed", "model", cli_value=model) or "sentence-transformers/LaBSE"
     )

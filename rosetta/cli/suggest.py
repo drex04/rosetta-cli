@@ -38,7 +38,7 @@ def cli(
     config: str,
 ) -> None:
     """Rank master ontology candidates for source schema fields."""
-    cfg = load_config(config)
+    cfg = load_config(Path(config))
     resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)
     resolved_min_score = float(
         get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0

@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from rdflib import Graph, Literal, URIRef
-from rdflib.namespace import RDFS, XSD
+from rdflib.namespace import RDF, RDFS, XSD
 
 from rosetta.core.models import ProvenanceRecord
 from rosetta.core.rdf_utils import _PROV as PROV
@@ -85,17 +85,18 @@ def stamp_artifact(
 
     ts_literal = Literal(now.isoformat(), datatype=XSD.dateTime)
 
-    # PROV-O triples
-    g.add((activity, PROV.type, PROV.Activity))  # type: ignore[attr-defined]
+    # PROV-O triples — use RDF.type (rdf:type), not PROV.type, so that
+    # downstream SPARQL "?x a prov:Activity" patterns resolve correctly.
+    g.add((activity, RDF.type, PROV.Activity))  # type: ignore[attr-defined]
     g.add((activity, PROV.startedAtTime, ts_literal))  # type: ignore[attr-defined]
     g.add((activity, PROV.endedAtTime, ts_literal))  # type: ignore[attr-defined]
     g.add((activity, PROV.wasAssociatedWith, agent_ref))  # type: ignore[attr-defined]
     if label is not None:
         g.add((activity, RDFS.label, Literal(label)))
 
-    g.add((artifact_ref, PROV.type, PROV.Entity))  # type: ignore[attr-defined]
+    g.add((artifact_ref, RDF.type, PROV.Entity))  # type: ignore[attr-defined]
     g.add((artifact_ref, PROV.wasGeneratedBy, activity))  # type: ignore[attr-defined]
-    g.add((agent_ref, PROV.type, PROV.Agent))  # type: ignore[attr-defined]
+    g.add((agent_ref, RDF.type, PROV.Agent))  # type: ignore[attr-defined]
 
     # Bind namespaces
     bind_namespaces(g)

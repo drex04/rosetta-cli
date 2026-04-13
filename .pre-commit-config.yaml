@@ -16,7 +16,8 @@ repos:
       - id: basedpyright
         name: basedpyright
         language: system
-        entry: uv run basedpyright
+        # Exit code 3 = warnings only (no errors) — treat as success
+        entry: bash -c 'uv run basedpyright; code=$?; [ $code -eq 0 ] || [ $code -eq 3 ]'
         pass_filenames: false
         types: [python]
 

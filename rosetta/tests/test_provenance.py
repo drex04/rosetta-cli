@@ -65,26 +65,26 @@ def test_stamp_increments_version(empty_graph: Graph) -> None:
 
 def test_stamp_adds_prov_entity_triple(stamped_graph: tuple[Graph, int]) -> None:
     g, _ = stamped_graph
-    assert (URIRef(_ARTIFACT_URI), PROV.type, PROV.Entity) in g  # type: ignore[attr-defined]
+    assert (URIRef(_ARTIFACT_URI), RDF.type, PROV.Entity) in g  # type: ignore[attr-defined]
 
 
 def test_stamp_adds_activity_triple(stamped_graph: tuple[Graph, int]) -> None:
     g, _ = stamped_graph
-    activities = list(g.subjects(PROV.type, PROV.Activity))  # type: ignore[attr-defined]
+    activities = list(g.subjects(RDF.type, PROV.Activity))  # type: ignore[attr-defined]
     assert len(activities) >= 1
 
 
 def test_stamp_adds_agent_triple(stamped_graph: tuple[Graph, int]) -> None:
     g, _ = stamped_graph
     default_agent = URIRef("http://rosetta.interop/ns/agent/rosetta-cli")
-    assert (default_agent, PROV.type, PROV.Agent) in g  # type: ignore[attr-defined]
+    assert (default_agent, RDF.type, PROV.Agent) in g  # type: ignore[attr-defined]
 
 
 def test_stamp_datetime_injected(empty_graph: Graph) -> None:
     fixed = datetime(2026, 1, 1, tzinfo=UTC)
     stamp_artifact(empty_graph, _ARTIFACT_URI, now=fixed)
     # Find activity node
-    activities = list(empty_graph.subjects(PROV.type, PROV.Activity))  # type: ignore[attr-defined]
+    activities = list(empty_graph.subjects(RDF.type, PROV.Activity))  # type: ignore[attr-defined]
     assert activities, "No activity node found"
     activity = activities[0]
     started_values = list(empty_graph.objects(activity, PROV.startedAtTime))  # type: ignore[attr-defined]
@@ -187,7 +187,11 @@ def test_cli_stamp_writes_valid_turtle(ttl_file: Path, tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
     g = Graph()
     g.parse(str(out), format="turtle")
-    assert len(g) > 0
+    # Must contain PROV-O content, not merely be non-empty
+    assert any(True for _ in g.subjects(PROV.wasGeneratedBy, None)), (
+        "No prov:wasGeneratedBy triple found"
+    )  # type: ignore[attr-defined]
+    assert any(True for _ in g.objects(None, ROSE_NS.version)), "No rose:version triple found"
 
 
 def test_cli_stamp_exits_zero(ttl_file: Path) -> None:
@@ -201,6 +205,15 @@ def test_cli_stamp_invalid_input(malformed_ttl_file: Path) -> None:
     result = runner.invoke(cli, ["stamp", str(malformed_ttl_file)])
     assert result.exit_code == 1
     # Error message should appear on stderr (mix_stderr=True by default in CliRunner)
+    assert "Error" in result.output or "error" in result.output.lower()
+
+
+def test_cli_stamp_unwritable_output(ttl_file: Path, tmp_path: Path) -> None:
+    """stamp with an unwritable output path exits 1 with an error on stderr."""
+    bad_out = tmp_path / "no_such_dir" / "out.ttl"
+    runner = CliRunner()
+    result = runner.invoke(cli, ["stamp", str(ttl_file), "--output", str(bad_out)])
+    assert result.exit_code == 1
     assert "Error" in result.output or "error" in result.output.lower()
 
 
