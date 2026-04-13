@@ -1,10 +1,13 @@
-"""Unit utilities for rosetta-lint: QUDT IRI mapping, dimension vectors, compatibility, and FnML suggestions."""
+"""Unit utilities for rosetta-lint: QUDT IRI mapping, dimension vectors,
+compatibility, and FnML suggestions."""
 
 from __future__ import annotations
 
 from importlib.resources import files
 
 import rdflib
+
+from rosetta.core.models import FnmlSuggestion
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -31,6 +34,7 @@ UNIT_STRING_TO_IRI: dict[str, str | None] = {
 # Graph loading
 # ---------------------------------------------------------------------------
 
+
 def load_qudt_graph() -> rdflib.Graph:
     """Load qudt_units.ttl and fnml_registry.ttl into a single merged Graph."""
     data = files("rosetta.policies")
@@ -43,6 +47,7 @@ def load_qudt_graph() -> rdflib.Graph:
 # ---------------------------------------------------------------------------
 # Dimension vector lookup
 # ---------------------------------------------------------------------------
+
 
 def dimension_vector(unit_iri: str, qudt_graph: rdflib.Graph) -> str | None:
     """Return the qudt:hasDimensionVector string for *unit_iri*, or None if absent.
@@ -64,6 +69,7 @@ def dimension_vector(unit_iri: str, qudt_graph: rdflib.Graph) -> str | None:
 # Compatibility check
 # ---------------------------------------------------------------------------
 
+
 def units_compatible(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> bool | None:
     """Compare dimension vectors of two unit IRIs.
 
@@ -84,6 +90,7 @@ def units_compatible(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> bo
 # ---------------------------------------------------------------------------
 # IRI expansion helper
 # ---------------------------------------------------------------------------
+
 
 def expand_unit_iri(iri: str) -> str:
     """Expand a short-form ``"unit:X"`` IRI to its full QUDT equivalent."""
@@ -108,7 +115,7 @@ SELECT ?fn ?label ?multiplier ?offset WHERE {
 """
 
 
-def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> dict | None:
+def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> FnmlSuggestion | None:
     """Query the merged policy graph for a conversion function between two unit IRIs.
 
     Both qudt_units.ttl and fnml_registry.ttl must already be merged in *qudt_graph*
@@ -120,23 +127,29 @@ def suggest_fnml(src_iri: str, tgt_iri: str, qudt_graph: rdflib.Graph) -> dict |
     src_full = expand_unit_iri(src_iri)
     tgt_full = expand_unit_iri(tgt_iri)
 
-    results = list(qudt_graph.query(
-        _FNML_QUERY,
-        initBindings={
-            "from": rdflib.URIRef(src_full),
-            "to": rdflib.URIRef(tgt_full),
-        },
-    ))
+    results = list(
+        qudt_graph.query(
+            _FNML_QUERY,
+            initBindings={
+                "from": rdflib.URIRef(src_full),
+                "to": rdflib.URIRef(tgt_full),
+            },
+        )
+    )
     if not results:
         return None
 
-    row = results[0]
-    # None-guard all OPTIONAL SPARQL vars before use
-    multiplier = float(row.multiplier) if row.multiplier is not None else None
-    offset = float(row.offset) if row.offset is not None else None
-    return {
-        "fnml_function": str(row.fn),
-        "label": str(row.label),
-        "multiplier": multiplier,
-        "offset": offset,
-    }
+    row = results[0]  # pyright: ignore[reportIndexIssue]
+    # None-guard all OPTIONAL SPARQL vars before use; rdflib ResultRow attrs are dynamic
+    fn_val = row.fn  # pyright: ignore[reportAttributeAccessIssue]
+    label_val = row.label  # pyright: ignore[reportAttributeAccessIssue]
+    mult_val = row.multiplier  # pyright: ignore[reportAttributeAccessIssue]
+    off_val = row.offset  # pyright: ignore[reportAttributeAccessIssue]
+    multiplier = float(mult_val) if mult_val is not None else None
+    offset = float(off_val) if off_val is not None else None
+    return FnmlSuggestion(
+        fnml_function=str(fn_val),
+        label=str(label_val) if label_val is not None else None,
+        multiplier=multiplier,
+        offset=offset,
+    )

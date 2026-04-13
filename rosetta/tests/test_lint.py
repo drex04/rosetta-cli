@@ -1,4 +1,5 @@
 """Tests for rosetta/core/units.py and rosetta/cli/lint.py."""
+
 from __future__ import annotations
 
 import json
@@ -15,10 +16,10 @@ from rosetta.core.units import (
     units_compatible,
 )
 
-
 # ---------------------------------------------------------------------------
 # Module-level fixture — load QUDT graph once for all unit tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def qudt_graph():
@@ -28,6 +29,7 @@ def qudt_graph():
 # ---------------------------------------------------------------------------
 # Section 1 — units.py unit tests
 # ---------------------------------------------------------------------------
+
 
 def test_unit_string_to_iri_meter():
     assert UNIT_STRING_TO_IRI["meter"] == "unit:M"
@@ -75,7 +77,7 @@ def test_units_compatible_different_dimension(qudt_graph):
 
 
 def test_units_compatible_unknown_unit(qudt_graph):
-    assert units_compatible(None, "unit:M", qudt_graph) is None
+    assert units_compatible(None, "unit:M", qudt_graph) is None  # pyright: ignore[reportArgumentType]
 
 
 def test_units_compatible_missing_vector(qudt_graph):
@@ -91,7 +93,7 @@ def test_suggest_fnml_known_pair(qudt_graph):
     assert result is not None
     assert "fnml_function" in result
     assert "multiplier" in result
-    assert abs(result["multiplier"] - 0.3048) < 1e-6
+    assert abs(result["multiplier"] - 0.3048) < 1e-6  # pyright: ignore[reportOperatorIssue]
 
 
 def test_suggest_fnml_offset_pair(qudt_graph):
@@ -107,6 +109,7 @@ def test_suggest_fnml_unknown_pair(qudt_graph):
 # ---------------------------------------------------------------------------
 # Section 2 — CLI integration tests
 # ---------------------------------------------------------------------------
+
 
 def _write(tmp_path, name, content):
     p = tmp_path / name
@@ -192,13 +195,13 @@ _MST_UNKNOWN_UNIT = """\
     rdfs:range xsd:float .
 """
 
-_SUGGESTIONS = json.dumps({
-    "http://example.org/field/alt": {
-        "suggestions": [
-            {"uri": "http://example.org/master/altitude", "score": 0.95}
-        ]
+_SUGGESTIONS = json.dumps(
+    {
+        "http://example.org/field/alt": {
+            "suggestions": [{"target_uri": "http://example.org/master/altitude", "score": 0.95}]
+        }
     }
-})
+)
 
 
 def _invoke(tmp_path, src_ttl, mst_ttl, extra_args=None):
@@ -253,10 +256,19 @@ def test_lint_cli_output_file(tmp_path):
     mst = _write(tmp_path, "mst.ttl", _MST_METRE)
     sug = _write(tmp_path, "sug.json", _SUGGESTIONS)
     runner = CliRunner()
-    result = runner.invoke(cli, [
-        "--source", src, "--master", mst, "--suggestions", sug,
-        "--output", out_path,
-    ])
+    runner.invoke(
+        cli,
+        [
+            "--source",
+            src,
+            "--master",
+            mst,
+            "--suggestions",
+            sug,
+            "--output",
+            out_path,
+        ],
+    )
     assert (tmp_path / "out.json").exists()
     with open(out_path) as fh:
         data = json.load(fh)
@@ -366,14 +378,16 @@ _MST_MULTI = """\
     rdfs:range xsd:float .
 """
 
-_SUGGESTIONS_MULTI = json.dumps({
-    "http://example.org/field/alt": {
-        "suggestions": [{"uri": "http://example.org/master/altitude", "score": 0.95}]
-    },
-    "http://example.org/field/lat": {
-        "suggestions": [{"uri": "http://example.org/master/latitude", "score": 0.90}]
-    },
-})
+_SUGGESTIONS_MULTI = json.dumps(
+    {
+        "http://example.org/field/alt": {
+            "suggestions": [{"target_uri": "http://example.org/master/altitude", "score": 0.95}]
+        },
+        "http://example.org/field/lat": {
+            "suggestions": [{"target_uri": "http://example.org/master/latitude", "score": 0.90}]
+        },
+    }
+)
 
 
 def test_lint_cli_master_unit_missing(tmp_path):
@@ -388,7 +402,7 @@ def test_lint_cli_master_unit_missing(tmp_path):
 
 
 def test_lint_cli_dbm_no_iri_mapping(tmp_path):
-    """dBm is in UNIT_STRING_TO_IRI but maps to None → unit_not_detected with IRI-mapping message."""
+    """dBm maps to None in UNIT_STRING_TO_IRI → unit_not_detected with IRI-mapping message."""
     result = _invoke(tmp_path, _SRC_DBM, _MST_METRE)
     assert result.exit_code == 0
     data = json.loads(result.output)

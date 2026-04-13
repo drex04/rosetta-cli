@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 import yaml
 
-from rosetta.core.parsers import FieldSchema, schema_slug
+from rosetta.core.parsers._types import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
 
 
-def _resolve_ref(ref: str, schemas: dict, *, _depth: int = 0, _max_depth: int = 10) -> dict:
+def _resolve_ref(
+    ref: str, schemas: dict[str, Any], *, _depth: int = 0, _max_depth: int = 10
+) -> dict[str, Any]:
     """Resolve an internal $ref like '#/components/schemas/X' to its schema dict.
 
     Recursively resolves chained $refs up to _max_depth to prevent infinite loops.
@@ -27,7 +29,9 @@ def _resolve_ref(ref: str, schemas: dict, *, _depth: int = 0, _max_depth: int = 
             resolved = schemas[name]
             # Recursively resolve if the resolved schema itself has a $ref
             if "$ref" in resolved:
-                return _resolve_ref(resolved["$ref"], schemas, _depth=_depth + 1, _max_depth=_max_depth)
+                return _resolve_ref(
+                    resolved["$ref"], schemas, _depth=_depth + 1, _max_depth=_max_depth
+                )
             return resolved
     raise ValueError(f"Cannot resolve $ref: {ref}")
 
@@ -40,8 +44,7 @@ def parse_openapi(src: TextIO, path: Path | None, nation: str) -> tuple[list[Fie
     """
     doc = yaml.safe_load(src)
     if not isinstance(doc, dict):
-        raise ValueError("OpenAPI document must be a YAML mapping, got "
-                         f"{type(doc).__name__}")
+        raise ValueError(f"OpenAPI document must be a YAML mapping, got {type(doc).__name__}")
 
     # Derive slug: normalize path.stem through schema_slug to ensure lowercase/safe URIs;
     # fall back to schema_slug of info.title when no path is available.
@@ -52,7 +55,7 @@ def parse_openapi(src: TextIO, path: Path | None, nation: str) -> tuple[list[Fie
         slug = schema_slug(title)
 
     components = doc.get("components", {})
-    schemas: dict = components.get("schemas", {})
+    schemas: dict[str, Any] = components.get("schemas", {})
 
     # Merged properties: name -> FieldSchema (last-schema-wins)
     merged: dict[str, FieldSchema] = {}
@@ -62,11 +65,11 @@ def parse_openapi(src: TextIO, path: Path | None, nation: str) -> tuple[list[Fie
         if "$ref" in schema_obj:
             schema_obj = _resolve_ref(schema_obj["$ref"], schemas)
 
-        properties: dict = schema_obj.get("properties", {})
-        required_fields: list = schema_obj.get("required", [])
+        properties: dict[str, Any] = schema_obj.get("properties", {})
+        required_fields: list[str] = schema_obj.get("required", [])
 
         # Collect sample values from schema-level examples (list of dicts) only
-        schema_examples: list[dict] = schema_obj.get("examples", [])
+        schema_examples: list[dict[str, Any]] = schema_obj.get("examples", [])
 
         for field_name, field_def in properties.items():
             # Resolve $ref in individual property if present

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from rdflib import Graph, Literal, Namespace, URIRef, BNode
+from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
 from rosetta.core.parsers import FieldSchema
-from rosetta.core.rdf_utils import ROSE_NS as ROSE, bind_namespaces, save_graph
+from rosetta.core.rdf_utils import bind_namespaces
 
 # Pre-build URIRefs for properties that clash with Namespace built-in methods
 _ROSE_BASE = "http://rosetta.interop/ns/"
@@ -38,7 +38,7 @@ def fields_to_graph(fields: list[FieldSchema], nation: str, slug: str) -> Graph:
         An rdflib Graph with all field triples bound to standard Rosetta prefixes.
     """
     g = Graph()
-    bind_namespaces(g)
+    _ = bind_namespaces(g)
     g.bind("xsd", XSD)
 
     F = Namespace(f"http://rosetta.interop/field/{nation}/{slug}/")
@@ -71,7 +71,9 @@ def fields_to_graph(fields: list[FieldSchema], nation: str, slug: str) -> Graph:
             cs = field.categorical_stats
             stats_bn = BNode()
             g.add((stats_bn, ROSE_COUNT, Literal(cs["count"], datatype=XSD.integer)))
-            g.add((stats_bn, ROSE_DISTINCT_COUNT, Literal(cs["distinct_count"], datatype=XSD.integer)))
+            g.add(
+                (stats_bn, ROSE_DISTINCT_COUNT, Literal(cs["distinct_count"], datatype=XSD.integer))
+            )
             g.add((stats_bn, ROSE_NULL_RATE, Literal(cs["null_rate"], datatype=XSD.double)))
             g.add((field_uri, ROSE_STATS, stats_bn))
 

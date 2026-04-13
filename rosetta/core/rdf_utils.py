@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import io
 from pathlib import Path
-from typing import TextIO, Union
+from typing import Any, TextIO
 
-from rdflib import Graph, Namespace, URIRef, Literal  # noqa: F401 — re-exported
+from rdflib import Graph, Literal, Namespace, URIRef  # noqa: F401 — re-exported
 
 # ---------------------------------------------------------------------------
 # Namespace declarations
@@ -24,6 +23,7 @@ _SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
 # Public helpers
 # ---------------------------------------------------------------------------
 
+
 def bind_namespaces(g: Graph) -> Graph:
     """Bind the standard Rosetta prefixes onto *g* and return it."""
     g.bind("rose", ROSE_NS)
@@ -35,7 +35,7 @@ def bind_namespaces(g: Graph) -> Graph:
 
 
 def load_graph(
-    path: Union[Path, TextIO],
+    path: Path | TextIO,
     fmt: str = "turtle",
 ) -> Graph:
     """Load an RDF graph from *path* (file path or file-like object).
@@ -55,16 +55,14 @@ def load_graph(
             g.parse(data=path.read(), format=fmt)
     except Exception as exc:
         source_label = str(path) if isinstance(path, Path) else repr(path)
-        raise ValueError(
-            f"Failed to parse RDF from {source_label!r} as {fmt!r}: {exc}"
-        ) from exc
+        raise ValueError(f"Failed to parse RDF from {source_label!r} as {fmt!r}: {exc}") from exc
 
     return bind_namespaces(g)
 
 
 def save_graph(
     g: Graph,
-    path: Union[Path, TextIO],
+    path: Path | TextIO,
     fmt: str = "turtle",
 ) -> None:
     """Serialize *g* to *path* (file path or file-like object)."""
@@ -79,7 +77,11 @@ def save_graph(
         path.write(serialized)
 
 
-def query_graph(g: Graph, sparql: str, bindings: dict | None = None) -> list[dict]:
+def query_graph(
+    g: Graph,
+    sparql: str,
+    bindings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     """Execute a SPARQL SELECT query and return results as a list of dicts.
 
     Each dict maps variable name (str) to an rdflib term.
@@ -87,7 +89,9 @@ def query_graph(g: Graph, sparql: str, bindings: dict | None = None) -> list[dic
     to avoid SPARQL injection.
     """
     results = g.query(sparql, initBindings=bindings or {})
-    return [
-        {str(var): row[var] for var in results.vars}
-        for row in results
-    ]
+    vars_ = results.vars or []
+    out: list[dict[str, Any]] = []
+    for row in results:
+        # rdflib ResultRow supports __getitem__ by Variable; pyright stubs don't model this
+        out.append({str(v): row[v] for v in vars_})  # pyright: ignore[reportArgumentType,reportIndexIssue,reportCallIssue]
+    return out

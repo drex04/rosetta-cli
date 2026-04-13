@@ -60,7 +60,22 @@
 
 ---
 
-## Phase 5: rosetta-rml-gen
+## Phase 5: Code quality infrastructure
+**Goal:** Establish a robust, enforced code quality baseline — static type checking, consistent formatting/linting config, and Pydantic runtime validation for structured data — before building further tools on top.
+
+**Delivers:**
+- `basedpyright` configured in strict mode (pyproject.toml); clean check on all `rosetta/` source
+- `ruff` fully configured (format + lint rules, target Python 3.11+)
+- Full type annotations on all `rosetta/core/` and `rosetta/cli/` modules
+- `pydantic>=2` added; Pydantic models for `LintFinding`, `LintReport`, `Suggestion`, `SuggestionReport`, `EmbeddingEntry`
+- Bare `dict` returns replaced with typed models at core function boundaries
+- Runtime validation at CLI output boundaries (models validated before JSON serialisation)
+
+**Requirements:** REQ-QA-01, REQ-QA-02
+
+---
+
+## Phase 6: rosetta-rml-gen
 **Goal:** Generate valid RML/FnML Turtle from approved decisions.
 
 **Delivers:**
@@ -73,7 +88,7 @@
 
 ---
 
-## Phase 6: rosetta-provenance
+## Phase 7: rosetta-provenance
 **Goal:** Stamp PROV-O metadata on mapping artifacts.
 
 **Delivers:**
@@ -86,7 +101,7 @@
 
 ---
 
-## Phase 7: rosetta-validate
+## Phase 8: rosetta-validate
 **Goal:** SHACL validation of mapping artifacts.
 
 **Delivers:**
@@ -99,7 +114,7 @@
 
 ---
 
-## Phase 8: rosetta-accredit + feedback loop
+## Phase 9: rosetta-accredit + feedback loop
 **Goal:** Full governance layer. Accreditation state machine + suggestion feedback loop.
 
 **Delivers:**

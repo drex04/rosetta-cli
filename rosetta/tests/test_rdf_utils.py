@@ -10,17 +10,16 @@ from rdflib import Graph, Literal, URIRef
 
 from rosetta.core.rdf_utils import (
     ROSE_NS,
-    ROSE_STATS_NS,
     bind_namespaces,
     load_graph,
     query_graph,
     save_graph,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_simple_graph() -> Graph:
     """Return a small graph with two rose: triples."""
@@ -35,6 +34,7 @@ def _make_simple_graph() -> Graph:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_roundtrip(tmp_path: Path) -> None:
     """Save a graph to Turtle, reload it, and confirm triples survive."""
@@ -124,14 +124,16 @@ def test_load_graph_invalid_rdf(tmp_path: Path) -> None:
 
 def test_query_graph_with_bindings() -> None:
     """query_graph passes bindings as initBindings to avoid SPARQL injection."""
-    from rdflib import Literal
 
     g = Graph()
-    g.parse(data="""
+    g.parse(
+        data="""
         @prefix ex: <http://example.org/> .
         ex:a ex:name "Alice" .
         ex:b ex:name "Bob" .
-    """, format="turtle")
+    """,
+        format="turtle",
+    )
 
     results = query_graph(
         g,

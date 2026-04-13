@@ -7,38 +7,37 @@
 
 ## Runtime
 **Environment:** Python 3.11+ (specified in `pyproject.toml` requires-python)
-**Package Manager:** uv (lockfile: `uv-5ee6d68394d92c70.lock`)
+**Package Manager:** uv — lockfile present at `uv.lock`; use `uv sync` to install, `uv add <pkg>` to add deps
 
 ## Frameworks
-**Core:** Click 8.1+ — command-line interface framework for all 8 CLI tools (`rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-rml-gen`, `rosetta-provenance`, `rosetta-accredit`)
-**RDF:** rdflib 6.3+ — semantic graph representation, SPARQL querying, Turtle/N-Triples serialization
-**Validation:** pySHACL 0.20+ — shape-based RDF validation (SHACL profiles in `rosetta/policies/`)
-**Testing:** pytest 7.4+ (dev) — unit and integration tests in `rosetta/tests/`
+**CLI:** Click >=8.1 — all 8 entrypoints in `rosetta/cli/` use `@click.command()`
+**RDF:** rdflib >=6.3 — semantic graph representation, SPARQL querying, Turtle/N-Triples serialization
+**Validation:** pySHACL >=0.20 — SHACL shape validation; shapes in `rosetta/policies/`
+**Testing:** pytest >=9.0 — tests in `rosetta/tests/`; run with `uv run pytest`
+**Build:** hatchling — wheel backend, packages `rosetta/` only
 
 ## Key Dependencies
-**Critical:**
-- **rdflib** (6.3+) — RDF graph parsing, SPARQL execution, URI/literal handling; core to all semantic operations
-- **click** (8.1+) — CLI argument parsing, file I/O orchestration, exit code handling
-- **sentence-transformers** (3.0+) — embedding models (LaBSE, E5) for semantic similarity in `rosetta-embed` and `rosetta-suggest`
-- **pySHACL** (0.20+) — SHACL validation engine for `rosetta-lint` conformance checks
-- **numpy** (1.26+) — vector math for embedding similarity calculations in `rosetta/core/similarity.py`
-- **pyyaml** (6.0+) — YAML parsing (used by parsers in `rosetta/core/parsers/`)
+**rdflib >=6.3** — RDF graph parsing, SPARQL execution; core to all semantic operations in `rosetta/core/rdf_utils.py`
+**click >=8.1** — CLI argument parsing, file I/O orchestration, exit code handling
+**sentence-transformers >=3.0** — LaBSE model for multilingual embeddings; drives `rosetta-embed` and `rosetta-suggest`
+**pySHACL >=0.20** — SHACL validation engine for `rosetta-lint` conformance checks
+**numpy >=1.26** — vector math for cosine similarity in `rosetta/core/similarity.py`
+**pydantic >=2.13** — typed user-facing JSON output; all models in `rosetta/core/models.py`
+**pyyaml >=6.0** — YAML/config parsing used by core parsers
 
 ## Configuration
-**Environment:** 3-tier config precedence (CLI flag > env var > config file):
-- Config file: `rosetta.toml` in CWD (loaded by `rosetta/core/config.py`)
-- Env vars: prefix `ROSETTA_{SECTION}_{KEY}` (uppercase), e.g., `ROSETTA_EMBED_MODEL`
-- CLI flags: override both (see each tool's `--config` option)
+**Primary config:** `rosetta.toml` at repo root — store path, RDF namespaces, embed model, suggest thresholds, lint strictness
+**Override:** all `rosetta.toml` settings overridable via CLI flags at runtime
+**No required env vars** for core operation — model weights downloaded on first run by sentence-transformers
 
-**Config sections (rosetta.toml):**
-- `[general]` — store_path, default_format (Turtle)
-- `[embed]` — model (default: sentence-transformers/LaBSE), mode
-- `[suggest]` — top_k, min_score, anomaly_threshold
-- `[lint]` — strict (boolean)
+## Linting & Type Checking
+**Formatter:** `uv run ruff format .` (line-length 100, target py311)
+**Linter:** `uv run ruff check .` — rules E, W, F, I, UP
+**Type checker:** `uv run basedpyright` — strict on `rosetta/core/` and `rosetta/cli/`; basic on tests
 
 ## Platform Requirements
-**Development:** Linux/macOS/Windows with Python 3.11+ and uv package manager
-**Production:** Python 3.11+ runtime; no external services required (all operations local to filesystem)
+**Development:** Linux/macOS; uv installed; Python 3.11+
+**Production:** Python 3.11+ only; no containerization config present; tools are Unix-composable CLI utilities (stdin/stdout, exit codes 0/1)
 
 ---
 *Stack analysis: 2026-04-13*

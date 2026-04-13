@@ -5,7 +5,7 @@ import itertools
 from pathlib import Path
 from typing import TextIO
 
-from rosetta.core.parsers import FieldSchema, schema_slug
+from rosetta.core.parsers._types import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
 
 

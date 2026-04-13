@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from rdflib import Graph, Namespace, RDF
+from rdflib import RDF, Graph, Namespace
 
 from rosetta.core.rdf_utils import query_graph
 
@@ -80,10 +80,15 @@ def _e5_passage_prefix(model_name: str) -> str:
 class EmbeddingModel:
     """Thin wrapper around a SentenceTransformer model."""
 
+    model_name: str
+    _passage_prefix: str
+    _query_prefix: str
+
     def __init__(self, model_name: str = "sentence-transformers/LaBSE") -> None:
         from sentence_transformers import SentenceTransformer
+
         self.model_name = model_name
-        self._model = SentenceTransformer(model_name)
+        self._model: SentenceTransformer = SentenceTransformer(model_name)
         self._passage_prefix = _e5_passage_prefix(model_name)
         self._query_prefix = "query: " if self._passage_prefix else ""
 

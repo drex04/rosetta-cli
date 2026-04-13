@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, TextIO
+from typing import TextIO
 
 
 @contextmanager
@@ -17,7 +18,7 @@ def open_input(path: str | Path | None) -> Generator[TextIO, None, None]:
     if path is None or path == "-":
         yield sys.stdin
     else:
-        fh = open(path, "r", encoding="utf-8")
+        fh = open(path, encoding="utf-8")
         try:
             yield fh
         finally:

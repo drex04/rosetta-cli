@@ -45,3 +45,46 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - Roadmap: `.planning/ROADMAP.md`
 - Architecture decisions: `.planning/DECISIONS.md`
 - Full implementation plan: `PLAN.md`
+
+## Code Quality
+
+### Mandatory checks — run before every commit
+
+- `uv run ruff format .` — auto-format
+- `uv run ruff check .` — lint (rules: E, W, F, I, UP)
+- `uv run basedpyright` — static type check (strict: source, basic: tests)
+- `uv run pytest -m "not slow"` — regression guard
+
+CI enforces all four on every push/PR (`.github/workflows/ci.yml`).
+
+### Type annotation rules
+
+- All functions in `rosetta/core/` and `rosetta/cli/` must have explicit parameter and return annotations.
+- Use **broad rdflib types**: `rdflib.term.Node | None`, `rdflib.Graph` — do not narrow to `URIRef`/`Literal` at function boundaries.
+- Use `list[dict[str, Any]]` only for internal transient structures. User-facing JSON outputs must use Pydantic models (see below).
+- Tests are annotated (basic mode) — annotate fixture return types and non-obvious variables.
+
+### Pydantic models (rosetta/core/models.py)
+
+User-facing JSON outputs are typed via Pydantic v2:
+
+| Output | Model |
+|--------|-------|
+| `rosetta-lint` | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
+| `rosetta-suggest` | `SuggestionReport` (RootModel) |
+| `rosetta-embed` | `EmbeddingReport` (RootModel) |
+
+- Construct model instances in the CLI, not bare dicts.
+- Serialise with `model.model_dump(mode="json")` before `json.dumps()`.
+- New structured outputs must define a model in `rosetta/core/models.py` first.
+- Define Pydantic models only after the underlying function return shape is finalized — or write a failing test first. Redesigning mid-phase is costly.
+
+## Gotchas
+
+- **Orchestrator plan naming:** After `/fh:auto`, check `.planning/phases/NN-*/` for files named `plan0N-*.md`. If present, rename to `NN-01-PLAN.md` — the orchestrator expects this exact format and will fail plan-work on every resume if it doesn't find it. *(learnings: 2026-04-13)*
+- **basedpyright in tests:** `# type: ignore[arg-type]` may not suppress errors in test files. Use `# pyright: ignore[reportArgumentType]` instead. *(learnings: 2026-04-13)*
+- **rdflib SPARQL boundaries:** `row.attribute` access on query results is untyped — use `# pyright: ignore[reportAttributeAccessIssue]` at every access point. Standard solution for untyped library integration. *(learnings: 2026-04-13)*
+
+## Conventions
+
+- **Stub tests belong in the tool's own test file** — don't put `test_<tool>_stub_exits_1` in `test_ingest.py`. When the real implementation lands, the stub test should be in the right file to update, not delete. *(learnings: 2026-04-13)*

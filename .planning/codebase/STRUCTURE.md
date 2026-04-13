@@ -7,77 +7,89 @@
 rosetta-cli/
   rosetta/
     cli/           # 8 Click entrypoints (one per tool)
-    core/          # Shared domain logic (RDF, embedding, similarity, units)
-    policies/      # Static RDF graphs (QUDT, FnML)
+    core/          # Shared domain logic
+      parsers/     # Format-specific schema parsers (CSV, JSON Schema, OpenAPI)
+    policies/      # Static RDF knowledge graphs (TTL)
     tests/         # pytest fixtures and test files
-  pyproject.toml   # Python package config; defines 8 CLI tools
-  rosetta.toml     # Runtime config (embed model, lint strictness, suggest top-k)
+  pyproject.toml   # Package config; defines 8 CLI tool entrypoints
+  rosetta.toml     # Runtime config (model name, lint strictness, top-k)
 ```
 
 ## Directory Purposes
 
 **`rosetta/cli/`:**
-- Purpose: CLI argument parsing and orchestration for all 8 tools
+- Purpose: CLI argument parsing and orchestration; one file per tool
 - Key files: `ingest.py`, `embed.py`, `suggest.py`, `lint.py`, `validate.py`, `rml_gen.py`, `provenance.py`, `accredit.py`
-- Pattern: Each file = one Click command; reads config, calls core function, handles I/O and exit codes
+- Pattern: Each file = one Click `@command`; reads config, calls core function, serializes output, handles exit codes
 
 **`rosetta/core/`:**
 - Purpose: Reusable domain logic shared across all CLI tools
 - Key files:
-  - `rdf_utils.py` — RDF graph loading/saving, SPARQL execution, namespace binding
-  - `embedding.py` — Extract text from RDF for embedding models; support master vs national schema detection
-  - `similarity.py` — Cosine similarity ranking, top-k filtering, anomaly detection
+  - `rdf_utils.py` — graph load/save, SPARQL helpers, namespace binding
+  - `embedding.py` — text extraction from RDF + LaBSE encoding
+  - `similarity.py` — cosine similarity ranking, top-k, anomaly detection
   - `units.py` — QUDT unit lookup, dimension vector comparison, FnML suggestions
-  - `unit_detect.py` — Detect units from field labels (meter, kilometer, knot, dBm, etc.)
-  - `ingest_rdf.py` — Parse national schemas into RDF
-  - `config.py` — 3-tier config loader (file < env < CLI)
-  - `io.py` — Unix-composable stdin/stdout wrappers
+  - `unit_detect.py` — detect units from field labels (meter, knot, dBm, etc.)
+  - `ingest_rdf.py` — convert `FieldRecord` list → `rdflib.Graph`
+  - `models.py` — Pydantic output models (`LintReport`, `SuggestionReport`, `EmbeddingReport`)
+  - `config.py` — 3-tier config loader (file < env < CLI flag)
+  - `io.py` — `open_input()` / `open_output()` stdin/stdout context managers
+  - `provenance.py` — provenance record stamping and querying
+  - `accredit.py` — accreditation state machine logic
+  - `rml_builder.py` — RML mapping document construction
+
+**`rosetta/core/parsers/`:**
+- Purpose: Normalize heterogeneous national schemas to `list[FieldRecord]`
+- Key files: `_types.py` (FieldRecord type), `csv_parser.py`, `json_schema_parser.py`, `openapi_parser.py`
+- Entry: `__init__.py` exposes `dispatch_parser(src, path, fmt, nation, max_rows)`
 
 **`rosetta/policies/`:**
 - Purpose: Static knowledge graphs embedded as package data
 - Key files: `qudt_units.ttl`, `fnml_registry.ttl`
-- Pattern: Loaded at runtime by `rosetta.core.units.load_qudt_graph()`
+- Loading: `rosetta.core.units.load_qudt_graph()` via `importlib.resources`
 
 **`rosetta/tests/`:**
-- Purpose: Unit and integration tests
-- Key files: `conftest.py` (synthetic RDF fixtures), `test_*.py` (per-module tests)
+- Purpose: Unit and integration tests; one test file per module
+- Key files: `conftest.py` (shared synthetic RDF fixtures), `test_{module}.py`
 
 ## Key File Locations
-
-**Entry Points:** `rosetta/cli/{tool}.py:cli` — 8 Click decorators + main function
-**Configuration:** `rosetta.toml` — shared defaults; `rosetta/core/config.py` — 3-tier loader
-**Core Logic:** `rosetta/core/{rdf_utils,embedding,similarity,units}.py`
-**Testing:** `rosetta/tests/{conftest,test_*.py}` — fixtures and pytest cases
-**Policies:** `rosetta/policies/{qudt_units,fnml_registry}.ttl` — RDF knowledge bases
+**Entry Points:** `rosetta/cli/{tool}.py:cli` — Click command decorated with `@click.command()`
+**Configuration:** `rosetta.toml` (defaults), `rosetta/core/config.py` (loader)
+**Core Logic:** `rosetta/core/{rdf_utils,embedding,similarity,units,ingest_rdf}.py`
+**Output Models:** `rosetta/core/models.py`
+**Testing:** `rosetta/tests/{conftest.py,test_*.py}`
+**Policies:** `rosetta/policies/{qudt_units,fnml_registry}.ttl`
 
 ## Naming Conventions
-
-**Files:** `{feature}.py` — lowercase, one concept per file (e.g., `units.py`, `embedding.py`)
-**Functions:** `snake_case`; core functions prefixed `_` for private/internal use
-**Classes:** `PascalCase` (e.g., `EmbeddingModel`)
-**Tests:** `test_{module}.py` — filename matches tested module
-**RDF files:** `*.ttl` in policies, `*.toml` for config
+**Files:** `snake_case.py` — one concept per file (e.g., `unit_detect.py`)
+**Functions:** `snake_case`; private/internal prefixed with `_`
+**Classes:** `PascalCase` (e.g., `EmbeddingModel`, `LintReport`)
+**Tests:** `test_{module}.py` — filename mirrors the tested module
+**RDF artifacts:** `*.ttl` (human), `*.nt` (machine interchange)
 
 ## Where to Add New Code
 
 **New CLI tool:**
-- Implementation: Create `rosetta/cli/{tool_name}.py` with Click @command decorator
-- Tests: Add `rosetta/tests/test_{tool_name}.py`
-- Register: Add entrypoint in `pyproject.toml` [project.scripts]
+- Entrypoint: `rosetta/cli/{tool_name}.py` with `@click.command()` named `cli`
+- Tests: `rosetta/tests/test_{tool_name}.py`
+- Register: `pyproject.toml` `[project.scripts]` → `rosetta-{tool-name} = "rosetta.cli.{tool_name}:cli"`
 
-**New core module (e.g., validation logic):**
+**New core module:**
 - Location: `rosetta/core/{feature}.py`
-- Pattern: Implement pure functions or classes; depend only on rdflib, numpy, or existing core modules
-- Tests: Add corresponding test file in `rosetta/tests/`
+- Pattern: Pure functions with full type annotations; no Click imports; raise `ValueError` on bad input
+- Tests: `rosetta/tests/test_{feature}.py`
 
-**New test fixture (e.g., synthetic graph):**
-- Location: `rosetta/tests/conftest.py` (if shared across tests)
-- Pattern: Use pytest @fixture decorator; return rdflib.Graph or other test data
+**New Pydantic output model:**
+- Location: `rosetta/core/models.py` — define model after return shape is finalized
+- Usage: Construct in CLI layer; serialize via `model.model_dump(mode="json")`
+
+**New parser format:**
+- Location: `rosetta/core/parsers/{format}_parser.py`
+- Register: Add to `dispatch_parser()` in `rosetta/core/parsers/__init__.py`
 
 **New policy/ontology:**
 - Location: `rosetta/policies/{name}.ttl`
-- Loading: Add to `rosetta.core.units.load_qudt_graph()` or similar function
-- Pattern: Embed as package data via importlib.resources
+- Loading: Load via `importlib.resources` in `rosetta/core/units.py` or a new loader
 
 ---
 *Structure analysis: 2026-04-13*
