@@ -20,8 +20,11 @@ def parse_csv(
     Reads up to max_sample_rows rows. Infers data_type per column,
     detects units, and computes stats.
     """
-    reader = csv.DictReader(src)
-    rows = list(itertools.islice(reader, max_sample_rows))
+    try:
+        reader = csv.DictReader(src)
+        rows = list(itertools.islice(reader, max_sample_rows))
+    except csv.Error as exc:
+        raise ValueError(f"Malformed CSV: {exc}") from exc
 
     slug = schema_slug(path.stem) if path is not None else "unknown"
 

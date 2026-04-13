@@ -120,3 +120,23 @@ def test_load_graph_invalid_rdf(tmp_path: Path) -> None:
     bad_stream = io.StringIO("<<< completely broken >>>")
     with pytest.raises(ValueError, match="Failed to parse RDF"):
         load_graph(bad_stream)
+
+
+def test_query_graph_with_bindings() -> None:
+    """query_graph passes bindings as initBindings to avoid SPARQL injection."""
+    from rdflib import Literal
+
+    g = Graph()
+    g.parse(data="""
+        @prefix ex: <http://example.org/> .
+        ex:a ex:name "Alice" .
+        ex:b ex:name "Bob" .
+    """, format="turtle")
+
+    results = query_graph(
+        g,
+        "SELECT ?name WHERE { ?s <http://example.org/name> ?name }",
+        bindings={"s": URIRef("http://example.org/a")},
+    )
+    assert len(results) == 1
+    assert str(results[0]["name"]) == "Alice"

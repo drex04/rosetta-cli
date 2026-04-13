@@ -259,3 +259,47 @@ def test_histogram_edges_in_rdf():
     import json as _json
     edges = _json.loads(str(histogram_edges[0]))
     assert len(edges) == 11
+
+
+# ---------------------------------------------------------------------------
+# Regression: parser error handling
+# ---------------------------------------------------------------------------
+
+def test_openapi_empty_file_raises():
+    """OpenAPI parser must raise ValueError on empty/non-dict YAML input."""
+    from rosetta.core.parsers.openapi_parser import parse_openapi
+
+    with pytest.raises(ValueError, match="YAML mapping"):
+        parse_openapi(io.StringIO(""), None, "TEST")
+
+    with pytest.raises(ValueError, match="YAML mapping"):
+        parse_openapi(io.StringIO("just a string"), None, "TEST")
+
+
+def test_csv_malformed_wraps_csv_error(monkeypatch):
+    """csv.Error during parsing is wrapped as ValueError with 'Malformed CSV'."""
+    import csv as csv_mod
+    from rosetta.core.parsers.csv_parser import parse_csv
+
+    original_init = csv_mod.DictReader.__init__
+
+    def bad_init(self, *a, **kw):
+        original_init(self, *a, **kw)
+
+    # Make iterating the reader raise csv.Error
+    monkeypatch.setattr(csv_mod.DictReader, "__next__", lambda self: (_ for _ in ()).throw(csv_mod.Error("bad line")))
+
+    src = io.StringIO("name,value\na,1")
+    with pytest.raises(ValueError, match="Malformed CSV"):
+        parse_csv(src, None, "TEST")
+
+
+def test_ingest_cli_invalid_input_format():
+    """--input-format with invalid value should be rejected by Click."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "--input", str(FIXTURES / "nor_radar.csv"),
+        "--nation", "NOR",
+        "--input-format", "xml",
+    ])
+    assert result.exit_code != 0

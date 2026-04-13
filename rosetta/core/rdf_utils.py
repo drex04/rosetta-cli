@@ -79,12 +79,14 @@ def save_graph(
         path.write(serialized)
 
 
-def query_graph(g: Graph, sparql: str) -> list[dict]:
+def query_graph(g: Graph, sparql: str, bindings: dict | None = None) -> list[dict]:
     """Execute a SPARQL SELECT query and return results as a list of dicts.
 
     Each dict maps variable name (str) to an rdflib term.
+    Use *bindings* (passed as ``initBindings``) instead of string interpolation
+    to avoid SPARQL injection.
     """
-    results = g.query(sparql)
+    results = g.query(sparql, initBindings=bindings or {})
     return [
         {str(var): row[var] for var in results.vars}
         for row in results

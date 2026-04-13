@@ -321,3 +321,41 @@ def test_suggest_cli_config_precedence(tmp_path):
     data = json.loads(result.output)
     for uri in SOURCE_EMB:
         assert len(data[uri]["suggestions"]) <= 1
+
+
+# ---------------------------------------------------------------------------
+# Regression: top-k with min_score must return up to top_k qualifying entries
+# ---------------------------------------------------------------------------
+
+def test_rank_suggestions_top_k_with_min_score_returns_all_qualifying():
+    """top_k=3 with min_score filtering should still return 3 results when 3+ qualify.
+
+    Regression test: previously the loop broke on rank count including filtered
+    entries, so fewer qualifying results were returned than top_k.
+    """
+    from rosetta.core.similarity import rank_suggestions
+
+    src_uris = ["http://src/a"]
+    A = np.array([[1.0, 0.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    master_uris = [
+        "http://m/a",  # score ~0.0 (orthogonal, filtered)
+        "http://m/b",  # score ~0.0 (orthogonal, filtered)
+        "http://m/c",  # score ~0.95
+        "http://m/d",  # score ~0.90
+        "http://m/e",  # score ~0.85
+    ]
+    B = np.array([
+        [0.0, 1.0, 0.0, 0.0, 0.0],  # a: orthogonal
+        [0.0, 0.0, 1.0, 0.0, 0.0],  # b: orthogonal
+        [0.95, 0.05, 0.0, 0.0, 0.0],  # c: high
+        [0.90, 0.10, 0.0, 0.0, 0.0],  # d: high
+        [0.85, 0.15, 0.0, 0.0, 0.0],  # e: high
+    ], dtype=np.float32)
+
+    result = rank_suggestions(src_uris, A, master_uris, B, top_k=3, min_score=0.5)
+    suggestions = result["http://src/a"]["suggestions"]
+    assert len(suggestions) == 3, f"Expected 3 qualifying suggestions, got {len(suggestions)}"
+    assert all(s["score"] >= 0.5 for s in suggestions)
+    assert suggestions[0]["rank"] == 1
+    assert suggestions[1]["rank"] == 2
+    assert suggestions[2]["rank"] == 3

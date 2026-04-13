@@ -58,15 +58,17 @@ def rank_suggestions(
         sorted_indices = np.argsort(sim_row)[::-1]
 
         suggestions = []
-        rank = 1
         for idx in sorted_indices:
             score = round(float(sim_row[idx]), 6)
             if score < min_score:
                 continue
-            suggestions.append({"uri": master_uris[idx], "score": score, "rank": rank})
-            rank += 1
-            if rank > n_take:
+            suggestions.append({"uri": master_uris[idx], "score": score, "rank": len(suggestions)})
+            if len(suggestions) >= n_take:
                 break
+
+        # Assign 1-based ranks after collection
+        for rank_idx, sug in enumerate(suggestions, 1):
+            sug["rank"] = rank_idx
 
         result[src_uri] = {
             "suggestions": suggestions,

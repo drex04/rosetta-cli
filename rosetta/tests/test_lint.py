@@ -403,7 +403,7 @@ def test_lint_cli_strict_info_stays_info(tmp_path):
     data = json.loads(result.output)
     infos = [f for f in data["findings"] if f["severity"] == "INFO"]
     assert infos, "Expected at least one INFO finding (unit_not_detected)"
-    assert all(f["rule"] == "unit_not_detected" or True for f in infos)
+    assert all(f["rule"] == "unit_not_detected" for f in infos)
 
 
 def test_lint_cli_unit_conversion_null_fnml(tmp_path):

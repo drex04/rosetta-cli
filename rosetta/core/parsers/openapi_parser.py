@@ -30,6 +30,9 @@ def parse_openapi(src: TextIO, path: Path | None, nation: str) -> tuple[list[Fie
     into a flat list (last-schema-wins on duplicate names).
     """
     doc = yaml.safe_load(src)
+    if not isinstance(doc, dict):
+        raise ValueError("OpenAPI document must be a YAML mapping, got "
+                         f"{type(doc).__name__}")
 
     # Derive slug: normalize path.stem through schema_slug to ensure lowercase/safe URIs;
     # fall back to schema_slug of info.title when no path is available.

@@ -1,4 +1,6 @@
 """rosetta-accredit: Accredit mappings for operational use."""
+import sys
+
 import click
 
 
@@ -6,4 +8,5 @@ import click
 @click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
 def cli(config):
     """Accredit approved mappings for operational deployment."""
-    click.echo("Not yet implemented")
+    click.echo("Not yet implemented", err=True)
+    sys.exit(1)
