@@ -173,17 +173,15 @@ echo "      Target: $TGT"
 
 echo ""
 echo "      submit →"
-uv run rosetta-accredit submit \
+uv run rosetta-accredit --ledger "$LEDGER" submit \
   --source "$SRC" --target "$TGT" \
-  --ledger "$LEDGER" \
   --actor "pipeline-demo" \
   --notes "Auto-submitted by full-pipeline.sh"
 
 echo ""
 echo "      approve →"
-uv run rosetta-accredit approve \
-  --source "$SRC" --target "$TGT" \
-  --ledger "$LEDGER"
+uv run rosetta-accredit --ledger "$LEDGER" approve \
+  --source "$SRC" --target "$TGT"
 
 echo ""
 echo "      suggest with ledger (accredited boost):"
@@ -208,9 +206,8 @@ EOF
 
 echo ""
 echo "      revoke →"
-uv run rosetta-accredit revoke \
-  --source "$SRC" --target "$TGT" \
-  --ledger "$LEDGER"
+uv run rosetta-accredit --ledger "$LEDGER" revoke \
+  --source "$SRC" --target "$TGT"
 
 echo ""
 echo "      suggest with ledger (revoked excluded):"
@@ -238,7 +235,7 @@ EOF
 
 echo ""
 echo "      Ledger status:"
-uv run rosetta-accredit status --ledger "$LEDGER"
+uv run rosetta-accredit --ledger "$LEDGER" status
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 

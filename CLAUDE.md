@@ -34,6 +34,7 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 
 ## Conventions
 
+- **Public API surface changes must update README.md** — any change to CLI commands, option names, option placement (e.g. group-level vs subcommand-level), output formats, or exit codes requires a matching update to the relevant tool section in `README.md` before the work is complete.
 - All tools: read from files or stdin, write to files or stdout (Unix-composable)
 - RDF serialization: Turtle (.ttl) for human artifacts, N-Triples for machine interchange
 - Exit code 0 = success/conformant, 1 = errors/violations (composable in shell scripts)

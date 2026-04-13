@@ -380,13 +380,20 @@ All subcommands print a JSON response to stdout.
 SRC="http://rosetta.interop/ns/NOR/nor_radar/altitude_m"
 TGT="http://rosetta.interop/ns/master/altitude"
 
-uv run rosetta-accredit submit --source "$SRC" --target "$TGT" \
+# --ledger is a GLOBAL option — it must come before the subcommand name
+uv run rosetta-accredit --ledger my/ledger.json submit \
+  --source "$SRC" --target "$TGT" \
   --actor alice --notes "Validated against NOR field manual"
-uv run rosetta-accredit approve --source "$SRC" --target "$TGT"
-uv run rosetta-accredit status
+uv run rosetta-accredit --ledger my/ledger.json approve \
+  --source "$SRC" --target "$TGT"
+uv run rosetta-accredit --ledger my/ledger.json status
 
 # Later: withdraw or deny
-uv run rosetta-accredit revoke --source "$SRC" --target "$TGT"
+uv run rosetta-accredit --ledger my/ledger.json revoke \
+  --source "$SRC" --target "$TGT"
+
+# Omit --ledger to use the default (store/ledger.json)
+uv run rosetta-accredit submit --source "$SRC" --target "$TGT" --actor alice
 ```
 
 **Exit codes:** 0 on success, 1 on state-machine violations.
