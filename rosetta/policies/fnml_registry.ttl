@@ -1,0 +1,84 @@
+@prefix rose:  <http://rosetta.interop/ns/> .
+@prefix unit:  <http://qudt.org/vocab/unit/> .
+@prefix fnml:  <http://rosetta.interop/fnml/> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix qudt:  <http://qudt.org/schema/qudt/> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+fnml:ConvertFtToM
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:FT ;
+    rose:toUnit    unit:M ;
+    rdfs:label     "Convert feet to metres"@en ;
+    qudt:conversionMultiplier 0.3048 .
+
+fnml:ConvertMToFt
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:M ;
+    rose:toUnit    unit:FT ;
+    rdfs:label     "Convert metres to feet"@en ;
+    qudt:conversionMultiplier 3.28084 .
+
+fnml:ConvertKiloMToM
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:KiloM ;
+    rose:toUnit    unit:M ;
+    rdfs:label     "Convert kilometres to metres"@en ;
+    qudt:conversionMultiplier 1000 .
+
+fnml:ConvertMToKiloM
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:M ;
+    rose:toUnit    unit:KiloM ;
+    rdfs:label     "Convert metres to kilometres"@en ;
+    qudt:conversionMultiplier 0.001 .
+
+fnml:ConvertKphToMs
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:KiloM-PER-HR ;
+    rose:toUnit    unit:M-PER-SEC ;
+    rdfs:label     "Convert km/h to m/s"@en ;
+    qudt:conversionMultiplier 0.277778 .
+
+fnml:ConvertMsToKph
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:M-PER-SEC ;
+    rose:toUnit    unit:KiloM-PER-HR ;
+    rdfs:label     "Convert m/s to km/h"@en ;
+    qudt:conversionMultiplier 3.6 .
+
+fnml:ConvertKnToMs
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:KN ;
+    rose:toUnit    unit:M-PER-SEC ;
+    rdfs:label     "Convert knots to m/s"@en ;
+    qudt:conversionMultiplier 0.514444 .
+
+fnml:ConvertDegToRad
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:DEG ;
+    rose:toUnit    unit:RAD ;
+    rdfs:label     "Convert degrees to radians"@en ;
+    qudt:conversionMultiplier 0.017453293 .
+
+fnml:ConvertRadToDeg
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:RAD ;
+    rose:toUnit    unit:DEG ;
+    rdfs:label     "Convert radians to degrees"@en ;
+    qudt:conversionMultiplier 57.2957795 .
+
+fnml:ConvertKgToG
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:KiloGM ;
+    rose:toUnit    unit:GM ;
+    rdfs:label     "Convert kilograms to grams"@en ;
+    qudt:conversionMultiplier 1000 .
+
+fnml:ConvertCelsiusToKelvin
+    a rose:ConversionFunction ;
+    rose:fromUnit  unit:degC ;
+    rose:toUnit    unit:K ;
+    rdfs:label     "Convert Celsius to Kelvin"@en ;
+    qudt:conversionMultiplier 1.0 ;
+    qudt:conversionOffset 273.15 .

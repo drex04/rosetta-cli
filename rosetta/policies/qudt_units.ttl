@@ -1,0 +1,126 @@
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ── Length ────────────────────────────────────────────────────────────────────
+
+unit:M
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Metre" ;
+    qudt:symbol           "m" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T0D0" .
+
+unit:FT
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Foot" ;
+    qudt:symbol           "ft" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T0D0" .
+
+unit:KiloM
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Kilometre" ;
+    qudt:symbol           "km" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T0D0" .
+
+unit:NauticalMile
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Nautical Mile" ;
+    qudt:symbol           "nmi" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T0D0" .
+
+# ── Speed ─────────────────────────────────────────────────────────────────────
+
+unit:KiloM-PER-HR
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Kilometre per Hour" ;
+    qudt:symbol           "km/h" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T-1D0" .
+
+unit:M-PER-SEC
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Metre per Second" ;
+    qudt:symbol           "m/s" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T-1D0" .
+
+unit:KN
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Knot" ;
+    qudt:symbol           "kn" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T-1D0" .
+
+# ── Angle ─────────────────────────────────────────────────────────────────────
+
+unit:DEG
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Degree" ;
+    qudt:symbol           "°" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T0D0" .
+
+unit:RAD
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Radian" ;
+    qudt:symbol           "rad" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T0D0" .
+
+# ── Mass ──────────────────────────────────────────────────────────────────────
+
+unit:KiloGM
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Kilogram" ;
+    qudt:symbol           "kg" ;
+    qudt:hasDimensionVector "A0E0L0I0M1H0T0D0" .
+
+unit:GM
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Gram" ;
+    qudt:symbol           "g" ;
+    qudt:hasDimensionVector "A0E0L0I0M1H0T0D0" .
+
+# ── Time ──────────────────────────────────────────────────────────────────────
+
+unit:SEC
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Second" ;
+    qudt:symbol           "s" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T1D0" .
+
+unit:MIN
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Minute" ;
+    qudt:symbol           "min" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T1D0" .
+
+unit:HR
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Hour" ;
+    qudt:symbol           "hr" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T1D0" .
+
+# ── Pressure ──────────────────────────────────────────────────────────────────
+
+unit:PA
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Pascal" ;
+    qudt:symbol           "Pa" ;
+    qudt:hasDimensionVector "A0E0L-1I0M1H0T-2D0" .
+
+unit:DeciBAR
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Decibar" ;
+    qudt:symbol           "dbar" ;
+    qudt:hasDimensionVector "A0E0L-1I0M1H0T-2D0" .
+
+# ── Temperature ───────────────────────────────────────────────────────────────
+
+unit:K
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Kelvin" ;
+    qudt:symbol           "K" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H1T0D0" .
+
+unit:degC
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Degree Celsius" ;
+    qudt:symbol           "°C" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H1T0D0" .

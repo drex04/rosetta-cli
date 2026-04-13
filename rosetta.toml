@@ -14,3 +14,6 @@ mode = "lexical-only"
 top_k = 5
 min_score = 0.0
 anomaly_threshold = 0.3
+
+[lint]
+strict = false
