@@ -12,7 +12,10 @@ from rosetta.core.unit_detect import compute_stats, detect_unit
 
 def parse_json_schema(src: TextIO, path: Path | None, nation: str) -> tuple[list[FieldSchema], str]:
     """Parse a JSON Schema document and return (fields, slug)."""
-    schema = json.load(src)
+    try:
+        schema = json.load(src)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Malformed JSON{f' in {path!r}' if path else ''}: {exc}") from exc
 
     if "properties" not in schema:
         raise ValueError(f"JSON Schema missing 'properties' key in {path!r}")

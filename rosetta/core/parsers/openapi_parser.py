@@ -9,8 +9,13 @@ from rosetta.core.parsers import FieldSchema, schema_slug
 from rosetta.core.unit_detect import compute_stats, detect_unit
 
 
-def _resolve_ref(ref: str, schemas: dict) -> dict:
-    """Resolve an internal $ref like '#/components/schemas/X' to its schema dict."""
+def _resolve_ref(ref: str, schemas: dict, *, _depth: int = 0, _max_depth: int = 10) -> dict:
+    """Resolve an internal $ref like '#/components/schemas/X' to its schema dict.
+
+    Recursively resolves chained $refs up to _max_depth to prevent infinite loops.
+    """
+    if _depth > _max_depth:
+        raise ValueError(f"$ref chain too deep (>{_max_depth}): {ref}")
     if not ref.startswith("#"):
         raise ValueError(f"External $ref not supported: {ref}")
     # Expect format: #/components/schemas/<Name>
@@ -19,7 +24,11 @@ def _resolve_ref(ref: str, schemas: dict) -> dict:
     if len(parts) == 3 and parts[0] == "components" and parts[1] == "schemas":
         name = parts[2]
         if name in schemas:
-            return schemas[name]
+            resolved = schemas[name]
+            # Recursively resolve if the resolved schema itself has a $ref
+            if "$ref" in resolved:
+                return _resolve_ref(resolved["$ref"], schemas, _depth=_depth + 1, _max_depth=_max_depth)
+            return resolved
     raise ValueError(f"Cannot resolve $ref: {ref}")
 
 

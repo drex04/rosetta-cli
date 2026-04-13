@@ -99,6 +99,58 @@ def test_embedding_model_encode_shape(mock_sentence_transformer):
     assert len(result[1]) == 4
 
 
+class _FakeModelCapture:
+    """Fake model that captures the texts passed to encode."""
+    def __init__(self):
+        self.last_texts = None
+
+    def encode(self, texts):
+        self.last_texts = texts
+        return np.zeros((len(texts), 4), dtype=np.float32)
+
+
+def test_encode_query_e5_prefix(monkeypatch):
+    """encode_query applies 'query: ' prefix for E5 models."""
+    from rosetta.core.embedding import EmbeddingModel
+    import sentence_transformers
+
+    fake = _FakeModelCapture()
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
+
+    model = EmbeddingModel("intfloat/multilingual-e5-base")
+    model.encode_query(["test query"])
+
+    assert fake.last_texts == ["query: test query"]
+
+
+def test_encode_passage_e5_prefix(monkeypatch):
+    """encode applies 'passage: ' prefix for E5 models."""
+    from rosetta.core.embedding import EmbeddingModel
+    import sentence_transformers
+
+    fake = _FakeModelCapture()
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
+
+    model = EmbeddingModel("intfloat/multilingual-e5-large")
+    model.encode(["test passage"])
+
+    assert fake.last_texts == ["passage: test passage"]
+
+
+def test_encode_query_non_e5_no_prefix(monkeypatch):
+    """encode_query does NOT apply prefix for non-E5 models."""
+    from rosetta.core.embedding import EmbeddingModel
+    import sentence_transformers
+
+    fake = _FakeModelCapture()
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: fake)
+
+    model = EmbeddingModel("sentence-transformers/LaBSE")
+    model.encode_query(["test query"])
+
+    assert fake.last_texts == ["test query"]
+
+
 # ---------------------------------------------------------------------------
 # CLI tests
 # ---------------------------------------------------------------------------

@@ -11,6 +11,10 @@ from click.testing import CliRunner
 from rdflib import Graph, Namespace, URIRef
 
 from rosetta.cli.ingest import cli
+from rosetta.cli.validate import cli as validate_cli
+from rosetta.cli.provenance import cli as provenance_cli
+from rosetta.cli.rml_gen import cli as rml_gen_cli
+from rosetta.cli.accredit import cli as accredit_cli
 from rosetta.core.ingest_rdf import fields_to_graph
 from rosetta.core.parsers import FieldSchema, dispatch_parser, schema_slug
 from rosetta.core.parsers.json_schema_parser import parse_json_schema
@@ -303,3 +307,89 @@ def test_ingest_cli_invalid_input_format():
         "--input-format", "xml",
     ])
     assert result.exit_code != 0
+
+
+def test_ingest_cli_invalid_output_format():
+    """--format with invalid RDF format should be rejected by Click."""
+    runner = CliRunner()
+    result = runner.invoke(cli, [
+        "--input", str(FIXTURES / "nor_radar.csv"),
+        "--nation", "NOR",
+        "--format", "garbage",
+    ])
+    assert result.exit_code != 0
+    assert "Invalid value" in result.output or "invalid choice" in result.output.lower()
+
+
+def test_json_schema_malformed_raises():
+    """parse_json_schema raises ValueError with 'Malformed JSON' for invalid JSON."""
+    src = io.StringIO("{invalid json")
+    with pytest.raises(ValueError, match="Malformed JSON"):
+        parse_json_schema(src, None, "TST")
+
+
+def test_openapi_chained_ref_resolved():
+    """parse_openapi resolves chained $ref (A -> B -> C)."""
+    yaml_str = """
+openapi: "3.0.3"
+info:
+  title: Test API
+  version: "1.0"
+components:
+  schemas:
+    AliasToBase:
+      $ref: "#/components/schemas/BaseType"
+    BaseType:
+      type: object
+      properties:
+        field_a:
+          type: string
+    Wrapper:
+      type: object
+      properties:
+        nested:
+          $ref: "#/components/schemas/AliasToBase"
+"""
+    src = io.StringIO(yaml_str)
+    fields, slug = parse_openapi(src, None, "TST")
+    # Should have field_a from BaseType (resolved through AliasToBase)
+    # and nested from Wrapper
+    field_names = {f.name for f in fields}
+    assert "field_a" in field_names
+    assert "nested" in field_names
+
+
+# ---------------------------------------------------------------------------
+# Stub CLI exit codes
+# ---------------------------------------------------------------------------
+
+def test_validate_stub_exits_1():
+    """rosetta-validate stub exits with code 1 (not implemented)."""
+    runner = CliRunner()
+    result = runner.invoke(validate_cli, [])
+    assert result.exit_code == 1
+    assert "not yet implemented" in result.output.lower() or "not implemented" in result.output.lower()
+
+
+def test_provenance_stub_exits_1():
+    """rosetta-provenance stub exits with code 1 (not implemented)."""
+    runner = CliRunner()
+    result = runner.invoke(provenance_cli, [])
+    assert result.exit_code == 1
+    assert "not yet implemented" in result.output.lower() or "not implemented" in result.output.lower()
+
+
+def test_rml_gen_stub_exits_1():
+    """rosetta-rml-gen stub exits with code 1 (not implemented)."""
+    runner = CliRunner()
+    result = runner.invoke(rml_gen_cli, [])
+    assert result.exit_code == 1
+    assert "not yet implemented" in result.output.lower() or "not implemented" in result.output.lower()
+
+
+def test_accredit_stub_exits_1():
+    """rosetta-accredit stub exits with code 1 (not implemented)."""
+    runner = CliRunner()
+    result = runner.invoke(accredit_cli, [])
+    assert result.exit_code == 1
+    assert "not yet implemented" in result.output.lower() or "not implemented" in result.output.lower()

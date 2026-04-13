@@ -16,7 +16,9 @@ from rosetta.core.rdf_utils import save_graph
 @click.command()
 @click.option("--input", "-i", "input_path", default="-", show_default=True, help="Input file path (default: stdin).")
 @click.option("--output", "-o", "output_path", default="-", show_default=True, help="Output file path (default: stdout).")
-@click.option("--format", "-f", "fmt", default="turtle", show_default=True, help="Output RDF format.")
+@click.option("--format", "-f", "fmt", default="turtle", show_default=True,
+              type=click.Choice(["turtle", "n3", "nt", "xml", "json-ld"], case_sensitive=False),
+              help="Output RDF format.")
 @click.option("--input-format", "input_fmt", default=None,
               type=click.Choice(["csv", "json-schema", "openapi"], case_sensitive=False),
               help="Input format (auto-detected from extension if omitted).")
