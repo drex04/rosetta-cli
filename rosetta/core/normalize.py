@@ -28,7 +28,53 @@ except Exception:  # pragma: no cover — only fails if linkml_runtime not insta
     pass
 # -------------------------------------------------------------------------
 
+import re
+from typing import Any
+
 from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
+
+
+def _hoist_nested_objects(schema: dict[str, Any]) -> dict[str, Any]:
+    """Hoist inline nested ``type: object`` schemas into ``$defs``.
+
+    ``JsonSchemaImportEngine`` cannot translate inline nested objects; it
+    expects either primitive types or ``$ref`` pointers into ``$defs``.
+    This pre-processing step lifts every nested object (at any depth) into
+    a named definition and replaces the inline schema with a ``$ref``.
+    """
+    defs: dict[str, Any] = {}
+
+    def _title(name: str) -> str:
+        return "".join(w.capitalize() for w in re.split(r"[_\-\s]+", name))
+
+    def _unique(base: str) -> str:
+        name = _title(base)
+        counter = 1
+        while name in defs:
+            name = f"{_title(base)}{counter}"
+            counter += 1
+        return name
+
+    def _process(node: Any, hint: str, is_root: bool = False) -> Any:
+        if not isinstance(node, dict):
+            return node
+        node = dict(node)
+        if "properties" in node:
+            node["properties"] = {k: _process(v, k) for k, v in node["properties"].items()}
+        if "items" in node:
+            node["items"] = _process(node["items"], hint + "Item")
+        if not is_root and node.get("type") == "object" and "properties" in node:
+            def_name = _unique(hint)
+            defs[def_name] = node
+            return {"$ref": f"#/$defs/{def_name}"}
+        return node
+
+    result = _process(schema, "", is_root=True)
+    if defs:
+        existing: dict[str, Any] = result.get("$defs", {})
+        existing.update(defs)
+        result["$defs"] = existing
+    return result
 
 
 def normalize_schema(
@@ -152,7 +198,7 @@ def normalize_schema(
                     builder.add_object(item)
             else:
                 builder.add_object(data)
-            inferred = builder.to_schema()
+            inferred = _hoist_nested_objects(builder.to_schema())
             tmp_path_str2: str | None = None
             try:
                 with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as tmp:
