@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 import numpy as np
 import pytest
@@ -164,91 +165,41 @@ def test_rank_suggestions_min_score():
     assert "http://m/bearing" not in uris
 
 
-def test_rank_suggestions_anomaly_true():
-    """Field with max score < threshold gets anomaly: true."""
-    from rosetta.core.similarity import rank_suggestions
-
-    src_uris = ["http://src/a"]
-    # Source vector that is mostly orthogonal to master vectors
-    A = np.array([[0.0, 0.0, 1.0]], dtype=np.float32)
-    master_uris = ["http://m/a", "http://m/b"]
-    B = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=np.float32)
-
-    result = rank_suggestions(src_uris, A, master_uris, B, anomaly_threshold=0.3)
-    assert result["http://src/a"]["anomaly"] is True
-
-
-def test_rank_suggestions_anomaly_false():
-    """Field with max score >= threshold gets anomaly: false."""
-    from rosetta.core.similarity import rank_suggestions
-
-    src_uris = ["http://src/a"]
-    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
-    master_uris = ["http://m/a"]
-    B = np.array([[0.9, 0.1, 0.0]], dtype=np.float32)
-
-    result = rank_suggestions(src_uris, A, master_uris, B, anomaly_threshold=0.3)
-    assert result["http://src/a"]["anomaly"] is False
-
-
-def test_rank_suggestions_anomaly_pre_filter():
-    """Field with good match filtered by high min_score is NOT anomalous.
-
-    Anomaly is computed from raw scores BEFORE min_score filtering, so even
-    if the best match is excluded by min_score, anomaly=False when raw max>=threshold.
-    """
-    from rosetta.core.similarity import rank_suggestions
-
-    src_uris = ["http://src/a"]
-    master_uris = ["http://m/a"]
-
-    # Use a vector that scores ~0.98 but min_score=0.999 excludes it
-    A2 = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
-    B2 = np.array([[0.98, 0.2, 0.0]], dtype=np.float32)  # score will be < 1.0
-
-    result = rank_suggestions(src_uris, A2, master_uris, B2, min_score=0.999, anomaly_threshold=0.3)
-    # suggestions list will be empty (all filtered), but anomaly should be False
-    # because raw max score (~0.98) >= anomaly_threshold (0.3)
-    assert result["http://src/a"]["anomaly"] is False
-    assert result["http://src/a"]["suggestions"] == []
-
-
 # ---------------------------------------------------------------------------
 # CLI tests
 # ---------------------------------------------------------------------------
 
 
-def test_suggest_cli_basic(src_file, mst_file):
-    """CLI with pre-baked JSON fixture exits 0, valid JSON output."""
+def test_suggest_cli_basic(src_file, mst_file) -> None:
+    """CLI with pre-baked JSON fixture exits 0, SSSOM TSV output."""
     from rosetta.cli.suggest import cli
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["--source", src_file, "--master", mst_file])
+    result = runner.invoke(cli, [src_file, mst_file])
 
     err_detail = result.output + (str(result.exception) if result.exception else "")
     assert result.exit_code == 0, err_detail
-    data = json.loads(result.output)
-    for uri in SOURCE_EMB:
-        assert uri in data
-        assert "suggestions" in data[uri]
-        assert "anomaly" in data[uri]
-        assert isinstance(data[uri]["anomaly"], bool)
-        assert isinstance(data[uri]["suggestions"], list)
+    assert "subject_id" in result.output
+    assert "\t" in result.output
+    assert "{" not in result.output
+    assert result.output.lstrip().startswith("#")
 
 
-def test_suggest_cli_stdout(src_file, mst_file):
-    """CLI without --output writes JSON to stdout."""
+def test_suggest_cli_stdout(src_file, mst_file) -> None:
+    """CLI without --output writes SSSOM TSV to stdout."""
     from rosetta.cli.suggest import cli
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["--source", src_file, "--master", mst_file])
+    result = runner.invoke(cli, [src_file, mst_file])
 
     assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    assert len(data) == len(SOURCE_EMB)
+    assert "subject_id" in result.output
+    assert "\t" in result.output
+    assert "{" not in result.output
+    assert result.output.lstrip().startswith("#")
 
 
-def test_suggest_cli_empty_source(tmp_path, mst_file):
+def test_suggest_cli_empty_source(tmp_path, mst_file) -> None:
     """CLI exits 1 with 'source file' in output when source has no embeddings."""
     from rosetta.cli.suggest import cli
 
@@ -256,13 +207,13 @@ def test_suggest_cli_empty_source(tmp_path, mst_file):
     empty = tmp_path / "empty_source.json"
     empty.write_text("{}")
 
-    result = runner.invoke(cli, ["--source", str(empty), "--master", mst_file])
+    result = runner.invoke(cli, [str(empty), mst_file])
 
     assert result.exit_code == 1
     assert "source file" in result.output
 
 
-def test_suggest_cli_empty_master(tmp_path, src_file):
+def test_suggest_cli_empty_master(tmp_path, src_file) -> None:
     """CLI exits 1 with 'master file' in output when master has no embeddings."""
     from rosetta.cli.suggest import cli
 
@@ -270,13 +221,13 @@ def test_suggest_cli_empty_master(tmp_path, src_file):
     empty = tmp_path / "empty_master.json"
     empty.write_text("{}")
 
-    result = runner.invoke(cli, ["--source", src_file, "--master", str(empty)])
+    result = runner.invoke(cli, [src_file, str(empty)])
 
     assert result.exit_code == 1
     assert "master file" in result.output
 
 
-def test_suggest_cli_missing_lexical_key(tmp_path, mst_file):
+def test_suggest_cli_missing_lexical_key(tmp_path, mst_file) -> None:
     """CLI exits 1 with offending URI in output when a JSON entry lacks 'lexical'."""
     from rosetta.cli.suggest import cli
 
@@ -285,36 +236,39 @@ def test_suggest_cli_missing_lexical_key(tmp_path, mst_file):
     bad_src = tmp_path / "bad_source.json"
     bad_src.write_text(json.dumps({bad_uri: {"label": "x"}}))
 
-    result = runner.invoke(cli, ["--source", str(bad_src), "--master", mst_file])
+    result = runner.invoke(cli, [str(bad_src), mst_file])
 
     assert result.exit_code == 1
     assert bad_uri in result.output
 
 
-def test_suggest_cli_top_k(src_file, mst_file):
-    """--top-k 1 returns exactly 1 suggestion per field."""
+def test_suggest_cli_top_k(src_file, mst_file) -> None:
+    """--top-k 1 returns exactly 1 data row per source field."""
     from rosetta.cli.suggest import cli
 
     runner = CliRunner()
-    result = runner.invoke(cli, ["--source", src_file, "--master", mst_file, "--top-k", "1"])
+    result = runner.invoke(cli, [src_file, mst_file, "--top-k", "1"])
 
     assert result.exit_code == 0, result.output
-    data = json.loads(result.output)
-    for uri in SOURCE_EMB:
-        assert len(data[uri]["suggestions"]) == 1
+    # Count data rows (non-comment, non-header lines)
+    lines = result.output.splitlines()
+    data_rows = [
+        ln
+        for ln in lines
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_rows) == len(SOURCE_EMB)
 
 
-def test_suggest_cli_config_precedence(tmp_path):
+def test_suggest_cli_config_precedence(tmp_path) -> None:
     """--top-k CLI flag overrides top_k in rosetta.toml."""
     from rosetta.cli.suggest import cli
 
-    # Write source and master files
     src = tmp_path / "source.json"
     src.write_text(json.dumps(SOURCE_EMB))
     mst = tmp_path / "master.json"
     mst.write_text(json.dumps(MASTER_EMB))
 
-    # Write a rosetta.toml with top_k = 10
     toml_cfg = tmp_path / "rosetta.toml"
     toml_cfg.write_text("[suggest]\ntop_k = 10\n")
 
@@ -322,9 +276,7 @@ def test_suggest_cli_config_precedence(tmp_path):
     result = runner.invoke(
         cli,
         [
-            "--source",
             str(src),
-            "--master",
             str(mst),
             "--config",
             str(toml_cfg),
@@ -335,9 +287,146 @@ def test_suggest_cli_config_precedence(tmp_path):
 
     err_detail = result.output + (str(result.exception) if result.exception else "")
     assert result.exit_code == 0, err_detail
-    data = json.loads(result.output)
-    for uri in SOURCE_EMB:
-        assert len(data[uri]["suggestions"]) <= 1
+    lines = result.output.splitlines()
+    data_rows = [
+        ln
+        for ln in lines
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    # 1 result per source field (2 fields × 1 = 2 rows)
+    assert len(data_rows) <= len(SOURCE_EMB)
+
+
+def test_suggest_cli_approved_mappings(tmp_path) -> None:
+    """--approved-mappings boosts a matching candidate's confidence."""
+    from rosetta.cli.suggest import cli
+
+    # Use non-collinear vectors: src=[0.9, 0, sqrt(1-0.81)], master=[1,0,0]
+    # cosine ~ 0.9; after boost of 0.1 → ~1.0 (capped)
+    sin_val = math.sqrt(1.0 - 0.81)
+    src_uri = "http://ex.org/FieldA"
+    master_uri = "http://ex.org/Master1"
+
+    src_emb = {src_uri: {"label": "FieldA", "lexical": [0.9, 0.0, sin_val]}}
+    master_emb = {master_uri: {"label": "Master1", "lexical": [1.0, 0.0, 0.0]}}
+
+    src_file = tmp_path / "src.json"
+    src_file.write_text(json.dumps(src_emb))
+    mst_file = tmp_path / "master.json"
+    mst_file.write_text(json.dumps(master_emb))
+
+    approved_tsv = tmp_path / "approved.sssom.tsv"
+    approved_tsv.write_text(
+        "# curie_map:\n"
+        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
+        "#   semapv: https://w3id.org/semapv/vocab/\n"
+        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\n"
+        f"{src_uri}\tskos:relatedMatch\t{master_uri}\tsemapv:LexicalMatching\t0.8\n"
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [str(src_file), str(mst_file), "--approved-mappings", str(approved_tsv)],
+    )
+    err_detail = result.output + (str(result.exception) if result.exception else "")
+    assert result.exit_code == 0, err_detail
+
+    # Parse confidence from TSV output
+    lines = result.output.splitlines()
+    data_rows = [
+        ln
+        for ln in lines
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_rows) >= 1
+    cols = data_rows[0].split("\t")
+    # confidence is 5th column (index 4)
+    confidence = float(cols[4])
+    # baseline cosine ~0.9, boosted by 0.1 → ~1.0 (capped)
+    assert confidence == pytest.approx(1.0, abs=0.05)
+
+
+def test_suggest_cli_derank_revoked(tmp_path) -> None:
+    """owl:differentFrom in approved mappings decreases candidate confidence below baseline."""
+    from rosetta.cli.suggest import cli
+
+    src_uri = "http://ex.org/FieldB"
+    master_uri = "http://ex.org/Master2"
+
+    src_emb = {src_uri: {"label": "FieldB", "lexical": [1.0, 0.0, 0.0]}}
+    master_emb = {master_uri: {"label": "Master2", "lexical": [0.9, 0.1, 0.0]}}
+
+    src_file = tmp_path / "src.json"
+    src_file.write_text(json.dumps(src_emb))
+    mst_file = tmp_path / "master.json"
+    mst_file.write_text(json.dumps(master_emb))
+
+    runner = CliRunner()
+
+    # Run without approved mappings to get baseline
+    baseline_result = runner.invoke(cli, [str(src_file), str(mst_file)])
+    assert baseline_result.exit_code == 0, baseline_result.output
+    baseline_lines = baseline_result.output.splitlines()
+    baseline_data = [
+        ln
+        for ln in baseline_lines
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    baseline_confidence = float(baseline_data[0].split("\t")[4])
+
+    # Write owl:differentFrom approved mappings
+    approved_tsv = tmp_path / "approved.sssom.tsv"
+    approved_tsv.write_text(
+        "# curie_map:\n"
+        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
+        "#   semapv: https://w3id.org/semapv/vocab/\n"
+        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\n"
+        f"{src_uri}\towl:differentFrom\t{master_uri}\tsemapv:LexicalMatching\t0.0\n"
+    )
+
+    derank_result = runner.invoke(
+        cli,
+        [str(src_file), str(mst_file), "--approved-mappings", str(approved_tsv)],
+    )
+    assert derank_result.exit_code == 0, derank_result.output
+    derank_lines = derank_result.output.splitlines()
+    derank_data = [
+        ln
+        for ln in derank_lines
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    deranked_confidence = float(derank_data[0].split("\t")[4])
+
+    assert deranked_confidence < baseline_confidence
+
+
+def test_suggest_cli_missing_approved_mappings(tmp_path, src_file, mst_file) -> None:
+    """--approved-mappings pointing to a non-existent file exits 1 with path in output."""
+    from rosetta.cli.suggest import cli
+
+    non_existent = str(tmp_path / "non_existent.sssom.tsv")
+    runner = CliRunner()
+    result = runner.invoke(cli, [src_file, mst_file, "--approved-mappings", non_existent])
+
+    assert result.exit_code == 1
+    assert "non_existent.sssom.tsv" in result.output or "non_existent.sssom.tsv" in (
+        result.stderr or ""
+    )
+
+
+def test_suggest_cli_output_file(tmp_path, src_file, mst_file) -> None:
+    """--output writes SSSOM TSV to file; file contains subject_id header."""
+    from rosetta.cli.suggest import cli
+
+    out_file = tmp_path / "out.sssom.tsv"
+    runner = CliRunner()
+    result = runner.invoke(cli, [src_file, mst_file, "--output", str(out_file)])
+
+    assert result.exit_code == 0, result.output
+    assert out_file.exists()
+    content = out_file.read_text()
+    assert "subject_id" in content
 
 
 # ---------------------------------------------------------------------------

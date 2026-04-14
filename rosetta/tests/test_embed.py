@@ -279,6 +279,9 @@ def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.Fixt
     assert output_file.exists()
     data = json.loads(output_file.read_text())
     assert len(data) >= 1
-    # Each value should have a 'lexical' key
+    # Each value should have a 'lexical' key and a 'label' key
     first_val = next(iter(data.values()))
     assert "lexical" in first_val
+    assert "label" in first_val
+    # The schema has one class "Speed" — label should reflect the class name
+    assert first_val["label"] == "Speed"

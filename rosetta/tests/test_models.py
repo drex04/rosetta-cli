@@ -8,13 +8,11 @@ from pydantic import ValidationError
 from rosetta.core.models import (
     EmbeddingReport,
     EmbeddingVectors,
-    FieldSuggestions,
     FnmlSuggestion,
     LintFinding,
     LintReport,
     LintSummary,
-    Suggestion,
-    SuggestionReport,
+    SSSOMRow,
 )
 
 # ---------------------------------------------------------------------------
@@ -140,30 +138,26 @@ def test_fnml_suggestion_getitem() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SuggestionReport
+# SSSOMRow
 # ---------------------------------------------------------------------------
 
 
-def test_suggestion_report_root_model_serialisation() -> None:
-    report = SuggestionReport(
-        root={
-            "urn:field:alpha": FieldSuggestions(
-                label="altitude",
-                suggestions=[Suggestion(target_uri="urn:qudt:Metre", label="metre", score=0.9)],
-                anomaly=False,
-            )
-        }
+def test_sssom_row_round_trip() -> None:
+    row = SSSOMRow(
+        subject_id="http://ex.org/FieldA",
+        predicate_id="skos:relatedMatch",
+        object_id="http://ex.org/onto#ConceptB",
+        mapping_justification="semapv:LexicalMatching",
+        confidence=0.85,
+        subject_label="FieldA",
+        object_label="ConceptB",
     )
-    data = report.model_dump(mode="json")
-
-    assert isinstance(data, dict)
-    assert "urn:field:alpha" in data
-    entry = data["urn:field:alpha"]
-    assert entry["label"] == "altitude"
-    assert entry["anomaly"] is False
-    assert entry["suggestions"][0]["target_uri"] == "urn:qudt:Metre"
-    assert entry["suggestions"][0]["label"] == "metre"
-    assert entry["suggestions"][0]["score"] == pytest.approx(0.9)
+    data = row.model_dump(mode="json")
+    assert data["subject_id"] == "http://ex.org/FieldA"
+    assert data["confidence"] == 0.85
+    assert data["subject_label"] == "FieldA"
+    roundtrip = SSSOMRow.model_validate(data)
+    assert roundtrip == row
 
 
 # ---------------------------------------------------------------------------

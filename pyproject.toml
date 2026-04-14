@@ -15,6 +15,7 @@ dependencies = [
     "genson>=1.2",
     "schema-automator>=0.5.5",
     "sssom>=0.4.15",
+    "linkml>=1.10.0",
 ]
 
 [project.scripts]

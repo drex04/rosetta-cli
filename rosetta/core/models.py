@@ -41,35 +41,48 @@ class LintReport(BaseModel):
     summary: LintSummary
 
 
-# --- Suggestions ---
+# --- Embeddings ---
+
+
+class EmbeddingVectors(BaseModel):
+    label: str = ""
+    lexical: list[float]
+
+
+class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
+    pass
+
+
+# --- Suggest ---
 
 
 class Suggestion(BaseModel):
     target_uri: str
-    label: str
+    label: str = ""
     score: float
 
 
 class FieldSuggestions(BaseModel):
-    label: str
+    label: str = ""
     suggestions: list[Suggestion]
-    anomaly: bool
+    anomaly: bool = False
 
 
 class SuggestionReport(RootModel[dict[str, FieldSuggestions]]):
     pass
 
 
-# --- Embeddings ---
+# --- SSSOM ---
 
 
-class EmbeddingVectors(BaseModel):
-    label: str | None = None
-    lexical: list[float]
-
-
-class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
-    pass
+class SSSOMRow(BaseModel):
+    subject_id: str
+    predicate_id: str
+    object_id: str
+    mapping_justification: str
+    confidence: float
+    subject_label: str = ""
+    object_label: str = ""
 
 
 # --- Provenance ---

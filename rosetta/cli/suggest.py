@@ -1,123 +1,206 @@
-"""rosetta-suggest: Rank master ontology candidates for source schema fields."""
+"""rosetta-suggest: Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
 
+import csv
+import io
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 import numpy as np
 
-from rosetta.core.accredit import load_ledger
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
-from rosetta.core.models import FieldSuggestions, Suggestion, SuggestionReport
-from rosetta.core.similarity import apply_ledger_feedback, rank_suggestions
+from rosetta.core.models import (
+    EmbeddingReport,
+    SSSOMRow,
+)
+from rosetta.core.similarity import apply_sssom_feedback, rank_suggestions
+
+_SSSOM_HEADER_LINES = [
+    "# mapping_set_id: https://rosetta-cli/mappings",
+    "# mapping_tool: rosetta-suggest",
+    "# license: https://creativecommons.org/licenses/by/4.0/",
+    "# curie_map:",
+    "#   skos: http://www.w3.org/2004/02/skos/core#",
+    "#   semapv: https://w3id.org/semapv/vocab/",
+]
+
+_SSSOM_COLUMNS = [
+    "subject_id",
+    "predicate_id",
+    "object_id",
+    "mapping_justification",
+    "confidence",
+    "subject_label",
+    "object_label",
+]
+
+
+def _parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
+    """Parse an SSSOM TSV file and return a list of SSSOMRow objects.
+
+    Skips comment lines (starting with '#') and rows with missing required fields.
+    """
+    rows: list[SSSOMRow] = []
+    with path.open(encoding="utf-8") as fh:
+        non_comment_lines: list[str] = []
+        for line in fh:
+            if not line.startswith("#"):
+                non_comment_lines.append(line)
+
+    if not non_comment_lines:
+        return rows
+
+    reader = csv.DictReader(non_comment_lines, delimiter="\t")
+    for row in reader:
+        subject_id = (row.get("subject_id") or "").strip()
+        predicate_id = (row.get("predicate_id") or "").strip()
+        object_id = (row.get("object_id") or "").strip()
+        mapping_justification = (row.get("mapping_justification") or "").strip()
+        if not (subject_id and predicate_id and object_id and mapping_justification):
+            continue
+        confidence_raw = (row.get("confidence") or "").strip()
+        confidence = float(confidence_raw) if confidence_raw else 0.0
+        rows.append(
+            SSSOMRow(
+                subject_id=subject_id,
+                predicate_id=predicate_id,
+                object_id=object_id,
+                mapping_justification=mapping_justification,
+                confidence=confidence,
+            )
+        )
+    return rows
 
 
 @click.command()
-@click.option(
-    "--source", required=True, type=click.Path(exists=True), help="Source embeddings JSON"
-)
-@click.option(
-    "--master", required=True, type=click.Path(exists=True), help="Master embeddings JSON"
-)
+@click.argument("source", type=click.Path(exists=True))
+@click.argument("master", type=click.Path(exists=True))
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
-@click.option("--anomaly-threshold", default=None, type=float, help="Anomaly flag threshold")
+@click.option(
+    "--approved-mappings",
+    default=None,
+    type=click.Path(),
+    help="Path to an approved mappings .sssom.tsv file",
+)
 @click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
-@click.option("--ledger", default=None, type=click.Path(), help="Path to accreditation ledger.json")
 @click.option("--config", default="rosetta.toml", show_default=True)
 def cli(
     source: str,
     master: str,
     top_k: int | None,
     min_score: float | None,
-    anomaly_threshold: float | None,
+    approved_mappings: str | None,
     output: str | None,
-    ledger: str | None,
     config: str,
 ) -> None:
-    """Rank master ontology candidates for source schema fields."""
+    """Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
     cfg = load_config(Path(config))
     resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)
     resolved_min_score = float(
         get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
     )
-    resolved_anomaly_threshold = float(
-        get_config_value(cfg, "suggest", "anomaly_threshold", cli_value=anomaly_threshold) or 0.3
-    )
+
+    # Validate --approved-mappings path up front (before heavy processing)
+    approved_path: Path | None = None
+    if approved_mappings is not None:
+        approved_path = Path(approved_mappings)
+        if not approved_path.exists():
+            click.echo(f"Approved mappings file not found: {approved_mappings}", err=True)
+            sys.exit(1)
 
     try:
-        src_emb = json.loads(Path(source).read_text())
-        master_emb = json.loads(Path(master).read_text())
+        src_raw = json.loads(Path(source).read_text())
+        master_raw = json.loads(Path(master).read_text())
 
-        if not src_emb:
-            click.echo(f"No embeddings found in source file: {source}", err=True)
+        if not src_raw:
+            click.echo(f"No embeddings found in source file: {source}")
             sys.exit(1)
-        if not master_emb:
-            click.echo(f"No embeddings found in master file: {master}", err=True)
+        if not master_raw:
+            click.echo(f"No embeddings found in master file: {master}")
             sys.exit(1)
 
-        for uri, val in src_emb.items():
+        # Validate and build numpy arrays
+        for uri, val in src_raw.items():
             if "lexical" not in val:
                 raise ValueError(f"Missing 'lexical' key for URI: {uri}")
-        src_uris = list(src_emb)
-        A = np.array([src_emb[u]["lexical"] for u in src_uris], dtype=np.float32)
-        src_labels = {
-            u: val.get("label") or u.split("/")[-1].replace("_", " ").title()
-            for u, val in src_emb.items()
-        }
-
-        for uri, val in master_emb.items():
+        for uri, val in master_raw.items():
             if "lexical" not in val:
                 raise ValueError(f"Missing 'lexical' key for URI: {uri}")
-        master_uris = list(master_emb)
-        B = np.array([master_emb[u]["lexical"] for u in master_uris], dtype=np.float32)
-        master_labels = {
-            u: val.get("label") or u.split("/")[-1].replace("_", " ").title()
-            for u, val in master_emb.items()
-        }
 
-        result = rank_suggestions(
-            src_uris,
-            A,
-            master_uris,
-            B,
-            resolved_top_k,
-            resolved_min_score,
-            resolved_anomaly_threshold,
-        )
+        # Parse via EmbeddingReport for typed access
+        src_report = EmbeddingReport.model_validate(src_raw)
+        master_report = EmbeddingReport.model_validate(master_raw)
 
-        if ledger is not None:
-            led = load_ledger(Path(ledger))
-            for src_uri, field_data in result.items():
-                field_data["suggestions"] = apply_ledger_feedback(
-                    src_uri, field_data["suggestions"], led
+        src_uris = list(src_report.root.keys())
+        master_uris = list(master_report.root.keys())
+
+        A = np.array([src_report.root[u].lexical for u in src_uris], dtype=np.float32)
+        B = np.array([master_report.root[u].lexical for u in master_uris], dtype=np.float32)
+
+        # Load approved mappings if provided
+        approved_rows: list[SSSOMRow] = []
+        if approved_path is not None:
+            approved_rows = _parse_sssom_tsv(approved_path)
+
+        # Compute ranked suggestions
+        result = rank_suggestions(src_uris, A, master_uris, B, resolved_top_k, resolved_min_score)
+
+        # --- SSSOM TSV output ---
+        sssom_rows: list[SSSOMRow] = []
+        for src_uri, field_data in result.items():
+            candidates_tsv: list[dict[str, Any]] = field_data["suggestions"]  # pyright: ignore[reportAny]
+
+            # Apply SSSOM feedback if approved mappings present
+            if approved_rows:
+                candidates_tsv = apply_sssom_feedback(src_uri, candidates_tsv, approved_rows)
+
+            src_label = src_report.root[src_uri].label
+
+            for cand in candidates_tsv:
+                obj_uri: str = cand["uri"]  # pyright: ignore[reportAny]
+                score: float = cand["score"]  # pyright: ignore[reportAny]
+                obj_label = (
+                    master_report.root[obj_uri].label if obj_uri in master_report.root else ""
                 )
-                # Re-sort by new score descending; re-assign 1-based ranks
-                field_data["suggestions"].sort(key=lambda s: s["score"], reverse=True)
-                for rank_idx, sug in enumerate(field_data["suggestions"], 1):
-                    sug["rank"] = rank_idx
 
-        report = SuggestionReport(
-            root={
-                uri: FieldSuggestions(
-                    label=src_labels[uri],
-                    suggestions=[
-                        Suggestion(
-                            target_uri=s["uri"],
-                            label=master_labels[s["uri"]],
-                            score=s["score"],
-                        )
-                        for s in field["suggestions"]
-                    ],
-                    anomaly=field["anomaly"],
+                sssom_rows.append(
+                    SSSOMRow(
+                        subject_id=src_uri,
+                        predicate_id="skos:relatedMatch",
+                        object_id=obj_uri,
+                        mapping_justification="semapv:LexicalMatching",
+                        confidence=score,
+                        subject_label=src_label,
+                        object_label=obj_label,
+                    )
                 )
-                for uri, field in result.items()
-            }
-        )
+
+        # Write SSSOM TSV
         with open_output(output) as fh:
-            fh.write(report.model_dump_json(indent=2))
+            for line in _SSSOM_HEADER_LINES:
+                fh.write(line + "\n")
+
+            buf = io.StringIO()
+            writer = csv.writer(buf, delimiter="\t", lineterminator="\n")
+            writer.writerow(_SSSOM_COLUMNS)
+            for row in sssom_rows:
+                writer.writerow(
+                    [
+                        row.subject_id,
+                        row.predicate_id,
+                        row.object_id,
+                        row.mapping_justification,
+                        row.confidence,
+                        row.subject_label,
+                        row.object_label,
+                    ]
+                )
+            fh.write(buf.getvalue())
+
     except Exception as e:
-        click.echo(f"Error: {e}", err=True)
+        click.echo(f"Error: {e}")
         sys.exit(1)

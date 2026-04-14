@@ -118,6 +118,8 @@ rosetta-translate eng_schema.linkml.yaml -o eng_schema_en.linkml.yaml --source-l
 
 Reads a `.linkml.yaml` file and computes embeddings for every schema slot. Outputs a JSON map of slot URI → embedding vector.
 
+> **Output format note:** Each entry in the output JSON now includes a `"label"` field (derived from the schema class or slot name) in addition to the `"lexical"` vector. The `"label"` field is used by `rosetta-suggest` to populate the `subject_label` and `object_label` columns in SSSOM TSV output.
+
 > **Note:** The first run downloads the model (~1.2 GB) from HuggingFace. Subsequent runs use the local cache.
 
 ```
@@ -157,18 +159,19 @@ uv run rosetta-embed -i nor.linkml.yaml -o nor_emb_e5.json \
 
 ### rosetta-suggest
 
-Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Flags low-confidence matches as anomalies. Optionally reads a ledger to boost accredited mappings and exclude revoked ones.
+Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs SSSOM TSV format. Optionally reads an approved SSSOM mappings file to boost confirmed mappings or derank rejected ones.
 
 ```
-Usage: rosetta-suggest [OPTIONS]
+Usage: rosetta-suggest [OPTIONS] SOURCE MASTER
+
+Arguments:
+  SOURCE                     Source embeddings JSON (positional)
+  MASTER                     Master embeddings JSON (positional)
 
 Options:
-  --source PATH              Source embeddings JSON   [required]
-  --master PATH              Master embeddings JSON   [required]
   --top-k INT                Max suggestions per field  [default: 5]
   --min-score FLOAT          Minimum cosine score  [default: 0.0]
-  --anomaly-threshold FLOAT  Anomaly flag threshold  [default: 0.3]
-  --ledger PATH              Accreditation ledger.json (boosts accredited, excludes revoked)
+  --approved-mappings PATH   Path to approved mappings .sssom.tsv (boost/derank)
   --output PATH              Output file  (default: stdout)
   --config PATH              Path to rosetta.toml
 ```
@@ -176,34 +179,32 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-suggest \
-  --source nor_emb.json \
-  --master usa_emb.json \
-  --output suggestions.json
+uv run rosetta-suggest nor_emb.json usa_emb.json --output suggestions.sssom.tsv
 
-# With accreditation feedback
-uv run rosetta-suggest \
-  --source nor_emb.json \
-  --master usa_emb.json \
-  --ledger store/ledger.json \
-  --output suggestions.json
+# With approved mappings feedback (boost confirmed, derank rejected)
+uv run rosetta-suggest nor_emb.json usa_emb.json \
+  --approved-mappings store/approved.sssom.tsv \
+  --output suggestions.sssom.tsv
 ```
 
-**Output format** — one entry per source field:
+**Output format** — SSSOM TSV with 7 columns and a YAML comment header:
 
-```json
-{
-	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
-		"suggestions": [
-			{
-				"target_uri": "http://rosetta.interop/ns/master/altitude",
-				"score": 0.94
-			}
-		],
-		"anomaly": false
-	}
-}
 ```
+# mapping_set_id: https://rosetta-cli/mappings
+# mapping_tool: rosetta-suggest
+# license: https://creativecommons.org/licenses/by/4.0/
+# curie_map:
+#   skos: http://www.w3.org/2004/02/skos/core#
+#   semapv: https://w3id.org/semapv/vocab/
+subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label
+http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude
+```
+
+Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`.
+
+**Deranking:** Rows with `predicate_id = owl:differentFrom` in the approved mappings file decrease the candidate's confidence score (the candidate is NOT removed from output). Use `skos:relatedMatch` or any other predicate to boost a candidate's score.
+
+> **Note:** `object_id` values in approved mapping files must be full URIs matching the embedding JSON keys exactly.
 
 **Exit codes:** 0 on success, 1 on error.
 

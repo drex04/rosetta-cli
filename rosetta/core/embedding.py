@@ -39,7 +39,7 @@ def extract_text_inputs_linkml(
     schema_name: str = schema.name or "schema"  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
     need_view = include_parents or include_ancestors or include_children
     view = SchemaView(schema) if need_view else None
-    results: list[tuple[str, str]] = []
+    results: list[tuple[str, str, str]] = []
 
     classes: dict[str, Any] = cast("dict[str, Any]", schema.classes)  # pyright: ignore[reportUnknownMemberType]
     slots: dict[str, Any] = cast("dict[str, Any]", schema.slots)  # pyright: ignore[reportUnknownMemberType]

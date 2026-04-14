@@ -1,36 +1,15 @@
-"""Normalise any supported schema format to a LinkML SchemaDefinition.
-
-NOTE: linkml package has a version incompatibility where linkml.__init__ references
-Format.JSON which no longer exists in linkml_runtime.  The monkey-patch below must
-run before any schema_automator importer is loaded.
-"""
+"""Normalise any supported schema format to a LinkML SchemaDefinition."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
-
-import pyparsing as _pp  # type: ignore[import-untyped]
-
-# ---- Monkey-patch linkml Format enum before schema_automator is imported ----
-# linkml.__init__ calls Format.JSON but linkml_runtime only exposes Format.JSONLD.
-# Patch once at module load time so all subsequent imports succeed.
-try:
-    from linkml_runtime.linkml_model.linkml_files import (
-        Format as _Format,  # type: ignore[import-untyped]
-    )
-
-    if not hasattr(_Format, "JSON"):
-        _Format.JSON = _Format.JSONLD  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
-except Exception:  # pragma: no cover — only fails if linkml_runtime not installed
-    pass
-# -------------------------------------------------------------------------
-
-import re
 from typing import Any
 
+import pyparsing as _pp  # type: ignore[import-untyped]
 from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
 
 
