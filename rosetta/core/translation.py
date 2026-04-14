@@ -1,58 +1,110 @@
+"""Translate class/slot titles and descriptions in a LinkML SchemaDefinition using DeepL."""
+
 from __future__ import annotations
 
+from typing import cast
+
 import deepl
-from rdflib import RDF, RDFS, Graph, Literal
+import deepl.exceptions
+from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
 
-from rosetta.core.rdf_utils import ROSE_NS, bind_namespaces
 
-
-def translate_labels(
-    g: Graph,
+def translate_schema(
+    schema: SchemaDefinition,
     source_lang: str,
-    api_key: str,
-) -> Graph:
-    """Translate all rose:Field rdfs:label values to English.
+    target_lang: str = "EN",
+    deepl_key: str | None = None,
+) -> SchemaDefinition:
+    """Translate class and slot titles/descriptions to *target_lang* via DeepL.
 
-    When source_lang starts with 'EN' (case-insensitive), returns *g* unchanged.
-    Covers EN, EN-US, EN-GB, en, etc. — no API call for any English variant.
-    Otherwise calls DeepL, replaces rdfs:label with the English translation,
-    and adds rose:originalLabel preserving the original text.
+    If source_lang starts with 'EN' (case-insensitive), return schema unchanged.
+    Original non-English titles are prepended to aliases.
     """
     if source_lang.upper().startswith("EN"):
-        return g
+        return schema
 
-    # Collect (field_node, label_literal) for all rose:Field nodes
-    field_labels: list[tuple[object, Literal]] = []
-    for field_node in g.subjects(RDF.type, ROSE_NS.Field):
-        for label in g.objects(field_node, RDFS.label):  # pyright: ignore[reportArgumentType]
-            if isinstance(label, Literal):
-                field_labels.append((field_node, label))
+    if not deepl_key:
+        raise ValueError("DeepL API key required. Set DEEPL_API_KEY or pass --deepl-key.")
 
-    if not field_labels:
-        return g
+    translator = deepl.Translator(deepl_key)
+    sl: str | None = source_lang if source_lang.lower() != "auto" else None
 
-    # Deduplicate
-    unique_texts = list(dict.fromkeys(str(lbl) for _, lbl in field_labels))
+    # Collect all unique texts to translate in one batch
+    texts_to_translate: list[str] = []
+    # (kind, node_name, original_text) tuples telling us where to write back results
+    targets: list[tuple[str, str, str]] = []
 
-    translator = deepl.Translator(api_key)
-    sl = None if source_lang.lower() == "auto" else source_lang.upper()
-    results = translator.translate_text(unique_texts, target_lang="EN-US", source_lang=sl)
-    assert isinstance(
-        results, list
-    )  # DeepL returns list when input is list; narrows for basedpyright
-    if len(results) != len(unique_texts):
-        raise ValueError(
-            f"DeepL returned {len(results)} results for {len(unique_texts)} unique labels; "
-            "aborting to prevent silent label loss."
+    for cls_name, cls in schema.classes.items():  # pyright: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+        label: str = cls.title or str(cls_name).replace("_", " ").title()  # pyright: ignore[reportAttributeAccessIssue]
+        if label not in texts_to_translate:
+            texts_to_translate.append(label)
+        targets.append(("class_title", str(cls_name), label))
+        desc: str | None = cls.description  # pyright: ignore[reportAttributeAccessIssue]
+        if desc:
+            if desc not in texts_to_translate:
+                texts_to_translate.append(desc)
+            targets.append(("class_desc", str(cls_name), desc))
+
+    for slot_name, slot in schema.slots.items():  # pyright: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+        label = slot.title or str(slot_name).replace("_", " ").title()  # pyright: ignore[reportAttributeAccessIssue]
+        if label not in texts_to_translate:
+            texts_to_translate.append(label)
+        targets.append(("slot_title", str(slot_name), label))
+        sdesc: str | None = slot.description  # pyright: ignore[reportAttributeAccessIssue]
+        if sdesc:
+            if sdesc not in texts_to_translate:
+                texts_to_translate.append(sdesc)
+            targets.append(("slot_desc", str(slot_name), sdesc))
+
+    if not texts_to_translate:
+        return schema
+
+    try:
+        results = translator.translate_text(
+            texts_to_translate,
+            target_lang="EN-US",
+            source_lang=sl,
         )
-    translation_map = {orig: res.text for orig, res in zip(unique_texts, results)}
+    except deepl.exceptions.AuthorizationException as exc:
+        raise RuntimeError(
+            f"DeepL authentication failed: {exc}. Check --deepl-key or DEEPL_API_KEY env var."
+        ) from exc
+    except deepl.exceptions.QuotaExceededException as exc:
+        raise RuntimeError(f"DeepL quota exceeded: {exc}.") from exc
+    except deepl.exceptions.DeepLException as exc:
+        raise RuntimeError(f"DeepL API error: {exc}.") from exc
 
-    for field_node, orig_label in field_labels:
-        orig_text = str(orig_label)
-        eng_text = translation_map.get(orig_text, orig_text)
-        g.remove((field_node, RDFS.label, orig_label))  # pyright: ignore[reportArgumentType]
-        g.add((field_node, RDFS.label, Literal(eng_text)))  # pyright: ignore[reportArgumentType]
-        g.add((field_node, ROSE_NS.originalLabel, Literal(orig_text)))  # pyright: ignore[reportArgumentType]
+    # DeepL returns list when input is list; cast to narrow for zip
+    results_list = cast("list[deepl.TextResult]", results)
 
-    bind_namespaces(g)
-    return g
+    # Build translation map
+    translation_map: dict[str, str] = {
+        original: result.text
+        for original, result in zip(texts_to_translate, results_list, strict=True)
+    }
+
+    # Apply translations — linkml_runtime containers are untyped, suppress attribute errors
+    for kind, node_name, original in targets:
+        translated = translation_map.get(original, original)
+        if kind == "class_title":
+            cls_obj = schema.classes[node_name]  # pyright: ignore[reportAttributeAccessIssue,reportOptionalSubscript,reportCallIssue,reportArgumentType]
+            if cls_obj.aliases is None:  # pyright: ignore[reportAttributeAccessIssue]
+                cls_obj.aliases = []  # pyright: ignore[reportAttributeAccessIssue]
+            aliases: list[str] = cast("list[str]", cls_obj.aliases)  # pyright: ignore[reportAttributeAccessIssue]
+            if original not in aliases:
+                aliases.insert(0, original)
+            cls_obj.title = translated  # pyright: ignore[reportAttributeAccessIssue]
+        elif kind == "class_desc":
+            schema.classes[node_name].description = translated  # pyright: ignore[reportAttributeAccessIssue,reportOptionalSubscript,reportCallIssue,reportArgumentType]
+        elif kind == "slot_title":
+            slot_obj = schema.slots[node_name]  # pyright: ignore[reportAttributeAccessIssue,reportOptionalSubscript,reportCallIssue,reportArgumentType]
+            if slot_obj.aliases is None:  # pyright: ignore[reportAttributeAccessIssue]
+                slot_obj.aliases = []  # pyright: ignore[reportAttributeAccessIssue]
+            saliases: list[str] = cast("list[str]", slot_obj.aliases)  # pyright: ignore[reportAttributeAccessIssue]
+            if original not in saliases:
+                saliases.insert(0, original)
+            slot_obj.title = translated  # pyright: ignore[reportAttributeAccessIssue]
+        elif kind == "slot_desc":
+            schema.slots[node_name].description = translated  # pyright: ignore[reportAttributeAccessIssue,reportOptionalSubscript,reportCallIssue,reportArgumentType]
+
+    return schema

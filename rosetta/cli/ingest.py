@@ -1,4 +1,4 @@
-"""rosetta-ingest: Ingest a national schema into the RDF store."""
+"""rosetta-ingest — normalise a schema file to LinkML YAML."""
 
 from __future__ import annotations
 
@@ -7,79 +7,47 @@ from pathlib import Path
 
 import click
 
-from rosetta.core.config import load_config
-from rosetta.core.ingest_rdf import fields_to_graph
-from rosetta.core.io import open_input, open_output
-from rosetta.core.parsers import dispatch_parser
-from rosetta.core.rdf_utils import save_graph
+from rosetta.core.normalize import normalize_schema
 
 
 @click.command()
 @click.option(
     "--input",
-    "-i",
     "input_path",
-    default="-",
-    show_default=True,
-    help="Input file path (default: stdin).",
-)
-@click.option(
-    "--output",
-    "-o",
-    "output_path",
-    default="-",
-    show_default=True,
-    help="Output file path (default: stdout).",
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Input schema file.",
 )
 @click.option(
     "--format",
-    "-f",
     "fmt",
-    default="turtle",
-    show_default=True,
-    type=click.Choice(["turtle", "n3", "nt", "xml", "json-ld"], case_sensitive=False),
-    help="Output RDF format.",
-)
-@click.option(
-    "--input-format",
-    "input_fmt",
     default=None,
-    type=click.Choice(
-        ["csv", "json-schema", "openapi", "xsd", "json-sample"], case_sensitive=False
-    ),
-    help="Input format (auto-detected from extension if omitted).",
+    help="json-schema | openapi | xsd | csv | tsv | json-sample | rdfs",
 )
-@click.option("--nation", "-n", required=True, help="Nation code (e.g. NOR, DEU, USA). Required.")
 @click.option(
-    "--max-sample-rows",
-    "max_sample_rows",
-    default=1000,
-    show_default=True,
-    help="Max rows read from CSV for stats computation.",
+    "--schema-name",
+    default=None,
+    help="Schema identifier (default: filename stem).",
 )
-@click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
+@click.option(
+    "--output",
+    required=True,
+    type=click.Path(path_type=Path),
+    help="Output path for .linkml.yaml file.",
+)
 def cli(
-    input_path: str,
-    output_path: str,
-    fmt: str,
-    input_fmt: str | None,
-    nation: str,
-    max_sample_rows: int,
-    config: str | None,
+    input_path: Path,
+    fmt: str | None,
+    schema_name: str | None,
+    output: Path,
 ) -> None:
-    """Ingest a national schema into the RDF store."""
-    load_config(Path(config) if config is not None else None)
-    # Guard: stdin without explicit format
-    if input_path == "-" and input_fmt is None:
-        click.echo("--input-format required when reading from stdin", err=True)
-        sys.exit(1)
+    """Normalise a schema file to LinkML YAML."""
     try:
-        path = Path(input_path) if input_path != "-" else None
-        with open_input(input_path) as src:
-            fields, slug = dispatch_parser(src, path, input_fmt, nation, max_sample_rows)
-        g = fields_to_graph(fields, nation, slug)
-        with open_output(output_path) as out:
-            save_graph(g, out, fmt)
-    except Exception as e:
-        click.echo(str(e), err=True)
+        from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
+
+        schema_def = normalize_schema(input_path, fmt=fmt, schema_name=schema_name)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(yaml_dumper.dumps(schema_def))
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"Error: {exc}", err=True)
         sys.exit(1)

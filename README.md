@@ -16,24 +16,26 @@ All tools are available via `uv run <tool>` after syncing.
 
 ### rosetta-ingest
 
-Parses a national schema file and emits an RDF graph (Turtle by default). Input format is auto-detected from the file extension.
+Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input format is auto-detected from the file extension.
 
 #### Supported formats
 
 | Extension / `--input-format` | Format | Notes |
 |------------------------------|--------|-------|
-| `.csv` | CSV with statistical annotations | Auto-detected |
+| `.csv` / `csv` | CSV with statistical annotations | Auto-detected |
+| `.tsv` / `tsv` | TSV with statistical annotations | Auto-detected |
 | `.json` / `json-schema` | JSON Schema | Auto-detected from `.json` |
 | `.yaml` / `.yml` / `openapi` | OpenAPI 3.x | Auto-detected |
 | `.xsd` / `xsd` | XML Schema | Auto-detected |
 | `json-sample` | JSON sample data | **Must pass `--input-format json-sample`** — no extension auto-detect |
+| `rdfs` | RDFS/OWL vocabulary | **Must pass `--input-format rdfs`** |
 
 **json-sample** accepts three input shapes:
 - Top-level array: `[{"field": value, ...}, ...]`
 - Flat object (treated as single-row sample): `{"field": value, ...}`
 - Single-key envelope: `{"key": [{"field": value, ...}, ...]}`
 
-Nested objects are preserved as `rose:hasChild` relationships in the Turtle output. Leaf field statistics (count, min, max, mean, stddev, histogram) are computed from the actual sample values.
+Nested objects are preserved as nested classes in the LinkML output. Leaf field statistics (count, min, max, mean, stddev, histogram) are computed from the actual sample values.
 
 ```
 Usage: rosetta-ingest [OPTIONS]
@@ -41,9 +43,8 @@ Usage: rosetta-ingest [OPTIONS]
 Options:
   -i, --input PATH         Input file (default: stdin)
   -o, --output PATH        Output file (default: stdout)
-  -f, --format TEXT        Output RDF serialization: turtle, nt  [default: turtle]
-  --input-format TEXT      Force input format: csv, json-schema, openapi, xsd, json-sample
-  -n, --nation TEXT        Nation code (e.g. NOR, DEU, USA)  [required]
+  --input-format TEXT      Force input format: csv, tsv, json-schema, openapi, xsd, json-sample, rdfs
+  --schema-name TEXT       Schema name (default: filename stem)
   --max-sample-rows INT    Max rows read from sample for statistics  [default: 1000]
   -c, --config PATH        Path to rosetta.toml
 ```
@@ -51,10 +52,10 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-ingest -i rosetta/tests/fixtures/nor_radar.csv    -n NOR -o nor.ttl
-uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot.json -n DEU -o deu.ttl
-uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml      -n USA -o usa.ttl
-uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot_sample.json -n DEU --input-format json-sample -o deu_sample.ttl
+uv run rosetta-ingest -i rosetta/tests/fixtures/nor_radar.csv    -o nor.linkml.yaml
+uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot.json -o deu.linkml.yaml
+uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml      -o usa.linkml.yaml
+uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot_sample.json --input-format json-sample -o deu_sample.linkml.yaml
 ```
 
 **Exit codes:** 0 on success, 1 on parse or I/O error.
@@ -63,7 +64,7 @@ uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot_sample.json -n DEU -
 
 ### rosetta-translate
 
-Normalises non-English field labels to English via DeepL before embedding.
+Normalises non-English class titles, slot titles, and descriptions to English via DeepL before embedding. Accepts a `.linkml.yaml` file and outputs a `.linkml.yaml` file with translated titles and descriptions; original values are preserved in `aliases`.
 
 **Synopsis**
 
@@ -75,8 +76,8 @@ rosetta-translate [OPTIONS]
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--input FILE`, `-i FILE` | `-` (stdin) | Turtle input file |
-| `--output FILE`, `-o FILE` | `-` (stdout) | Turtle output (English-normalised TTL) |
+| `--input FILE`, `-i FILE` | `-` (stdin) | LinkML YAML input file |
+| `--output FILE`, `-o FILE` | `-` (stdout) | LinkML YAML output (English-normalised) |
 | `--source-lang LANG` | `auto` | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
 | `--config FILE`, `-c FILE` | `rosetta.toml` | Config file path |
 
@@ -87,23 +88,23 @@ Set `DEEPL_API_KEY` to your DeepL API key. For English-source schemas, use `--so
 **Pipeline example**
 
 ```bash
-rosetta-ingest nor_radar.csv --nation NOR -o nor.ttl
-rosetta-translate nor.ttl nor_en.ttl --source-lang NO
-rosetta-embed nor_en.ttl nor_embeddings.json
+rosetta-ingest nor_radar.csv -o nor.linkml.yaml
+rosetta-translate nor.linkml.yaml -o nor_en.linkml.yaml --source-lang NO
+rosetta-embed nor_en.linkml.yaml -o nor_embeddings.json
 rosetta-suggest nor_embeddings.json master_embeddings.json -o suggestions.json
 ```
 
 For English schemas, `--source-lang EN` keeps the pipeline uniform:
 
 ```bash
-rosetta-translate eng_schema.ttl eng_schema_en.ttl --source-lang EN
+rosetta-translate eng_schema.linkml.yaml -o eng_schema_en.linkml.yaml --source-lang EN
 ```
 
 ---
 
 ### rosetta-embed
 
-Reads a Turtle file and computes embeddings for every schema attribute. Outputs a JSON map of attribute URI → embedding vector.
+Reads a `.linkml.yaml` file and computes embeddings for every schema slot. Outputs a JSON map of slot URI → embedding vector.
 
 > **Note:** The first run downloads the model (~1.2 GB) from HuggingFace. Subsequent runs use the local cache.
 
@@ -111,25 +112,30 @@ Reads a Turtle file and computes embeddings for every schema attribute. Outputs 
 Usage: rosetta-embed [OPTIONS]
 
 Options:
-  -i, --input PATH    Turtle input file  (default: stdin)
-  -o, --output PATH   JSON output file   (default: stdout)
-  --mode TEXT         Embedding mode  [default: lexical-only]
-  --model TEXT        Sentence-transformer model  [default: intfloat/e5-large-v2]
-  -c, --config PATH   Path to rosetta.toml
+  -i, --input PATH            LinkML YAML input file  (default: stdin)
+  -o, --output PATH           JSON output file         (default: stdout)
+  --include-definitions       Include slot definitions in the embedding text
+  --include-parents           Include immediate parent class context
+  --include-ancestors         Include full ancestor chain context (supersedes --include-parents)
+  --include-children          Include direct child slot names in the embedding text
+  --model TEXT                Sentence-transformer model  [default: intfloat/e5-large-v2]
+  -c, --config PATH           Path to rosetta.toml
 ```
-
-> **Caveat:** Only `lexical-only` mode is active. Other values for `--mode` are accepted but have no effect.
 
 > **E5 models** (`intfloat/multilingual-e5-*`) receive the `"passage: "` prefix automatically on indexed texts. No extra flags needed.
 
 **Example:**
 
 ```bash
-uv run rosetta-embed -i nor.ttl -o nor_emb.json
-uv run rosetta-embed -i usa.ttl -o usa_emb.json
+uv run rosetta-embed -i nor.linkml.yaml -o nor_emb.json
+uv run rosetta-embed -i usa.linkml.yaml -o usa_emb.json
+
+# Richer context — include full ancestor chain and slot definitions
+uv run rosetta-embed -i nor.linkml.yaml -o nor_emb.json \
+  --include-ancestors --include-definitions
 
 # Cross-verify with multilingual E5 (stronger on non-English schemas)
-uv run rosetta-embed -i nor.ttl -o nor_emb_e5.json \
+uv run rosetta-embed -i nor.linkml.yaml -o nor_emb_e5.json \
   --model intfloat/multilingual-e5-base
 ```
 

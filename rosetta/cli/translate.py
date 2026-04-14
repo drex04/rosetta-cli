@@ -1,90 +1,74 @@
-"""rosetta-translate: Normalise non-English field labels to English via DeepL."""
+"""rosetta-translate — translate class/slot titles in a LinkML schema using DeepL."""
+
+from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
+from typing import cast
 
 import click
 
-from rosetta.core.config import get_config_value, load_config
-from rosetta.core.io import open_input, open_output
-from rosetta.core.rdf_utils import ROSE_NS, load_graph, save_graph
-from rosetta.core.translation import translate_labels
 
-
-@click.command("rosetta-translate")
+@click.command()
 @click.option(
     "--input",
-    "-i",
     "input_path",
-    default="-",
-    show_default=True,
-    help="Turtle input file (default: stdin).",
-)
-@click.option(
-    "--output",
-    "-o",
-    "output_path",
-    default="-",
-    show_default=True,
-    help="Turtle output file (default: stdout).",
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Input .linkml.yaml schema file.",
 )
 @click.option(
     "--source-lang",
-    default=None,
-    help="Source language code (e.g. DE, NO) or 'auto'. 'EN'/'EN-US'/etc = passthrough.",
+    default="auto",
+    show_default=True,
+    help="Source language code (e.g. DE, FR) or 'auto'. Use 'EN' to skip translation.",
 )
-@click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
+@click.option(
+    "--output",
+    required=True,
+    type=click.Path(path_type=Path),
+    help="Output path for translated .linkml.yaml file.",
+)
+@click.option(
+    "--deepl-key",
+    default=None,
+    help="DeepL API key (overrides DEEPL_API_KEY env var).",
+)
 def cli(
-    input_path: str,
-    output_path: str,
-    source_lang: str | None,
-    config: str | None,
+    input_path: Path,
+    source_lang: str,
+    output: Path,
+    deepl_key: str | None,
 ) -> None:
-    """Translate non-English field labels to English via DeepL.
-
-    Reads a rosetta-ingest TTL and writes an English-normalised TTL.
-    Use --source-lang EN (or any EN-* variant) to pass through without any API call.
-    """
-    cfg = load_config(Path(config) if config is not None else None)
-    resolved_lang = (
-        get_config_value(cfg, "translate", "source_lang", cli_value=source_lang) or "auto"
-    )
-
-    # NOTE: must use same predicate as translate_labels — both use startswith("EN")
-    is_passthrough = resolved_lang.upper().startswith("EN")
-
-    api_key = os.environ.get("DEEPL_API_KEY", "")
-    if not is_passthrough and not api_key:
-        click.echo(
-            "Error: DEEPL_API_KEY environment variable is not set. "
-            "Set it or pass --source-lang EN for passthrough.",
-            err=True,
-        )
-        sys.exit(1)
-
+    """Translate class and slot titles in a LinkML schema to English using DeepL."""
     try:
-        with open_input(input_path) as src:
-            g = load_graph(src)
+        from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
+        from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
+        from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-        # Idempotency guard: skip if any rose:originalLabel already exists
-        if any(True for _ in g.subject_objects(ROSE_NS.originalLabel)):
+        from rosetta.core.translation import translate_schema
+
+        key = deepl_key or os.environ.get("DEEPL_API_KEY")
+        if not key and not source_lang.upper().startswith("EN"):
             click.echo(
-                "Warning: graph already contains rose:originalLabel triples"
-                " — skipping translation.",
+                "Error: DeepL API key required. Set DEEPL_API_KEY or use --deepl-key.",
                 err=True,
             )
-            with open_output(output_path) as fh:
-                save_graph(g, fh)
-            return
+            raise SystemExit(1)
 
-        g = translate_labels(g, source_lang=resolved_lang, api_key=api_key)
-
-        if output_path != "-":
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open_output(output_path) as fh:
-            save_graph(g, fh)
-
-    except Exception as e:
-        click.echo(str(e), err=True)
-        sys.exit(1)
+        schema = cast(
+            "SchemaDefinition",
+            yaml_loader.load(str(input_path), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+        )
+        result = translate_schema(
+            schema,
+            source_lang=source_lang,
+            target_lang="EN",
+            deepl_key=key,
+        )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        yaml_text: str = yaml_dumper.dumps(result)  # pyright: ignore[reportUnknownMemberType]
+        output.write_text(yaml_text)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"Error: {exc}", err=True)
+        raise SystemExit(1) from exc

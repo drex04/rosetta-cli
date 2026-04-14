@@ -1,12 +1,29 @@
-"""RDF Turtle emitter: converts a list of FieldSchema objects into an rdflib Graph."""
+"""RDF Turtle emitter — Phase 12 rewrite pending (Task 2 of 12-01-PLAN.md).
+
+The v1 FieldSchema-based emitter has been removed together with rosetta.core.parsers.
+"""
 
 from __future__ import annotations
 
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS, XSD
 
-from rosetta.core.parsers import FieldSchema
 from rosetta.core.rdf_utils import bind_namespaces
+
+
+# ---------------------------------------------------------------------------
+# Temporary stub type so the module is importable until Task 2 lands.
+# ---------------------------------------------------------------------------
+class FieldSchema:  # noqa: D101 — placeholder, will be deleted in Task 2
+    """Stub — replaced by LinkML SchemaDefinition in Task 2."""
+
+    name: str
+    data_type: str
+    detected_unit: str | None
+    numeric_stats: dict | None  # type: ignore[type-arg]
+    categorical_stats: dict | None  # type: ignore[type-arg]
+    children: list[FieldSchema]
+
 
 # Pre-build URIRefs for properties that clash with Namespace built-in methods
 _ROSE_BASE = "http://rosetta.interop/ns/"

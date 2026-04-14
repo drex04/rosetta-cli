@@ -1,80 +1,115 @@
-"""rosetta-embed: Embed RDF schema attributes using E5-large-v2."""
+"""rosetta-embed — embed a LinkML schema using a sentence-transformer model."""
 
+from __future__ import annotations
+
+import json
 import sys
 from pathlib import Path
 
 import click
 
-from rosetta.core.config import get_config_value, load_config
-from rosetta.core.embedding import EmbeddingModel, extract_text_inputs
-from rosetta.core.io import open_input, open_output
+from rosetta.core.embedding import (  # type: ignore[attr-defined]
+    EmbeddingModel,
+    extract_text_inputs_linkml,
+)
 from rosetta.core.models import EmbeddingReport, EmbeddingVectors
-from rosetta.core.rdf_utils import load_graph
 
 
 @click.command()
 @click.option(
     "--input",
-    "-i",
     "input_path",
-    default="-",
-    show_default=True,
-    help="Turtle input file (default: stdin).",
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Input .linkml.yaml schema file.",
 )
+@click.option("--model", default=None, help="Sentence-transformer model name.")
 @click.option(
     "--output",
-    "-o",
-    "output_path",
-    default="-",
-    show_default=True,
-    help="JSON output file (default: stdout).",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Output JSON path (default: stdout).",
 )
-@click.option("--mode", default=None, help="Embedding mode (default: lexical-only).")
-@click.option("--model", default=None, help="Model name (default: intfloat/e5-large-v2).")
-@click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
+@click.option(
+    "--include-definitions",
+    is_flag=True,
+    default=False,
+    help="Append description field to embedded text.",
+)
+@click.option(
+    "--include-parents",
+    is_flag=True,
+    default=False,
+    help="Append direct is_a parent title to embedded text.",
+)
+@click.option(
+    "--include-ancestors",
+    is_flag=True,
+    default=False,
+    help="Append all transitive is_a ancestor titles (supersedes --include-parents).",
+)
+@click.option(
+    "--include-children",
+    is_flag=True,
+    default=False,
+    help="Append direct is_a child class names to embedded text.",
+)
 def cli(
-    input_path: str,
-    output_path: str,
-    mode: str | None,
+    input_path: Path,
     model: str | None,
-    config: str | None,
+    output: Path | None,
+    include_definitions: bool,
+    include_parents: bool,
+    include_ancestors: bool,
+    include_children: bool,
 ) -> None:
-    """Embed RDF schema attributes using E5-large-v2."""
-    cfg = load_config(Path(config) if config is not None else None)
-    resolved_model = (
-        get_config_value(cfg, "embed", "model", cli_value=model) or "intfloat/e5-large-v2"
-    )
-    resolved_mode = get_config_value(cfg, "embed", "mode", cli_value=mode) or "lexical-only"
+    """Embed a LinkML schema using a sentence-transformer model."""
+    try:
+        from typing import cast as _cast
 
-    if resolved_mode != "lexical-only":
-        click.echo(
-            f"Warning: mode '{resolved_mode}' is not yet implemented; using lexical-only.",
-            err=True,
+        from linkml_runtime.linkml_model import SchemaDefinition
+        from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
+
+        from rosetta.core.config import get_config_value, load_config
+
+        config = load_config(None)
+        model_name: str = (
+            model or get_config_value(config, "embed", "model") or "sentence-transformers/LaBSE"
         )
 
-    try:
-        with open_input(input_path) as src:
-            g = load_graph(src)
-
-        pairs = extract_text_inputs(g)
+        schema = _cast(
+            SchemaDefinition,
+            yaml_loader.load(str(input_path), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+        )
+        pairs = extract_text_inputs_linkml(
+            schema,
+            include_definitions=include_definitions,
+            include_parents=include_parents,
+            include_ancestors=include_ancestors,
+            include_children=include_children,
+        )
         if not pairs:
-            click.echo("No embeddable attributes found in input.", err=True)
+            click.echo("Error: No embeddable nodes found in schema.", err=True)
             sys.exit(1)
 
-        em = EmbeddingModel(resolved_model)
-        uris, texts = zip(*pairs)
-        vectors = em.encode(list(texts))
+        em = EmbeddingModel(model_name)
+        texts = [text for _, text in pairs]
+        vectors = em.encode(texts)
 
-        # URIRef → str so json.dumps() doesn't raise TypeError; wrap in typed model
         report = EmbeddingReport(
-            root={str(uri): EmbeddingVectors(lexical=list(vec)) for uri, vec in zip(uris, vectors)}
+            root={
+                node_id: EmbeddingVectors(lexical=vec)
+                for (node_id, _), vec in zip(pairs, vectors, strict=True)
+            }
         )
-
-        # Auto-create output parent directory, then write
-        if output_path != "-":
-            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open_output(output_path) as fh:
-            fh.write(report.model_dump_json(indent=2))
-    except Exception as e:
-        click.echo(str(e), err=True)
+        out_json = json.dumps(report.model_dump(mode="json"), indent=2)
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(out_json)
+        else:
+            click.echo(out_json)
+    except SystemExit:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"Error: {exc}", err=True)
         sys.exit(1)

@@ -2,66 +2,10 @@
 
 from __future__ import annotations
 
-from rdflib import RDF, Graph, Namespace
+from typing import Any, cast
 
-from rosetta.core.rdf_utils import query_graph
-
-ROSE_NS = Namespace("http://rosetta.interop/ns/")
-
-_MASTER_SPARQL = """
-PREFIX rose: <http://rosetta.interop/ns/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-
-SELECT ?attr ?attrLabel ?comment ?conceptLabel WHERE {
-  ?attr a rose:Attribute ;
-        rdfs:label ?attrLabel .
-  OPTIONAL { ?attr rdfs:comment ?comment . }
-  OPTIONAL { ?concept rose:hasAttribute ?attr ;
-                      rdfs:label ?conceptLabel . }
-}
-"""
-
-_NATIONAL_SPARQL = """
-PREFIX rose: <http://rosetta.interop/ns/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?field ?label WHERE {
-  ?field a rose:Field ;
-         rdfs:label ?label .
-}
-"""
-
-
-def extract_text_inputs(g: Graph) -> list[tuple[str, str]]:
-    """Return (uri_str, text_str) pairs for every embeddable attribute in *g*.
-
-    Detects master-ontology graphs (containing rose:Attribute triples) and
-    national-schema graphs (containing rose:Field triples) and builds an
-    appropriate text representation for each node.
-    """
-    is_master = any(True for _ in g.triples((None, RDF.type, ROSE_NS.Attribute)))
-
-    results: list[tuple[str, str]] = []
-
-    if is_master:
-        for row in query_graph(g, _MASTER_SPARQL):
-            attr_uri = row["attr"]
-            attr_label = str(row["attrLabel"])
-            concept_label = str(row["conceptLabel"]) if row.get("conceptLabel") is not None else ""
-            comment = str(row["comment"]) if row.get("comment") is not None else ""
-            text = f"{concept_label} / {attr_label} — {comment}"
-            results.append((str(attr_uri), text))
-    else:
-        for row in query_graph(g, _NATIONAL_SPARQL):
-            field_uri = row["field"]
-            label = str(row["label"])
-            # Parent slug is the second-to-last path segment of the URI
-            schema_slug = str(field_uri).split("/")[-2]
-            text = f"{schema_slug} / {label} — "
-            results.append((str(field_uri), text))
-
-    return results
+from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
+from linkml_runtime.utils.schemaview import SchemaView  # type: ignore[import-untyped]
 
 
 def _e5_passage_prefix(model_name: str) -> str:
@@ -75,6 +19,65 @@ def _e5_passage_prefix(model_name: str) -> str:
     if "e5" in low and "e5se" not in low:  # exclude unrelated models with 'e5' in name
         return "passage: "
     return ""
+
+
+def extract_text_inputs_linkml(
+    schema: SchemaDefinition,
+    *,
+    include_definitions: bool = False,
+    include_parents: bool = False,
+    include_ancestors: bool = False,
+    include_children: bool = False,
+) -> list[tuple[str, str]]:
+    """Return (node_id, text) pairs for each class and slot in a LinkML SchemaDefinition.
+
+    node_id format: "{schema.name}/{node_name}"
+    text: title (base) + optional definition, parents/ancestors, children — joined with ". "
+    --include-ancestors supersedes --include-parents (ancestors is a strict superset).
+    """
+    schema_name: str = schema.name or "schema"  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+    need_view = include_parents or include_ancestors or include_children
+    view = SchemaView(schema) if need_view else None
+    results: list[tuple[str, str]] = []
+
+    classes: dict[str, Any] = cast("dict[str, Any]", schema.classes)  # pyright: ignore[reportUnknownMemberType]
+    slots: dict[str, Any] = cast("dict[str, Any]", schema.slots)  # pyright: ignore[reportUnknownMemberType]
+    all_nodes: dict[str, Any] = {**classes, **slots}
+
+    for node_name, node in all_nodes.items():
+        label: str = node.title or node_name.replace("_", " ").title()
+        parts: list[str] = [label]
+
+        if include_definitions and node.description:
+            parts.append(node.description)
+
+        if include_ancestors and view is not None:
+            try:
+                ancs: list[str] = [str(a) for a in view.class_ancestors(node_name)[1:]]  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType,reportUnknownArgumentType]
+            except Exception:  # noqa: BLE001
+                ancs = []
+            for anc in ancs:
+                anc_node: Any = classes.get(anc) or slots.get(anc)
+                anc_label: str = (anc_node.title if anc_node else None) or anc.replace(
+                    "_", " "
+                ).title()
+                parts.append(anc_label)
+        elif include_parents:
+            parent: str | None = getattr(node, "is_a", None)
+            if parent:
+                parent_node: Any = classes.get(parent) or slots.get(parent)
+                parent_label: str = (parent_node.title if parent_node else None) or parent.replace(
+                    "_", " "
+                ).title()
+                parts.append(parent_label)
+
+        if include_children:
+            children = [n for n, c in classes.items() if getattr(c, "is_a", None) == node_name]
+            parts.extend(ch.replace("_", " ").title() for ch in children)
+
+        results.append((f"{schema_name}/{node_name}", ". ".join(parts)))
+
+    return results
 
 
 class EmbeddingModel:

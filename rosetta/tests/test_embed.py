@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
-from click.testing import CliRunner
-from rdflib import RDF, RDFS, Graph, Literal, Namespace, URIRef
-
-ROSE = Namespace("http://rosetta.interop/ns/")
+import yaml
+from linkml_runtime.linkml_model import SchemaDefinition
 
 # ---------------------------------------------------------------------------
 # Shared fake model + fixture
@@ -32,63 +31,6 @@ def mock_sentence_transformer(monkeypatch):
 # ---------------------------------------------------------------------------
 # Unit tests (no CLI runner)
 # ---------------------------------------------------------------------------
-
-
-def test_extract_national_fields():
-    """extract_text_inputs returns 2 pairs for a graph with 2 rose:Field nodes."""
-    from rosetta.core.embedding import extract_text_inputs
-
-    g = Graph()
-    base = URIRef("http://rosetta.interop/field/NOR/nor_radar/")
-    f1 = URIRef(str(base) + "hoyde_m")
-    f2 = URIRef(str(base) + "bredde")
-    g.add((f1, RDF.type, ROSE.Field))
-    g.add((f1, RDFS.label, Literal("Hoyde")))
-    g.add((f2, RDF.type, ROSE.Field))
-    g.add((f2, RDFS.label, Literal("Bredde")))
-
-    pairs = extract_text_inputs(g)
-
-    assert len(pairs) == 2
-    all_text = " ".join(t for _, t in pairs)
-    assert "nor_radar" in all_text
-
-
-def test_extract_master_attributes():
-    """extract_text_inputs builds 'ConceptLabel / AttrLabel — Comment' for rose:Attribute."""
-    from rosetta.core.embedding import extract_text_inputs
-
-    g = Graph()
-    concept = URIRef("http://rosetta.interop/ns/SomeConcept")
-    attr = URIRef("http://rosetta.interop/ns/SomeAttr")
-    g.add((attr, RDF.type, ROSE.Attribute))
-    g.add((attr, RDFS.label, Literal("AttrLabel")))
-    g.add((attr, RDFS.comment, Literal("SomeComment")))
-    g.add((concept, RDF.type, ROSE.Concept))
-    g.add((concept, RDFS.label, Literal("ConceptLabel")))
-    g.add((concept, ROSE.hasAttribute, attr))
-
-    pairs = extract_text_inputs(g)
-
-    assert len(pairs) == 1
-    uri, text = pairs[0]
-    assert text == "ConceptLabel / AttrLabel — SomeComment"
-
-
-def test_extract_master_no_concept():
-    """rose:Attribute with no rose:hasAttribute produces ' / AttrLabel — '."""
-    from rosetta.core.embedding import extract_text_inputs
-
-    g = Graph()
-    attr = URIRef("http://rosetta.interop/ns/LoneAttr")
-    g.add((attr, RDF.type, ROSE.Attribute))
-    g.add((attr, RDFS.label, Literal("AttrLabel")))
-
-    pairs = extract_text_inputs(g)
-
-    assert len(pairs) == 1
-    _, text = pairs[0]
-    assert text == " / AttrLabel — "
 
 
 def test_embedding_model_encode_shape(mock_sentence_transformer):
@@ -160,131 +102,182 @@ def test_encode_query_non_e5_no_prefix(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# CLI tests
+# extract_text_inputs_linkml tests
 # ---------------------------------------------------------------------------
 
 
-def _make_national_ttl(n: int = 3) -> str:
-    """Return Turtle source with *n* rose:Field nodes."""
-    prefixes = (
-        "@prefix rose: <http://rosetta.interop/ns/> .\n"
-        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n\n"
+def _make_schema(
+    classes: dict[str, dict[str, Any]] | None = None,
+    slots: dict[str, dict[str, Any]] | None = None,
+    name: str = "test_schema",
+) -> SchemaDefinition:
+    """Build a minimal SchemaDefinition for testing."""
+    from linkml_runtime.linkml_model import ClassDefinition, SlotDefinition
+
+    schema = SchemaDefinition(id=f"https://example.org/{name}", name=name)
+    for cls_name, attrs in (classes or {}).items():
+        cls = ClassDefinition(cls_name)
+        for k, v in attrs.items():
+            setattr(cls, k, v)
+        schema.classes[cls_name] = cls
+    for slot_name, attrs in (slots or {}).items():
+        slot = SlotDefinition(slot_name)
+        for k, v in attrs.items():
+            setattr(slot, k, v)
+        schema.slots[slot_name] = slot
+    return schema
+
+
+def test_embed_linkml_base() -> None:
+    """Minimal schema with one class, no flags → 1 result, text == class title."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(classes={"speed": {"title": "Speed"}})
+    results = extract_text_inputs_linkml(schema)
+    assert len(results) == 1
+    node_id, text = results[0]
+    assert node_id == "test_schema/speed"
+    assert text == "Speed"
+
+
+def test_embed_linkml_definitions() -> None:
+    """Class with description + include_definitions=True → description in text."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(classes={"speed": {"title": "Speed", "description": "Rate of movement"}})
+    results = extract_text_inputs_linkml(schema, include_definitions=True)
+    assert len(results) == 1
+    assert "Rate of movement" in results[0][1]
+
+
+def test_embed_linkml_parents() -> None:
+    """Child class with is_a + include_parents=True → parent title in text."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(
+        classes={
+            "parent_class": {"title": "Parent"},
+            "child_class": {"title": "Child", "is_a": "parent_class"},
+        }
     )
-    triples = ""
-    for i in range(n):
-        triples += (
-            f"<http://rosetta.interop/field/NOR/nor_schema/field_{i}>\n"
-            f"    a rose:Field ;\n"
-            f'    rdfs:label "Field {i}" .\n\n'
-        )
-    return prefixes + triples
+    results = extract_text_inputs_linkml(schema, include_parents=True)
+    child_result = next(r for r in results if "child_class" in r[0])
+    assert "Parent" in child_result[1]
 
 
-def test_embed_cli_national(tmp_path, mock_sentence_transformer):
-    """CLI produces exit 0 and JSON with 3 keys each having a 'lexical' list."""
+def test_embed_linkml_ancestors() -> None:
+    """Grandchild → child → parent chain + include_ancestors=True → ancestor titles in text."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(
+        classes={
+            "grandparent": {"title": "Grandparent"},
+            "parent": {"title": "Parent", "is_a": "grandparent"},
+            "child": {"title": "Child", "is_a": "parent"},
+        }
+    )
+    results = extract_text_inputs_linkml(schema, include_ancestors=True)
+    child_result = next(r for r in results if "/child" in r[0])
+    assert "Parent" in child_result[1]
+    assert "Grandparent" in child_result[1]
+
+
+def test_embed_linkml_children() -> None:
+    """Parent class + child (is_a=parent) + include_children=True → child name in parent's text."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(
+        classes={
+            "vehicle": {"title": "Vehicle"},
+            "car": {"title": "Car", "is_a": "vehicle"},
+        }
+    )
+    results = extract_text_inputs_linkml(schema, include_children=True)
+    parent_result = next(r for r in results if "/vehicle" in r[0])
+    assert "Car" in parent_result[1]
+
+
+def test_embed_linkml_ancestors_supersedes_parents() -> None:
+    """include_ancestors=True + include_parents=True → ancestor path (superset), not just parent."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(
+        classes={
+            "gp": {"title": "Grandparent"},
+            "p": {"title": "Parent", "is_a": "gp"},
+            "c": {"title": "Child", "is_a": "p"},
+        }
+    )
+    results_ancestors = extract_text_inputs_linkml(
+        schema, include_ancestors=True, include_parents=True
+    )
+    child_result = next(r for r in results_ancestors if "/c" in r[0])
+    # Both Grandparent and Parent should appear (ancestors is strict superset)
+    assert "Grandparent" in child_result[1]
+    assert "Parent" in child_result[1]
+
+
+def test_embed_linkml_children_and_ancestors() -> None:
+    """Both flags → text contains both ancestor titles and child names."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(
+        classes={
+            "root": {"title": "Root"},
+            "mid": {"title": "Mid", "is_a": "root"},
+            "leaf": {"title": "Leaf", "is_a": "mid"},
+        }
+    )
+    results = extract_text_inputs_linkml(schema, include_ancestors=True, include_children=True)
+    mid_result = next(r for r in results if "/mid" in r[0])
+    assert "Root" in mid_result[1]  # ancestor
+    assert "Leaf" in mid_result[1]  # child
+
+
+def test_embed_linkml_no_flags() -> None:
+    """All flags False → text is title only, no separator artefacts."""
+    from rosetta.core.embedding import extract_text_inputs_linkml
+
+    schema = _make_schema(classes={"speed": {"title": "Speed", "description": "A description"}})
+    results = extract_text_inputs_linkml(schema)
+    assert results[0][1] == "Speed"
+    assert ". " not in results[0][1]
+
+
+def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.FixtureRequest) -> None:
+    """Click runner on a .linkml.yaml tmp file → exit 0, JSON output with at least one key."""
+    from click.testing import CliRunner
+
     from rosetta.cli.embed import cli
 
-    runner = CliRunner()
-    inp = tmp_path / "national.ttl"
-    inp.write_text(_make_national_ttl(3))
-    out = tmp_path / "out.json"
-
-    result = runner.invoke(cli, ["--input", str(inp), "--output", str(out)])
-
-    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    data = json.loads(out.read_text())
-    assert len(data) == 3
-    for val in data.values():
-        assert "lexical" in val
-        assert isinstance(val["lexical"], list)
-
-
-def test_embed_cli_empty_graph(tmp_path):
-    """CLI exits with code 1 when the input graph has no embeddable nodes."""
-    from rosetta.cli.embed import cli
+    schema_content = {
+        "id": "https://example.org/test",
+        "name": "test_schema",
+        "classes": {
+            "Speed": {
+                "title": "Speed",
+                "description": "Rate of movement",
+            }
+        },
+    }
+    schema_file = tmp_path / "test.linkml.yaml"
+    schema_file.write_text(yaml.dump(schema_content))
+    output_file = tmp_path / "out.json"
 
     runner = CliRunner()
-    inp = tmp_path / "empty.ttl"
-    inp.write_text("@prefix rose: <http://rosetta.interop/ns/> .\n")
-    out = tmp_path / "out.json"
-
-    result = runner.invoke(cli, ["--input", str(inp), "--output", str(out)])
-
-    assert result.exit_code == 1
-
-
-def test_embed_cli_output_creates_dirs(tmp_path, mock_sentence_transformer):
-    """CLI auto-creates nested output directories that do not yet exist."""
-    from rosetta.cli.embed import cli
-
-    runner = CliRunner()
-    inp = tmp_path / "national.ttl"
-    inp.write_text(_make_national_ttl(1))
-    out = tmp_path / "nested" / "deep" / "out.json"
-
-    result = runner.invoke(cli, ["--input", str(inp), "--output", str(out)])
-
-    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    assert out.exists()
-
-
-def test_embed_cli_stdout(tmp_path, mock_sentence_transformer):
-    """CLI without --output writes valid JSON to stdout."""
-    from rosetta.cli.embed import cli
-
-    runner = CliRunner()
-    inp = tmp_path / "national.ttl"
-    inp.write_text(_make_national_ttl(2))
-
-    result = runner.invoke(cli, ["--input", str(inp)])
-
-    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    data = json.loads(result.output)
-    assert len(data) == 2
-
-
-def test_embed_cli_unimplemented_mode_warns(tmp_path, mock_sentence_transformer):
-    """CLI emits a warning to stderr when an unimplemented mode is requested."""
-    from rosetta.cli.embed import cli
-
-    runner = CliRunner()
-    inp = tmp_path / "national.ttl"
-    inp.write_text(_make_national_ttl(2))
-
-    result = runner.invoke(cli, ["--input", str(inp), "--mode", "structural"])
-
-    assert result.exit_code == 0, result.output
-    assert "structural" in result.stderr
-    assert "not yet implemented" in result.stderr
-
-
-# ---------------------------------------------------------------------------
-# Slow test (skipped by default — requires model download)
-# ---------------------------------------------------------------------------
-
-MASTER_TTL = Path(__file__).resolve().parent.parent.parent / "store/master-ontology/master.ttl"
-
-
-@pytest.mark.slow
-def test_embed_cli_real_model_master_ttl():
-    """Real model encodes master.ttl; asserts correct output shape."""
-    from rosetta.cli.embed import cli
-
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        result = runner.invoke(
-            cli,
-            [
-                "--input",
-                str(MASTER_TTL),
-                "--output",
-                "out.json",
-                "--model",
-                "sentence-transformers/all-MiniLM-L6-v2",
-            ],
-        )
-        assert result.exit_code == 0
-        data = json.loads(Path("out.json").read_text())
-        assert len(data) > 0
-        first_vec = next(iter(data.values()))["lexical"]
-        assert len(first_vec) == 384  # all-MiniLM-L6-v2 dim
+    result = runner.invoke(
+        cli,
+        [
+            "--input",
+            str(schema_file),
+            "--output",
+            str(output_file),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert output_file.exists()
+    data = json.loads(output_file.read_text())
+    assert len(data) >= 1
+    # Each value should have a 'lexical' key
+    first_val = next(iter(data.values()))
+    assert "lexical" in first_val
