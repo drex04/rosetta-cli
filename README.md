@@ -20,17 +20,18 @@ Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input form
 
 #### Supported formats
 
-| Extension / `--input-format` | Format | Notes |
-|------------------------------|--------|-------|
-| `.csv` / `csv` | CSV with statistical annotations | Auto-detected |
-| `.tsv` / `tsv` | TSV with statistical annotations | Auto-detected |
-| `.json` / `json-schema` | JSON Schema | Auto-detected from `.json` |
-| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x | Auto-detected |
-| `.xsd` / `xsd` | XML Schema | Auto-detected |
-| `json-sample` | JSON sample data | **Must pass `--input-format json-sample`** — no extension auto-detect |
-| `rdfs` | RDFS/OWL vocabulary | **Must pass `--input-format rdfs`** |
+| Extension / `--input-format` | Format              | Notes                                                                 |
+| ---------------------------- | ------------------- | --------------------------------------------------------------------- |
+| `.csv` / `csv`               | CSV                 | Auto-detected                                                         |
+| `.tsv` / `tsv`               | TSV                 | Auto-detected                                                         |
+| `.json` / `json-schema`      | JSON Schema         | Auto-detected from `.json`                                            |
+| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x         | Auto-detected                                                         |
+| `.xsd` / `xsd`               | XML Schema          | Auto-detected                                                         |
+| `json-sample`                | JSON sample data    | **Must pass `--input-format json-sample`** — no extension auto-detect |
+| `rdfs`                       | RDFS/OWL vocabulary | **Must pass `--input-format rdfs`**                                   |
 
 **json-sample** accepts three input shapes:
+
 - Top-level array: `[{"field": value, ...}, ...]`
 - Flat object (treated as single-row sample): `{"field": value, ...}`
 - Single-key envelope: `{"key": [{"field": value, ...}, ...]}`
@@ -50,10 +51,10 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-ingest -i rosetta/tests/fixtures/nor_radar.csv    -o nor.linkml.yaml
-uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot.json -o deu.linkml.yaml
-uv run rosetta-ingest -i rosetta/tests/fixtures/usa_c2.yaml      -o usa.linkml.yaml
-uv run rosetta-ingest -i rosetta/tests/fixtures/deu_patriot_sample.json --input-format json-sample -o deu_sample.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nor_radar.csv --output nor_radar.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/deu_patriot.json --output deu_patriot.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
 ```
 
 **Exit codes:** 0 on success, 1 on parse or I/O error.
@@ -72,12 +73,12 @@ rosetta-translate [OPTIONS]
 
 **Options**
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--input FILE`, `-i FILE` | `-` (stdin) | LinkML YAML input file |
-| `--output FILE`, `-o FILE` | `-` (stdout) | LinkML YAML output (English-normalised) |
-| `--source-lang LANG` | `auto` | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
-| `--config FILE`, `-c FILE` | `rosetta.toml` | Config file path |
+| Option                     | Default        | Description                                                                                                                                    |
+| -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input FILE`, `-i FILE`  | `-` (stdin)    | LinkML YAML input file                                                                                                                         |
+| `--output FILE`, `-o FILE` | `-` (stdout)   | LinkML YAML output (English-normalised)                                                                                                        |
+| `--source-lang LANG`       | `auto`         | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
+| `--config FILE`, `-c FILE` | `rosetta.toml` | Config file path                                                                                                                               |
 
 **Requirements**
 
@@ -86,13 +87,26 @@ Set `DEEPL_API_KEY` to your DeepL API key. For English-source schemas, use `--so
 **Pipeline example**
 
 ```bash
-rosetta-ingest nor_radar.csv -o nor.linkml.yaml
-rosetta-translate nor.linkml.yaml -o nor_en.linkml.yaml --source-lang NO
-rosetta-embed nor_en.linkml.yaml -o nor_embeddings.json
-rosetta-suggest nor_embeddings.json master_embeddings.json -o suggestions.json
+uv run rosetta-ingest --input rosetta/tests/fixtures/nor_radar.csv --output nor_radar.linkml.yaml
+uv run rosetta-translate --input nor_radar.linkml.yaml --output nor_radar_en.linkml.yaml --source-lang auto
+// Norwegian-to-English embeddings
+uv run rosetta-embed --input nor_radar.linkml.yaml --output nor_radar_nb_embeddings.json
+// English-to-English embeddings
+uv run rosetta-embed --input nor_radar_en.linkml.yaml --output nor_radar_en_embeddings.json
+
+uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2.linkml.yaml
+uv run rosetta-translate --input usa_c2.linkml.yaml --output usa_c2_en.linkml.yaml --source-lang EN
+// translate with --source-lang EN should be a no-op
+uv run rosetta-embed --input usa_c2_en.linkml.yaml --output usa_c2_embeddings.json
+
+// TODO: Change to master_embeddings later instead of usa_c2
+// NB-to-EN cosine distance
+uv run rosetta-suggest --source nor_radar_nb_embeddings.json --master usa_c2_embeddings.json --output suggestions_nb.json
+// Compare to EN-to-EN cosine distance
+uv run rosetta-suggest --source nor_radar_en_embeddings.json --master usa_c2_embeddings.json --output suggestions_en.json
 ```
 
-For English schemas, `--source-lang EN` keeps the pipeline uniform:
+For English schemas, `--source-lang EN` keeps the pipeline uniform and is a no-op:
 
 ```bash
 rosetta-translate eng_schema.linkml.yaml -o eng_schema_en.linkml.yaml --source-lang EN
@@ -179,12 +193,15 @@ uv run rosetta-suggest \
 
 ```json
 {
-  "http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
-    "suggestions": [
-      { "target_uri": "http://rosetta.interop/ns/master/altitude", "score": 0.94 }
-    ],
-    "anomaly": false
-  }
+	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
+		"suggestions": [
+			{
+				"target_uri": "http://rosetta.interop/ns/master/altitude",
+				"score": 0.94
+			}
+		],
+		"anomaly": false
+	}
 }
 ```
 
@@ -210,14 +227,14 @@ Options:
 
 **Findings:**
 
-| Severity | Rule | Meaning |
-|----------|------|---------|
-| BLOCK | `unit_dimension_mismatch` | Source and target units measure different physical quantities |
-| WARNING | `unit_conversion_required` | Same dimension, different scale — FnML conversion suggested |
-| WARNING | `datatype_mismatch` | Numeric vs string type clash |
-| INFO | `unit_not_detected` | Source field has no detectable unit |
-| INFO | `master_unit_missing` | Master field has no `qudt:unit` annotation |
-| INFO | `unit_vector_missing` | QUDT dimension vector absent for one or both units |
+| Severity | Rule                       | Meaning                                                       |
+| -------- | -------------------------- | ------------------------------------------------------------- |
+| BLOCK    | `unit_dimension_mismatch`  | Source and target units measure different physical quantities |
+| WARNING  | `unit_conversion_required` | Same dimension, different scale — FnML conversion suggested   |
+| WARNING  | `datatype_mismatch`        | Numeric vs string type clash                                  |
+| INFO     | `unit_not_detected`        | Source field has no detectable unit                           |
+| INFO     | `master_unit_missing`      | Master field has no `qudt:unit` annotation                    |
+| INFO     | `unit_vector_missing`      | QUDT dimension vector absent for one or both units            |
 
 **Example:**
 
@@ -294,13 +311,13 @@ Options:
 
 ```json
 {
-  "http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
-    "target_uri": "http://rosetta.interop/ns/master/altitude"
-  },
-  "http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
-    "target_uri": "http://rosetta.interop/ns/master/speed",
-    "field_ref": "speed_kn"
-  }
+	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
+		"target_uri": "http://rosetta.interop/ns/master/altitude"
+	},
+	"http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
+		"target_uri": "http://rosetta.interop/ns/master/speed",
+		"field_ref": "speed_kn"
+	}
 }
 ```
 
@@ -428,6 +445,7 @@ Options:
 All subcommands print a JSON response to stdout.
 
 **State-machine rules:**
+
 - `approve` only valid from `pending`
 - `revoke` valid from `pending` or `accredited`
 - Re-submitting an existing `(source, target)` pair is an error
@@ -488,9 +506,9 @@ strict = false
 
 Two runnable scripts use the fixture files in `rosetta/tests/fixtures/` and write output to a local directory.
 
-| Script | Covers |
-|--------|--------|
-| `scripts/quickstart.sh` | Core pipeline: ingest → embed → suggest |
+| Script                     | Covers                                                          |
+| -------------------------- | --------------------------------------------------------------- |
+| `scripts/quickstart.sh`    | Core pipeline: ingest → embed → suggest                         |
 | `scripts/full-pipeline.sh` | All 8 tools: adds lint, rml-gen, provenance, validate, accredit |
 
 ```bash

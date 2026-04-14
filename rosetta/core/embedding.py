@@ -28,11 +28,12 @@ def extract_text_inputs_linkml(
     include_parents: bool = False,
     include_ancestors: bool = False,
     include_children: bool = False,
-) -> list[tuple[str, str]]:
-    """Return (node_id, text) pairs for each class and slot in a LinkML SchemaDefinition.
+) -> list[tuple[str, str, str]]:
+    """Return (node_id, label, text) triples for each class and slot in a LinkML SchemaDefinition.
 
     node_id format: "{schema.name}/{node_name}"
-    text: title (base) + optional definition, parents/ancestors, children — joined with ". "
+    label: human-readable title (used as the base text and stored in embeddings for display)
+    text: label + optional definition, parents/ancestors, children — joined with ". "
     --include-ancestors supersedes --include-parents (ancestors is a strict superset).
     """
     schema_name: str = schema.name or "schema"  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
@@ -75,7 +76,7 @@ def extract_text_inputs_linkml(
             children = [n for n, c in classes.items() if getattr(c, "is_a", None) == node_name]
             parts.extend(ch.replace("_", " ").title() for ch in children)
 
-        results.append((f"{schema_name}/{node_name}", ". ".join(parts)))
+        results.append((f"{schema_name}/{node_name}", label, ". ".join(parts)))
 
     return results
 
@@ -87,7 +88,7 @@ class EmbeddingModel:
     _passage_prefix: str
     _query_prefix: str
 
-    def __init__(self, model_name: str = "sentence-transformers/LaBSE") -> None:
+    def __init__(self, model_name: str = "intfloat/e5-large-v2") -> None:
         from sentence_transformers import SentenceTransformer
 
         self.model_name = model_name

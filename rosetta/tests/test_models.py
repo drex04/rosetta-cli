@@ -148,7 +148,8 @@ def test_suggestion_report_root_model_serialisation() -> None:
     report = SuggestionReport(
         root={
             "urn:field:alpha": FieldSuggestions(
-                suggestions=[Suggestion(target_uri="urn:qudt:Metre", score=0.9)],
+                label="altitude",
+                suggestions=[Suggestion(target_uri="urn:qudt:Metre", label="metre", score=0.9)],
                 anomaly=False,
             )
         }
@@ -158,8 +159,10 @@ def test_suggestion_report_root_model_serialisation() -> None:
     assert isinstance(data, dict)
     assert "urn:field:alpha" in data
     entry = data["urn:field:alpha"]
+    assert entry["label"] == "altitude"
     assert entry["anomaly"] is False
     assert entry["suggestions"][0]["target_uri"] == "urn:qudt:Metre"
+    assert entry["suggestions"][0]["label"] == "metre"
     assert entry["suggestions"][0]["score"] == pytest.approx(0.9)
 
 

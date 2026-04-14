@@ -74,7 +74,7 @@ def cli(
 
         config = load_config(None)
         model_name: str = (
-            model or get_config_value(config, "embed", "model") or "sentence-transformers/LaBSE"
+            model or get_config_value(config, "embed", "model") or "intfloat/e5-large-v2"
         )
 
         schema = _cast(
@@ -93,13 +93,13 @@ def cli(
             sys.exit(1)
 
         em = EmbeddingModel(model_name)
-        texts = [text for _, text in pairs]
+        texts = [text for _, _, text in pairs]
         vectors = em.encode(texts)
 
         report = EmbeddingReport(
             root={
-                node_id: EmbeddingVectors(lexical=vec)
-                for (node_id, _), vec in zip(pairs, vectors, strict=True)
+                node_id: EmbeddingVectors(label=label, lexical=vec)
+                for (node_id, label, _), vec in zip(pairs, vectors, strict=True)
             }
         )
         out_json = json.dumps(report.model_dump(mode="json"), indent=2)

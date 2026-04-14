@@ -13,12 +13,21 @@ from click.testing import CliRunner
 # ---------------------------------------------------------------------------
 
 SOURCE_EMB = {
-    "http://rosetta.interop/field/NOR/nor_radar/hoyde_m": {"lexical": [1.0, 0.0, 0.0]},
-    "http://rosetta.interop/field/NOR/nor_radar/azimut": {"lexical": [0.0, 1.0, 0.0]},
+    "http://rosetta.interop/field/NOR/nor_radar/hoyde_m": {
+        "label": "Height M",
+        "lexical": [1.0, 0.0, 0.0],
+    },
+    "http://rosetta.interop/field/NOR/nor_radar/azimut": {
+        "label": "Azimut",
+        "lexical": [0.0, 1.0, 0.0],
+    },
 }
 MASTER_EMB = {
-    "http://rosetta.interop/master/attr/altitude": {"lexical": [0.9, 0.1, 0.0]},
-    "http://rosetta.interop/master/attr/bearing": {"lexical": [0.1, 0.9, 0.0]},
+    "http://rosetta.interop/master/attr/altitude": {
+        "label": "Altitude",
+        "lexical": [0.9, 0.1, 0.0],
+    },
+    "http://rosetta.interop/master/attr/bearing": {"label": "Bearing", "lexical": [0.1, 0.9, 0.0]},
 }
 
 

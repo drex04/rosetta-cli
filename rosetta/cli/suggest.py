@@ -63,12 +63,20 @@ def cli(
                 raise ValueError(f"Missing 'lexical' key for URI: {uri}")
         src_uris = list(src_emb)
         A = np.array([src_emb[u]["lexical"] for u in src_uris], dtype=np.float32)
+        src_labels = {
+            u: val.get("label") or u.split("/")[-1].replace("_", " ").title()
+            for u, val in src_emb.items()
+        }
 
         for uri, val in master_emb.items():
             if "lexical" not in val:
                 raise ValueError(f"Missing 'lexical' key for URI: {uri}")
         master_uris = list(master_emb)
         B = np.array([master_emb[u]["lexical"] for u in master_uris], dtype=np.float32)
+        master_labels = {
+            u: val.get("label") or u.split("/")[-1].replace("_", " ").title()
+            for u, val in master_emb.items()
+        }
 
         result = rank_suggestions(
             src_uris,
@@ -94,8 +102,13 @@ def cli(
         report = SuggestionReport(
             root={
                 uri: FieldSuggestions(
+                    label=src_labels[uri],
                     suggestions=[
-                        Suggestion(target_uri=s["uri"], score=s["score"])
+                        Suggestion(
+                            target_uri=s["uri"],
+                            label=master_labels[s["uri"]],
+                            score=s["score"],
+                        )
                         for s in field["suggestions"]
                     ],
                     anomaly=field["anomaly"],

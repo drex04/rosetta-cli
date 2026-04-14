@@ -135,8 +135,9 @@ def test_embed_linkml_base() -> None:
     schema = _make_schema(classes={"speed": {"title": "Speed"}})
     results = extract_text_inputs_linkml(schema)
     assert len(results) == 1
-    node_id, text = results[0]
+    node_id, label, text = results[0]
     assert node_id == "test_schema/speed"
+    assert label == "Speed"
     assert text == "Speed"
 
 
@@ -147,7 +148,7 @@ def test_embed_linkml_definitions() -> None:
     schema = _make_schema(classes={"speed": {"title": "Speed", "description": "Rate of movement"}})
     results = extract_text_inputs_linkml(schema, include_definitions=True)
     assert len(results) == 1
-    assert "Rate of movement" in results[0][1]
+    assert "Rate of movement" in results[0][2]
 
 
 def test_embed_linkml_parents() -> None:
@@ -162,7 +163,7 @@ def test_embed_linkml_parents() -> None:
     )
     results = extract_text_inputs_linkml(schema, include_parents=True)
     child_result = next(r for r in results if "child_class" in r[0])
-    assert "Parent" in child_result[1]
+    assert "Parent" in child_result[2]
 
 
 def test_embed_linkml_ancestors() -> None:
@@ -178,8 +179,8 @@ def test_embed_linkml_ancestors() -> None:
     )
     results = extract_text_inputs_linkml(schema, include_ancestors=True)
     child_result = next(r for r in results if "/child" in r[0])
-    assert "Parent" in child_result[1]
-    assert "Grandparent" in child_result[1]
+    assert "Parent" in child_result[2]
+    assert "Grandparent" in child_result[2]
 
 
 def test_embed_linkml_children() -> None:
@@ -194,7 +195,7 @@ def test_embed_linkml_children() -> None:
     )
     results = extract_text_inputs_linkml(schema, include_children=True)
     parent_result = next(r for r in results if "/vehicle" in r[0])
-    assert "Car" in parent_result[1]
+    assert "Car" in parent_result[2]
 
 
 def test_embed_linkml_ancestors_supersedes_parents() -> None:
@@ -213,8 +214,8 @@ def test_embed_linkml_ancestors_supersedes_parents() -> None:
     )
     child_result = next(r for r in results_ancestors if "/c" in r[0])
     # Both Grandparent and Parent should appear (ancestors is strict superset)
-    assert "Grandparent" in child_result[1]
-    assert "Parent" in child_result[1]
+    assert "Grandparent" in child_result[2]
+    assert "Parent" in child_result[2]
 
 
 def test_embed_linkml_children_and_ancestors() -> None:
@@ -230,8 +231,8 @@ def test_embed_linkml_children_and_ancestors() -> None:
     )
     results = extract_text_inputs_linkml(schema, include_ancestors=True, include_children=True)
     mid_result = next(r for r in results if "/mid" in r[0])
-    assert "Root" in mid_result[1]  # ancestor
-    assert "Leaf" in mid_result[1]  # child
+    assert "Root" in mid_result[2]  # ancestor
+    assert "Leaf" in mid_result[2]  # child
 
 
 def test_embed_linkml_no_flags() -> None:
@@ -240,8 +241,8 @@ def test_embed_linkml_no_flags() -> None:
 
     schema = _make_schema(classes={"speed": {"title": "Speed", "description": "A description"}})
     results = extract_text_inputs_linkml(schema)
-    assert results[0][1] == "Speed"
-    assert ". " not in results[0][1]
+    assert results[0][2] == "Speed"
+    assert ". " not in results[0][2]
 
 
 def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.FixtureRequest) -> None:

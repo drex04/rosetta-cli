@@ -46,10 +46,12 @@ class LintReport(BaseModel):
 
 class Suggestion(BaseModel):
     target_uri: str
+    label: str
     score: float
 
 
 class FieldSuggestions(BaseModel):
+    label: str
     suggestions: list[Suggestion]
     anomaly: bool
 
@@ -62,6 +64,7 @@ class SuggestionReport(RootModel[dict[str, FieldSuggestions]]):
 
 
 class EmbeddingVectors(BaseModel):
+    label: str | None = None
     lexical: list[float]
 
 

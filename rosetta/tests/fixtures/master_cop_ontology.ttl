@@ -1,0 +1,644 @@
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:     <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos:    <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+@prefix mc: <https://ontology.nato.int/core/MasterCOP#> .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Ontology header
+#─────────────────────────────────────────────────────────────────────────────
+
+<https://ontology.nato.int/core/MasterCOP>
+    a owl:Ontology ;
+    dcterms:title "NATO Air Defense Master COP Ontology" ;
+    dcterms:description "Master ontology for NATO air defense common operational picture (COP). Defines canonical classes and properties for tracks, units, platforms, weapons, and engagement zones used in C2 data integration." ;
+    dcterms:creator "NATO NCI Agency" ;
+    dcterms:issued "2024-01-15"^^xsd:date ;
+    owl:versionInfo "1.0.0" ;
+    skos:scopeNote "Source of truth for semantic mapping from NATO member nation schemas (STANAG 5516, Link 16, national C2 systems) to a unified COP representation." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Top-level class
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Entity
+    a rdfs:Class ;
+    rdfs:label "Entity" ;
+    rdfs:comment "Top-level class for any distinct object tracked or managed in the COP." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Tracks
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Track
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Entity ;
+    rdfs:label "Track" ;
+    rdfs:comment "An observed or reported contact maintained by a C2 system. May be correlated from one or more sensor reports." .
+
+mc:AirTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Track ;
+    rdfs:label "Air Track" ;
+    rdfs:comment "An airborne track — fixed-wing aircraft, rotary-wing aircraft, UAV, or missile in flight." .
+
+mc:BallisticTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:AirTrack ;
+    rdfs:label "Ballistic Track" ;
+    rdfs:comment "A track following a ballistic trajectory — typically a ballistic missile or large-calibre artillery round." .
+
+mc:CruiseMissileTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:AirTrack ;
+    rdfs:label "Cruise Missile Track" ;
+    rdfs:comment "A track exhibiting terrain-following or low-altitude sustained powered flight consistent with a cruise missile." .
+
+mc:UAVTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:AirTrack ;
+    rdfs:label "UAV Track" ;
+    rdfs:comment "An unmanned aerial vehicle track, including MALE, HALE, and Group 1-5 UAS." .
+
+mc:SurfaceTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Track ;
+    rdfs:label "Surface Track" ;
+    rdfs:comment "A track on the surface — land vehicle or surface vessel." .
+
+mc:SubsurfaceTrack
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Track ;
+    rdfs:label "Subsurface Track" ;
+    rdfs:comment "A submerged track, typically a submarine." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Units
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Unit
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Entity ;
+    rdfs:label "Unit" ;
+    rdfs:comment "A military organizational unit with a defined mission, commander, and assigned assets." .
+
+mc:AirDefenseUnit
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Unit ;
+    rdfs:label "Air Defense Unit" ;
+    rdfs:comment "A unit whose primary mission is defense against air threats including missiles, aircraft, and UAS." .
+
+mc:FireUnit
+    a rdfs:Class ;
+    rdfs:subClassOf mc:AirDefenseUnit ;
+    rdfs:label "Fire Unit" ;
+    rdfs:comment "An air defense unit equipped with interceptors or surface-to-air missiles with organic engagement authority." .
+
+mc:SensorUnit
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Unit ;
+    rdfs:label "Sensor Unit" ;
+    rdfs:comment "A unit operating one or more sensors for surveillance, tracking, or targeting." .
+
+mc:CommandPost
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Unit ;
+    rdfs:label "Command Post" ;
+    rdfs:comment "A unit serving as a C2 node coordinating subordinate units and managing the COP." .
+
+mc:AEWUnit
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorUnit ;
+    rdfs:label "AEW Unit" ;
+    rdfs:comment "An airborne early warning unit providing extended radar coverage and airborne C2." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Platforms
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Platform
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Entity ;
+    rdfs:label "Platform" ;
+    rdfs:comment "A physical asset capable of carrying sensors, weapons, or personnel." .
+
+mc:Aircraft
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Platform ;
+    rdfs:label "Aircraft" ;
+    rdfs:comment "An airborne platform — fighter, bomber, AWACS, tanker, transport, helicopter, or UAV." .
+
+mc:FixedWingAircraft
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Aircraft ;
+    rdfs:label "Fixed-Wing Aircraft" ;
+    rdfs:comment "A conventional fixed-wing aircraft." .
+
+mc:RotaryWingAircraft
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Aircraft ;
+    rdfs:label "Rotary-Wing Aircraft" ;
+    rdfs:comment "A helicopter or other rotary-wing platform." .
+
+mc:AEWPlatform
+    a rdfs:Class ;
+    rdfs:subClassOf mc:FixedWingAircraft ;
+    rdfs:label "AEW Platform" ;
+    rdfs:comment "Airborne Early Warning platform (e.g., E-3 Sentry, E-2 Hawkeye) providing airborne surveillance and C2 relay." .
+
+mc:GroundBasedRadar
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Platform ;
+    rdfs:label "Ground-Based Radar" ;
+    rdfs:comment "A fixed or mobile ground-based radar system used for air surveillance or fire control." .
+
+mc:MissileSystem
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Platform ;
+    rdfs:label "Missile System" ;
+    rdfs:comment "A surface-to-air missile launcher and associated fire control radar." .
+
+mc:EWSystem
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Platform ;
+    rdfs:label "EW System" ;
+    rdfs:comment "An electronic warfare system providing emissions intelligence and jamming capability." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Weapons
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Weapon
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Entity ;
+    rdfs:label "Weapon" ;
+    rdfs:comment "A munition or weapon system employed against a target." .
+
+mc:SurfaceToAirMissile
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Weapon ;
+    rdfs:label "Surface-to-Air Missile" ;
+    rdfs:comment "A missile fired from a ground or sea-based launcher to intercept airborne targets." .
+
+mc:AirToAirMissile
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Weapon ;
+    rdfs:label "Air-to-Air Missile" ;
+    rdfs:comment "A missile fired from an airborne platform at an airborne target." .
+
+mc:GunSystem
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Weapon ;
+    rdfs:label "Gun System" ;
+    rdfs:comment "An anti-aircraft gun or close-in weapon system (CIWS)." .
+
+mc:DirectedEnergyWeapon
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Weapon ;
+    rdfs:label "Directed Energy Weapon" ;
+    rdfs:comment "A laser or high-power microwave weapon used against airborne threats." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Zones
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:Zone
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Entity ;
+    rdfs:label "Zone" ;
+    rdfs:comment "A defined airspace volume with a specific operational function." .
+
+mc:ADIZ
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "Air Defense Identification Zone" ;
+    rdfs:comment "Designated airspace in which identification, location, and control of civil and military aircraft is required in the interest of national security." .
+
+mc:EngagementZone
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "Engagement Zone" ;
+    rdfs:comment "The volume of airspace within which a weapon system has both authority and capability to engage a threat." .
+
+mc:NoFlyZone
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "No-Fly Zone" ;
+    rdfs:comment "Airspace in which all flight is prohibited unless specifically authorized by the controlling authority." .
+
+mc:RestrictedOperationsZone
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "Restricted Operations Zone" ;
+    rdfs:comment "Airspace of defined dimensions imposed by the coordinating authority within which the operation of one or more airspace users is restricted." .
+
+mc:Corridor
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "Corridor" ;
+    rdfs:comment "A defined airspace lane reserved for the transit of specific friendly aircraft, providing deconfliction from engagement zones." .
+
+mc:KillBox
+    a rdfs:Class ;
+    rdfs:subClassOf mc:Zone ;
+    rdfs:label "Kill Box" ;
+    rdfs:comment "Three-dimensional area reference used to facilitate the rapid attack of targets within a defined area of space." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Sensor reports
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:SensorReport
+    a rdfs:Class ;
+    rdfs:label "Sensor Report" ;
+    rdfs:comment "A single sensor detection or update from a radar, EW system, or other sensor contributing to track formation or update." .
+
+mc:RadarReturn
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorReport ;
+    rdfs:label "Radar Return" ;
+    rdfs:comment "A primary or secondary radar detection contributing to a track." .
+
+mc:IFFReport
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorReport ;
+    rdfs:label "IFF Report" ;
+    rdfs:comment "An Identification Friend or Foe transponder reply containing mode/code data." .
+
+mc:EWReport
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorReport ;
+    rdfs:label "EW Report" ;
+    rdfs:comment "An electronic warfare emission report contributing to platform type identification." .
+
+mc:AISReport
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorReport ;
+    rdfs:label "AIS Report" ;
+    rdfs:comment "An Automatic Identification System broadcast from a maritime vessel." .
+
+mc:ADSBReport
+    a rdfs:Class ;
+    rdfs:subClassOf mc:SensorReport ;
+    rdfs:label "ADS-B Report" ;
+    rdfs:comment "An Automatic Dependent Surveillance-Broadcast message from a civil or military aircraft." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Identity and threat properties
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:hasIdentity
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:IdentityCode ;
+    rdfs:label "has identity" ;
+    rdfs:comment "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." .
+
+mc:hasThreatLevel
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:ThreatLevel ;
+    rdfs:label "has threat level" ;
+    rdfs:comment "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." .
+
+mc:hasEngagementStatus
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:EngagementStatus ;
+    rdfs:label "has engagement status" ;
+    rdfs:comment "Current engagement status of the track." .
+
+mc:hasTrackQuality
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:integer ;
+    rdfs:label "has track quality" ;
+    rdfs:comment "Track quality score (0–15) indicating sensor fusion confidence in the track solution." .
+
+mc:hasTrackNumber
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:string ;
+    rdfs:label "has track number" ;
+    rdfs:comment "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." .
+
+mc:hasPlatformType
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:string ;
+    rdfs:label "has platform type" ;
+    rdfs:comment "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Kinematic properties
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:hasLatitude
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:double ;
+    rdfs:label "has latitude" ;
+    rdfs:comment "WGS-84 geodetic latitude in decimal degrees. Positive = north." .
+
+mc:hasLongitude
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:double ;
+    rdfs:label "has longitude" ;
+    rdfs:comment "WGS-84 geodetic longitude in decimal degrees. Positive = east." .
+
+mc:hasAltitude
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:double ;
+    rdfs:label "has altitude" ;
+    rdfs:comment "Altitude above mean sea level in meters." .
+
+mc:hasSpeed
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:double ;
+    rdfs:label "has speed" ;
+    rdfs:comment "Track speed over ground in knots." .
+
+mc:hasHeading
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:double ;
+    rdfs:label "has heading" ;
+    rdfs:comment "Track heading in degrees true (0–360)." .
+
+mc:hasVerticalRate
+    a rdf:Property ;
+    rdfs:domain mc:AirTrack ;
+    rdfs:range xsd:double ;
+    rdfs:label "has vertical rate" ;
+    rdfs:comment "Rate of climb or descent in feet per minute. Positive = climbing, negative = descending." .
+
+mc:hasRange
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:double ;
+    rdfs:label "has range" ;
+    rdfs:comment "Slant range from the reporting sensor to the track in nautical miles." .
+
+mc:hasBearing
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:double ;
+    rdfs:label "has bearing" ;
+    rdfs:comment "Bearing from the reporting sensor to the track in degrees true." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# IFF / identification properties
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:hasMode1Code
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:string ;
+    rdfs:label "has Mode 1 code" ;
+    rdfs:comment "IFF Mode 1 (mission type) code, two-digit octal string." .
+
+mc:hasMode2Code
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:string ;
+    rdfs:label "has Mode 2 code" ;
+    rdfs:comment "IFF Mode 2 (unit identification) code, four-digit octal string." .
+
+mc:hasMode3Code
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:string ;
+    rdfs:label "has Mode 3/A code" ;
+    rdfs:comment "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." .
+
+mc:hasMode5
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "has Mode 5" ;
+    rdfs:comment "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." .
+
+mc:hasCallsign
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "has callsign" ;
+    rdfs:comment "The tactical callsign assigned to a unit or aircraft." .
+
+mc:hasNATOStockNumber
+    a rdf:Property ;
+    rdfs:domain mc:Weapon ;
+    rdfs:range xsd:string ;
+    rdfs:label "has NATO stock number" ;
+    rdfs:comment "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Relational properties
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:detectedBy
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Platform ;
+    rdfs:label "detected by" ;
+    rdfs:comment "The sensor platform(s) that have contributed reports to this track." .
+
+mc:managedBy
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Unit ;
+    rdfs:label "managed by" ;
+    rdfs:comment "The C2 unit currently responsible for managing this track in the COP." .
+
+mc:engagedBy
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Unit ;
+    rdfs:label "engaged by" ;
+    rdfs:comment "The fire unit currently assigned to engage this track." .
+
+mc:assignedWeapon
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Weapon ;
+    rdfs:label "assigned weapon" ;
+    rdfs:comment "The weapon round assigned to intercept this track." .
+
+mc:correlatedWith
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Track ;
+    rdfs:label "correlated with" ;
+    rdfs:comment "Another track that the fusion engine has associated as the same physical object." .
+
+mc:operatedBy
+    a rdf:Property ;
+    rdfs:domain mc:Platform ;
+    rdfs:range mc:Unit ;
+    rdfs:label "operated by" ;
+    rdfs:comment "The unit that operates this platform." .
+
+mc:withinZone
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:Zone ;
+    rdfs:label "within zone" ;
+    rdfs:comment "The airspace zone(s) the track currently occupies." .
+
+mc:responsibleFor
+    a rdf:Property ;
+    rdfs:domain mc:Unit ;
+    rdfs:range mc:Zone ;
+    rdfs:label "responsible for" ;
+    rdfs:comment "The airspace zone(s) for which this unit has air defense responsibility." .
+
+mc:reportedBy
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range mc:SensorReport ;
+    rdfs:label "reported by" ;
+    rdfs:comment "The raw sensor reports fused to produce or update this track." .
+
+mc:hasTimestamp
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "has timestamp" ;
+    rdfs:comment "UTC timestamp of the last update to this entity." .
+
+mc:hasSource
+    a rdf:Property ;
+    rdfs:domain mc:Entity ;
+    rdfs:range xsd:string ;
+    rdfs:label "has source" ;
+    rdfs:comment "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." .
+
+mc:hasConfidence
+    a rdf:Property ;
+    rdfs:domain mc:Track ;
+    rdfs:range xsd:double ;
+    rdfs:label "has confidence" ;
+    rdfs:comment "Fusion engine confidence score for this track (0.0–1.0)." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Controlled vocabulary: IdentityCode
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:IdentityCode
+    a rdfs:Class ;
+    rdfs:label "Identity Code" ;
+    rdfs:comment "Closed set of tactical identity values per APP-6 / MIL-STD-2525." .
+
+mc:FRIEND
+    a mc:IdentityCode ;
+    rdfs:label "FRIEND" ;
+    skos:definition "Positively identified as a friendly unit." .
+
+mc:HOSTILE
+    a mc:IdentityCode ;
+    rdfs:label "HOSTILE" ;
+    skos:definition "Positively identified as hostile through ROE criteria." .
+
+mc:NEUTRAL
+    a mc:IdentityCode ;
+    rdfs:label "NEUTRAL" ;
+    skos:definition "Positively identified as neither friendly nor hostile." .
+
+mc:UNKNOWN
+    a mc:IdentityCode ;
+    rdfs:label "UNKNOWN" ;
+    skos:definition "Identity not yet determined; insufficient information to classify." .
+
+mc:ASSUMED_FRIEND
+    a mc:IdentityCode ;
+    rdfs:label "ASSUMED FRIEND" ;
+    skos:definition "Assumed to be friendly based on available information but not positively identified." .
+
+mc:SUSPECT
+    a mc:IdentityCode ;
+    rdfs:label "SUSPECT" ;
+    skos:definition "Suspected of hostile intent or capability, but not yet confirmed as hostile." .
+
+mc:PENDING
+    a mc:IdentityCode ;
+    rdfs:label "PENDING" ;
+    skos:definition "Track awaiting initial identity assessment by the C2 system." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Controlled vocabulary: ThreatLevel
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:ThreatLevel
+    a rdfs:Class ;
+    rdfs:label "Threat Level" ;
+    rdfs:comment "Assessed threat level of a track to defended assets." .
+
+mc:LOW
+    a mc:ThreatLevel ;
+    rdfs:label "LOW" ;
+    skos:definition "Track presents minimal threat. Continue to monitor." .
+
+mc:MEDIUM
+    a mc:ThreatLevel ;
+    rdfs:label "MEDIUM" ;
+    skos:definition "Track presents a potential threat. Increased readiness; prepare weapon assignments." .
+
+mc:HIGH
+    a mc:ThreatLevel ;
+    rdfs:label "HIGH" ;
+    skos:definition "Track presents a significant threat to defended assets. Prepare to engage." .
+
+mc:CRITICAL
+    a mc:ThreatLevel ;
+    rdfs:label "CRITICAL" ;
+    skos:definition "Track presents an immediate lethal threat. Engage immediately per ROE." .
+
+#─────────────────────────────────────────────────────────────────────────────
+# Controlled vocabulary: EngagementStatus
+#─────────────────────────────────────────────────────────────────────────────
+
+mc:EngagementStatus
+    a rdfs:Class ;
+    rdfs:label "Engagement Status" ;
+    rdfs:comment "The current engagement state of a track within the air battle." .
+
+mc:NOT_ENGAGED
+    a mc:EngagementStatus ;
+    rdfs:label "NOT ENGAGED" ;
+    skos:definition "No weapon has been assigned to engage this track." .
+
+mc:BEING_ENGAGED
+    a mc:EngagementStatus ;
+    rdfs:label "BEING ENGAGED" ;
+    skos:definition "A weapon has been assigned and is en route to intercept." .
+
+mc:DESTROYED
+    a mc:EngagementStatus ;
+    rdfs:label "DESTROYED" ;
+    skos:definition "Track has been assessed as destroyed by an interceptor." .
+
+mc:EVADED
+    a mc:EngagementStatus ;
+    rdfs:label "EVADED" ;
+    skos:definition "Track successfully evaded the assigned interceptor; weapon miss assessed." .
+
+mc:LEAKER
+    a mc:EngagementStatus ;
+    rdfs:label "LEAKER" ;
+    skos:definition "Track has penetrated the engagement envelope without being destroyed. Handoff required." .
+
+mc:FRIENDLY_FIRE_RISK
+    a mc:EngagementStatus ;
+    rdfs:label "FRIENDLY FIRE RISK" ;
+    skos:definition "Engagement withheld due to proximity of friendly assets or unclear identity." .
+
+mc:WEAPON_EXPENDED
+    a mc:EngagementStatus ;
+    rdfs:label "WEAPON EXPENDED" ;
+    skos:definition "Assigned weapon expended; battle damage assessment pending." .

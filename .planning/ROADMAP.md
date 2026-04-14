@@ -157,3 +157,53 @@ JSON sample-data deduction.
 - Tests, fixtures, README updates for both formats
 
 **Requirements:** REQ-INGEST-XSD-01, REQ-INGEST-SAMPLE-01
+
+---
+
+## Milestone: v2.0 — LinkML + SSSOM migration
+
+---
+
+## Phase 12: Schema Normalization
+**Goal:** Replace all custom schema parsers with schema-automator importers. Adopt LinkML
+`SchemaDefinition` as the single internal schema representation. Update `rosetta-translate`
+to operate on LinkML YAML instead of RDF Turtle. Lay the dependency foundation (sssom)
+for Phase 13.
+
+**Delivers:**
+- `rosetta/core/normalize.py` — `normalize_schema()` dispatching to 7 format importers
+- `rosetta/cli/ingest.py` rewritten — outputs `.linkml.yaml`; adds `--schema-name`; drops `--nation`
+- `rosetta/core/translation.py` + `rosetta/cli/translate.py` updated — LinkML YAML I/O;
+  translates class + slot titles and descriptions; preserves originals in `aliases`
+- `rosetta/core/parsers/` deleted entirely (all custom parsers and `FieldSchema`)
+- `schema-automator >= 0.5.5` and `sssom >= 0.4.15` added to dependencies
+
+**Requirements:** REQ-V2-INGEST-01
+
+---
+
+## Phase 13: Semantic Matching
+**Goal:** Update `rosetta-embed` and `rosetta-suggest` to work with LinkML SchemaDefinition.
+Add structural feature extraction. Output SSSOM candidates with confidence scores.
+
+**Delivers:**
+- `rosetta-embed` updated — consumes `.linkml.yaml`; computes embeddings from slot/class titles + descriptions
+- Structural feature extraction — class hierarchy, slot co-occurrence, cardinality
+- `rosetta-suggest` updated — outputs `.sssom.tsv` candidates; confidence field carries similarity scores
+- Accredited SSSOM store integrated into suggestion boost logic
+
+**Requirements:** REQ-V2-SUGGEST-01
+
+---
+
+## Phase 14: User Review
+**Goal:** User approves/rejects SSSOM candidate mappings. Produce an approved SSSOM mapping set
+ready for formal accreditation.
+
+**Delivers:**
+- `rosetta-review` (new tool or extended `rosetta-suggest`) — user approve/reject workflow
+- Output: `mappings-user-approved.sssom.tsv` with `mapping_justification: semapv:ManualMappingCuration`
+- Updated `rosetta-accredit` — reads/writes SSSOM instead of `ledger.json`; accredited
+  mappings feed back into suggestion boost (Phase 13 loop)
+
+**Requirements:** REQ-V2-REVIEW-01
