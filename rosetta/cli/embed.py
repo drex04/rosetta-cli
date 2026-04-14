@@ -8,7 +8,7 @@ from pathlib import Path
 
 import click
 
-from rosetta.core.embedding import (  # type: ignore[attr-defined]
+from rosetta.core.embedding import (
     EmbeddingModel,
     extract_text_inputs_linkml,
 )

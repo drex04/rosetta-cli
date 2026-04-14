@@ -41,12 +41,10 @@ Nested objects are preserved as nested classes in the LinkML output. Leaf field 
 Usage: rosetta-ingest [OPTIONS]
 
 Options:
-  -i, --input PATH         Input file (default: stdin)
-  -o, --output PATH        Output file (default: stdout)
-  --input-format TEXT      Force input format: csv, tsv, json-schema, openapi, xsd, json-sample, rdfs
-  --schema-name TEXT       Schema name (default: filename stem)
-  --max-sample-rows INT    Max rows read from sample for statistics  [default: 1000]
-  -c, --config PATH        Path to rosetta.toml
+  --input PATH         Input schema file.  [required]
+  --format TEXT        Force input format: csv, tsv, json-schema, openapi, xsd, json-sample, rdfs
+  --schema-name TEXT   Schema identifier (default: filename stem).
+  --output PATH        Output path for .linkml.yaml file.  [required]
 ```
 
 **Example:**
