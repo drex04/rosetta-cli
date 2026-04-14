@@ -1,101 +1,107 @@
 # Architecture
 
-**Analysis Date:** 2026-04-13
+**Analysis Date:** 2026-04-14
 
 ## Pattern Overview
-**Overall:** Composable CLI toolkit with layered separation (CLI, core logic, RDF utilities, policies)
+**Overall:** Unix-composable pipeline of single-responsibility CLI tools
 **Key Characteristics:**
-- Unix-composable: tools read/write files or stdin/stdout; exit code 0 = success, 1 = error
-- RDF-centric: all data flows through rdflib graphs; Turtle for human artifacts, N-Triples for machine interchange
-- Stateless processing: each tool is independent; config via 3-tier precedence (CLI flag > env var > rosetta.toml)
-- Policy-driven: QUDT unit registry and FnML mappings embedded in `rosetta/policies/`
+- Each tool reads from file/stdin, writes to file/stdout — composable in shell pipelines
+- Strict layer separation: CLI (I/O + Click) → Core (pure logic) → Store (file persistence)
+- Canonical intermediate format is LinkML YAML (`.linkml.yaml`); SSSOM TSV for mapping candidates
+- No shared in-process state — tools communicate through files on disk
 
 ## Layers
-**CLI (Presentation):**
-- Purpose: Parse arguments, call core logic, output results, handle exit codes
-- Contains: Click decorators, file I/O coordination, JSON serialization
-- Location: `rosetta/cli/{ingest,embed,suggest,lint,validate,rml_gen,provenance,accredit}.py`
-- Depends on: `rosetta.core`, `rosetta.core.io`
-- Used by: Direct shell invocation via pyproject.toml entrypoints
 
-**Core Logic (Domain):**
-- Purpose: Implement semantic mapping, embedding, linting, and RDF manipulation
-- Contains: Algorithm implementations (similarity ranking, unit compatibility, RDF SPARQL queries)
-- Location: `rosetta/core/{rdf_utils,embedding,similarity,units,unit_detect,ingest_rdf,config,io,models,provenance,accredit,rml_builder}.py`
-- Depends on: rdflib, sentence-transformers, numpy, pyyaml, pyshacl, pydantic
-- Used by: All CLI tools
+**CLI Layer:**
+- Purpose: Click entrypoints, argument parsing, I/O orchestration, exit codes
+- Contains: One module per tool; calls core functions; constructs Pydantic models for output
+- Location: `rosetta/cli/`
+- Depends on: `rosetta/core/`
+- Used by: Users, shell pipelines
 
-**Parser Subsystem:**
-- Purpose: Normalize heterogeneous national schemas (CSV, JSON Schema, OpenAPI) to a common field list
-- Contains: Format-specific parsers dispatched by file extension or `--input-format`
-- Location: `rosetta/core/parsers/{csv_parser,json_schema_parser,openapi_parser,_types}.py`; `__init__.py` exposes `dispatch_parser()`
-- Used by: `rosetta/cli/ingest.py`
+**Core Layer:**
+- Purpose: Pure business logic — normalization, embedding, similarity, RDF utilities, provenance
+- Contains: Stateless functions + `EmbeddingModel` class; all Pydantic output models
+- Location: `rosetta/core/`
+- Depends on: rdflib, linkml-runtime, schema-automator, sentence-transformers, pydantic
+- Used by: `rosetta/cli/`
 
-**Policies (Knowledge Base):**
-- Purpose: Static RDF graphs for QUDT units and FnML registry
-- Contains: TTL files (qudt_units.ttl, fnml_registry.ttl); no Python logic
+**Policies Layer:**
+- Purpose: Static knowledge graphs and validation rules (package data)
+- Contains: `mapping.shacl.ttl`, `qudt_units.ttl`, `fnml_registry.ttl`
 - Location: `rosetta/policies/`
-- Depends on: None
-- Used by: `rosetta.core.units.load_qudt_graph()`
+- Depends on: nothing (static files loaded via `importlib.resources`)
+- Used by: `rosetta-validate`, `rosetta-lint`
 
-**Tests:**
-- Purpose: Pytest fixtures and unit/integration tests
-- Location: `rosetta/tests/{conftest,test_*.py}`
-- Depends on: pytest, core modules
+**Store Layer:**
+- Purpose: Local file-based repository for accredited mappings and ontologies
+- Contains: Turtle files by nation (`store/national-schemas/`), master ontology (`store/master-ontology/`), approved mappings (`store/accredited-mappings/`)
+- Location: `store/`
+- Used by: `rosetta-accredit`, `rosetta-suggest`
 
 ## Data Flow
 
-**rosetta-ingest (canonical flow):**
-1. `cli/ingest.py:cli()` opens stdin/file via `core/io.open_input()`
-2. `core/parsers.dispatch_parser()` detects format → returns `list[FieldRecord]`
-3. `core/ingest_rdf.fields_to_graph()` converts field list → `rdflib.Graph`
-4. `core/rdf_utils.save_graph()` serializes → Turtle/N-Triples to stdout/file
+**rosetta-ingest (canonical ingestion):**
+1. `rosetta/cli/ingest.py` — accepts input file (CSV, TSV, JSON Schema, OpenAPI, RDFS/TTL, XSD, LinkML YAML) + `--schema-name`
+2. `rosetta/core/normalize.py:normalize_schema()` — dispatches to schema-automator importers for 7 formats; hoists nested objects into `$defs`
+3. Output: `.linkml.yaml` (LinkML `SchemaDefinition`)
 
-**rosetta-lint (representative pipeline):**
-1. Load source + master Turtle graphs via rdflib
-2. SPARQL queries extract unit/datatype info; None-guard OPTIONAL vars
-3. `rosetta.core.units.units_compatible()` compares QUDT dimension vectors
-4. Emit `LintReport` Pydantic model → JSON stdout; exit 1 if --strict + warnings
+**rosetta-embed:**
+1. `rosetta/cli/embed.py` — reads `.linkml.yaml`
+2. `rosetta/core/embedding.py:extract_text_inputs_linkml()` — extracts slot/class titles + descriptions as text strings
+3. `rosetta/core/embedding.py:EmbeddingModel.encode()` — encodes with `intfloat/e5-large-v2`; E5 passage prefix applied
+4. Output: embedding JSON (`EmbeddingReport` Pydantic model)
 
-**rosetta-suggest (embedding pipeline):**
-1. Load embeddings JSON {uri → {"lexical": array}} for source and master
-2. Build NumPy matrices → `rosetta.core.similarity.rank_suggestions()` (cosine similarity, top-k)
-3. Wrap in `SuggestionReport` Pydantic model → JSON stdout
+**rosetta-suggest:**
+1. `rosetta/cli/suggest.py` — reads source embedding JSON + master embedding JSON
+2. `rosetta/core/similarity.py:cosine_matrix()` → `rank_suggestions()` — cosine similarity, top-k
+3. `rosetta/core/similarity.py:apply_ledger_feedback()` / `apply_sssom_feedback()` — optional boost/revoke
+4. Output: `.sssom.tsv` (SSSOM TSV format, rows typed as `SSSOMRow`)
+
+**rosetta-translate:**
+- `rosetta/cli/translate.py` → `rosetta/core/translation.py` — LLM/DeepL translation of LinkML YAML field labels
+
+**rosetta-lint → rosetta-validate → rosetta-accredit:**
+- Lint: checks slots against QUDT units + SHACL shapes; outputs `LintReport` JSON
+- Validate: runs pySHACL against `rosetta/policies/mapping.shacl.ttl`; exit code only
+- Accredit: stamps approved SSSOM mappings into `store/accredited-mappings/`
 
 ## Key Abstractions
 
-**FieldRecord (`core/parsers/_types.py`):**
-- Purpose: Normalized field representation before RDF conversion
-- Contract: All parsers return `list[FieldRecord]`; consistent keys across formats
+**`normalize_schema()` (`rosetta/core/normalize.py`):**
+- Purpose: Single dispatch point for all 7 input formats → `SchemaDefinition`
+- Contract: Always returns `SchemaDefinition`; raises `ValueError` for unsupported formats
 
-**rdflib.Graph:**
-- Purpose: Universal in-memory representation for all semantic data
-- Contract: Always bind namespaces via `bind_namespaces()`; use broad `rdflib.term.Node | None` at function boundaries
+**`EmbeddingModel` (`rosetta/core/embedding.py`):**
+- Purpose: Wraps sentence-transformers with E5 passage/query prefix logic for asymmetric retrieval
+- Contract: Default model `intfloat/e5-large-v2`; use `encode()` for passages, `encode_query()` for queries
 
-**Pydantic output models (`core/models.py`):**
-- Purpose: Type-safe JSON output for lint (`LintReport`), suggest (`SuggestionReport`), embed (`EmbeddingReport`)
-- Contract: Construct in CLI layer; serialize via `model.model_dump(mode="json")` before `json.dumps()`
+**`SSSOMRow` (`rosetta/core/models.py`):**
+- Purpose: Typed row for SSSOM TSV output from `rosetta-suggest`
+- Contract: Fields match SSSOM spec column names; serialize via `model_dump(mode="json")`
 
-**Config precedence (`core/config.py`):**
-- Purpose: Allow runtime override of rosetta.toml settings
-- Contract: CLI flag > env var (ROSETTA_SECTION_KEY) > config file
+**Pydantic output models (`rosetta/core/models.py`):**
+- Purpose: All user-facing structured output is typed — never bare dicts at CLI boundaries
+- Contract: Construct in CLI layer; serialize with `model.model_dump(mode="json")` before `json.dumps()`
+
+**Config precedence (`rosetta/core/config.py`):**
+- Contract: CLI flag > env var (`ROSETTA_SECTION_KEY`) > `rosetta.toml`
 
 ## Entry Points
-**rosetta-ingest:** `rosetta/cli/ingest.py:cli` — parse national schema → RDF Turtle
-**rosetta-embed:** `rosetta/cli/embed.py:cli` — extract RDF field labels → LaBSE embeddings JSON
-**rosetta-suggest:** `rosetta/cli/suggest.py:cli` — cosine similarity → ranked mapping candidates JSON
-**rosetta-lint:** `rosetta/cli/lint.py:cli` — unit/datatype semantic lint → LintReport JSON
-**rosetta-validate:** `rosetta/cli/validate.py:cli` — SHACL shape validation → exit code
-**rosetta-rml-gen:** `rosetta/cli/rml_gen.py:cli` — generate RML mapping rules
-**rosetta-provenance:** `rosetta/cli/provenance.py:cli` — stamp/query mapping provenance
-**rosetta-accredit:** `rosetta/cli/accredit.py:cli` — manage accreditation state machine
+
+All 9 tools in `pyproject.toml [project.scripts]`:
+- `rosetta-ingest` → `rosetta/cli/ingest.py:cli`
+- `rosetta-embed` → `rosetta/cli/embed.py:cli`
+- `rosetta-suggest` → `rosetta/cli/suggest.py:cli`
+- `rosetta-translate` → `rosetta/cli/translate.py:cli`
+- `rosetta-lint` → `rosetta/cli/lint.py:cli`
+- `rosetta-validate` → `rosetta/cli/validate.py:cli`
+- `rosetta-rml-gen` → `rosetta/cli/rml_gen.py:cli`
+- `rosetta-provenance` → `rosetta/cli/provenance.py:cli`
+- `rosetta-accredit` → `rosetta/cli/accredit.py:cli`
 
 ## Error Handling
-**Strategy:** Unix convention — exit 0 on success, 1 on errors/violations
-- CLI wraps core logic in `try/except Exception as e: click.echo(str(e), err=True); sys.exit(1)`
-- Core raises `ValueError` with human-readable message; no internal recovery
-- SHACL violations: exit 1 without exception; findings written to output before exit
-- Missing SPARQL OPTIONAL results: return `None`; caller decides if error or info
+**Strategy:** Exit 0 = success, exit 1 = errors/violations. CLI catches core `ValueError`, prints to stderr, calls `sys.exit(1)`. Core raises `ValueError` with human-readable message — no internal recovery.
 
 ---
-*Architecture analysis: 2026-04-13*
+*Architecture analysis: 2026-04-14*
