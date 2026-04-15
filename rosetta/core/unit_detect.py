@@ -18,9 +18,9 @@ _NAME_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 ]
 
 _DESC_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bdecimal\s+degree\b", re.IGNORECASE), "degree"),
+    (re.compile(r"\bdecimal\s+degrees?\b", re.IGNORECASE), "degree"),
     (re.compile(r"\bkm/h\b", re.IGNORECASE), "km_per_hour"),
-    (re.compile(r"\bkilometer\b", re.IGNORECASE), "kilometer"),
+    (re.compile(r"\bkilometers?\b", re.IGNORECASE), "kilometer"),
     (re.compile(r"\b(?:feet|foot)\b", re.IGNORECASE), "foot"),
     (re.compile(r"\bknots?\b", re.IGNORECASE), "knot"),
     (re.compile(r"\bmetres?\b", re.IGNORECASE), "meter"),

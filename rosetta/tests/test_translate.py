@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import deepl
 import deepl.exceptions
 import pytest
+from click.testing import CliRunner
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -115,3 +117,117 @@ def test_translate_deepl_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
     schema = _make_schema(classes={"speed": {"title": "Geschwindigkeit"}})
     with pytest.raises(RuntimeError, match="DeepL API error"):
         translate_schema(schema, source_lang="DE", deepl_key="fake-key")
+
+
+# ---------------------------------------------------------------------------
+# CLI tests for rosetta/cli/translate.py
+# ---------------------------------------------------------------------------
+
+_MINIMAL_LINKML_YAML = """\
+id: https://example.org/test
+name: test_schema
+"""
+
+
+def _write_input(tmp_path: Path, content: str = _MINIMAL_LINKML_YAML) -> Path:
+    p = tmp_path / "input.linkml.yaml"
+    p.write_text(content)
+    return p
+
+
+def test_cli_missing_key_non_english_exits_1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No --deepl-key and source_lang != EN → exit code 1 with error message."""
+    from rosetta.cli.translate import cli
+
+    monkeypatch.delenv("DEEPL_API_KEY", raising=False)
+    runner = CliRunner()
+    input_path = _write_input(tmp_path)
+    result = runner.invoke(
+        cli,
+        ["--input", str(input_path), "--output", str(tmp_path / "out.yaml"), "--source-lang", "DE"],
+    )
+    assert result.exit_code == 1
+    assert "DeepL API key" in result.output
+
+
+def test_cli_english_source_passthrough(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """source_lang=EN → schema written to output, no DeepL key required."""
+    from rosetta.cli.translate import cli
+
+    monkeypatch.delenv("DEEPL_API_KEY", raising=False)
+    runner = CliRunner()
+    input_path = _write_input(tmp_path)
+    out_path = tmp_path / "out.yaml"
+    result = runner.invoke(
+        cli,
+        ["--input", str(input_path), "--output", str(out_path), "--source-lang", "EN"],
+    )
+    assert result.exit_code == 0, result.output
+    assert out_path.exists()
+
+
+def test_cli_translate_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """translate_schema returns schema → output file written, exit 0."""
+    from rosetta.cli.translate import cli
+
+    monkeypatch.delenv("DEEPL_API_KEY", raising=False)
+
+    def fake_translate(schema: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        return schema
+
+    monkeypatch.setattr("rosetta.cli.translate.translate_schema", fake_translate, raising=False)
+    # Also patch at the import location used inside the CLI's try block
+    import rosetta.core.translation as _tr
+
+    monkeypatch.setattr(_tr, "translate_schema", fake_translate)
+
+    runner = CliRunner()
+    input_path = _write_input(tmp_path)
+    out_path = tmp_path / "out.yaml"
+    result = runner.invoke(
+        cli,
+        [
+            "--input",
+            str(input_path),
+            "--output",
+            str(out_path),
+            "--source-lang",
+            "EN",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert out_path.exists()
+
+
+def test_cli_translate_exception_exits_1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """translate_schema raises → CLI prints error and exits 1."""
+    from rosetta.cli.translate import cli
+
+    monkeypatch.setenv("DEEPL_API_KEY", "fake-key")
+
+    import rosetta.core.translation as _tr
+
+    def boom(schema: Any, **kwargs: Any) -> Any:  # noqa: ANN401
+        raise RuntimeError("DeepL API error: network error.")
+
+    monkeypatch.setattr(_tr, "translate_schema", boom)
+
+    runner = CliRunner()
+    input_path = _write_input(tmp_path)
+    result = runner.invoke(
+        cli,
+        [
+            "--input",
+            str(input_path),
+            "--output",
+            str(tmp_path / "out.yaml"),
+            "--source-lang",
+            "DE",
+            "--deepl-key",
+            "fake-key",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Error" in result.output
