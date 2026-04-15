@@ -73,6 +73,12 @@ min_confidence = 80
 paths = ["rosetta"]
 exclude = ["rosetta/tests"]
 
+[tool.mypy]
+# Refurb passes rosetta/ files to mypy explicitly — they're always checked.
+# Skip following any imports into dependency code (never our problem to fix).
+follow_imports = "skip"
+ignore_missing_imports = true
+
 [tool.bandit]
 exclude_dirs = ["rosetta/tests"]
 skips = []
