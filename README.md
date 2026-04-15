@@ -285,148 +285,6 @@ uv run rosetta-accredit ingest candidates.sssom.tsv
 
 ---
 
-### rosetta-validate
-
-Validates an RDF Turtle file against SHACL shape constraints using pySHACL.
-
-```
-Usage: rosetta-validate [OPTIONS]
-
-Options:
-  --data PATH        RDF Turtle file to validate  [required]
-  --shapes PATH      Single SHACL shapes Turtle file
-  --shapes-dir PATH  Directory — loads all *.ttl files as shapes
-  -o, --output PATH  Output file  (default: stdout)
-  -c, --config PATH  Path to rosetta.toml
-```
-
-> At least one of `--shapes` or `--shapes-dir` must be provided.
-
-**Example:**
-
-```bash
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes rosetta/policies/mapping.shacl.ttl \
-  -o validation.json
-
-# Load all shapes from a directory
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes-dir rosetta/policies/ \
-  -o validation.json
-```
-
-**Exit codes:** 0 if conforms, 1 if SHACL violations found.
-
----
-
-### rosetta-rml-gen
-
-Generates valid RML/FnML Turtle from an approved decisions file. The output is executable by RMLMapper.
-
-```
-Usage: rosetta-rml-gen [OPTIONS]
-
-Options:
-  --decisions PATH      Approved decisions JSON  [required]
-  --source-file TEXT    Data file path to embed in rml:logicalSource (referenced, not read)  [required]
-  --source-format [json|csv]  Reference formulation: json, csv  [default: json]
-  --base-uri TEXT       Subject template base URI  [default: http://rosetta.interop/record]
-  --output PATH         Output file  (default: stdout)
-```
-
-**Decisions format:**
-
-```json
-{
-	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
-		"target_uri": "http://rosetta.interop/ns/master/altitude"
-	},
-	"http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
-		"target_uri": "http://rosetta.interop/ns/master/speed",
-		"field_ref": "speed_kn"
-	}
-}
-```
-
-`field_ref` is optional — defaults to the last path segment of the source URI. FnML unit-conversion support (`fnml_function`) is added in a later phase.
-
-**Subject field convention:** The generated `rr:subjectMap` uses `{base-uri}/{id}` as the subject template. Your source data must contain an `id` field (JSON key or CSV column) for RMLMapper to construct subject IRIs.
-
-**Example:**
-
-```bash
-uv run rosetta-rml-gen \
-  --decisions decisions.json \
-  --source-file data/nor_radar.csv \
-  --source-format csv \
-  --output mapping.rml.ttl
-```
-
-**Exit codes:** 0 on success, 1 on invalid or empty decisions.
-
----
-
-### rosetta-provenance
-
-Records and queries PROV-O provenance metadata stamped onto Turtle artifacts. Each stamp increments a version counter.
-
-```
-Usage: rosetta-provenance [OPTIONS] COMMAND
-
-Global options:
-  -c, --config PATH   Path to rosetta.toml
-
-Commands:
-  stamp   Stamp PROV-O metadata onto a Turtle artifact
-  query   Query provenance records stamped onto a Turtle artifact
-```
-
-**stamp:**
-
-```
-Usage: rosetta-provenance stamp [OPTIONS] INPUT
-
-Options:
-  -o, --output PATH   Output path (omit to overwrite INPUT in-place; use '-' for stdout)
-  --agent TEXT        Agent URI  [default: http://rosetta.interop/ns/agent/rosetta-cli]
-  -l, --label TEXT    Human-readable label for this stamp event
-  --format TEXT       Stderr summary format: text, json  [default: text]
-```
-
-**query:**
-
-```
-Usage: rosetta-provenance query [OPTIONS] INPUT
-
-Options:
-  --format TEXT   Output format: text, json  [default: text]
-```
-
-**Example:**
-
-```bash
-# Stamp in-place
-uv run rosetta-provenance stamp mapping.rml.ttl --label "Initial NOR→USA mapping"
-
-# Stamp to new file
-uv run rosetta-provenance stamp mapping.rml.ttl -o mapping.rml.v2.ttl --label "Reviewed"
-
-# Query provenance history (text)
-uv run rosetta-provenance query mapping.rml.ttl
-# v1  2026-04-13T12:00:00+00:00  http://rosetta.interop/ns/agent/rosetta-cli  Initial NOR→USA mapping
-
-# Query as JSON
-uv run rosetta-provenance query mapping.rml.ttl --format json
-```
-
-The artifact URI is derived from the input filename stem: `mapping.rml.ttl` → `rose:mapping.rml`.
-
-**Exit codes:** 0 on success, 1 on error.
-
----
-
 ### rosetta-accredit
 
 Manages the mapping accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta-suggest` (boost/derank) and `rosetta-lint` (conflict checking).
@@ -615,6 +473,148 @@ uv run rosetta-accredit ingest update.sssom.tsv
 ```
 
 **Exit codes:** 0 on success, 1 on state-machine violation or I/O error.
+
+---
+
+### rosetta-validate
+
+Validates an RDF Turtle file against SHACL shape constraints using pySHACL.
+
+```
+Usage: rosetta-validate [OPTIONS]
+
+Options:
+  --data PATH        RDF Turtle file to validate  [required]
+  --shapes PATH      Single SHACL shapes Turtle file
+  --shapes-dir PATH  Directory — loads all *.ttl files as shapes
+  -o, --output PATH  Output file  (default: stdout)
+  -c, --config PATH  Path to rosetta.toml
+```
+
+> At least one of `--shapes` or `--shapes-dir` must be provided.
+
+**Example:**
+
+```bash
+uv run rosetta-validate \
+  --data mapping.rml.ttl \
+  --shapes rosetta/policies/mapping.shacl.ttl \
+  -o validation.json
+
+# Load all shapes from a directory
+uv run rosetta-validate \
+  --data mapping.rml.ttl \
+  --shapes-dir rosetta/policies/ \
+  -o validation.json
+```
+
+**Exit codes:** 0 if conforms, 1 if SHACL violations found.
+
+---
+
+### rosetta-rml-gen
+
+Generates valid RML/FnML Turtle from an approved decisions file. The output is executable by RMLMapper.
+
+```
+Usage: rosetta-rml-gen [OPTIONS]
+
+Options:
+  --decisions PATH      Approved decisions JSON  [required]
+  --source-file TEXT    Data file path to embed in rml:logicalSource (referenced, not read)  [required]
+  --source-format [json|csv]  Reference formulation: json, csv  [default: json]
+  --base-uri TEXT       Subject template base URI  [default: http://rosetta.interop/record]
+  --output PATH         Output file  (default: stdout)
+```
+
+**Decisions format:**
+
+```json
+{
+	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
+		"target_uri": "http://rosetta.interop/ns/master/altitude"
+	},
+	"http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
+		"target_uri": "http://rosetta.interop/ns/master/speed",
+		"field_ref": "speed_kn"
+	}
+}
+```
+
+`field_ref` is optional — defaults to the last path segment of the source URI. FnML unit-conversion support (`fnml_function`) is added in a later phase.
+
+**Subject field convention:** The generated `rr:subjectMap` uses `{base-uri}/{id}` as the subject template. Your source data must contain an `id` field (JSON key or CSV column) for RMLMapper to construct subject IRIs.
+
+**Example:**
+
+```bash
+uv run rosetta-rml-gen \
+  --decisions decisions.json \
+  --source-file data/nor_radar.csv \
+  --source-format csv \
+  --output mapping.rml.ttl
+```
+
+**Exit codes:** 0 on success, 1 on invalid or empty decisions.
+
+---
+
+### rosetta-provenance
+
+Records and queries PROV-O provenance metadata stamped onto Turtle artifacts. Each stamp increments a version counter.
+
+```
+Usage: rosetta-provenance [OPTIONS] COMMAND
+
+Global options:
+  -c, --config PATH   Path to rosetta.toml
+
+Commands:
+  stamp   Stamp PROV-O metadata onto a Turtle artifact
+  query   Query provenance records stamped onto a Turtle artifact
+```
+
+**stamp:**
+
+```
+Usage: rosetta-provenance stamp [OPTIONS] INPUT
+
+Options:
+  -o, --output PATH   Output path (omit to overwrite INPUT in-place; use '-' for stdout)
+  --agent TEXT        Agent URI  [default: http://rosetta.interop/ns/agent/rosetta-cli]
+  -l, --label TEXT    Human-readable label for this stamp event
+  --format TEXT       Stderr summary format: text, json  [default: text]
+```
+
+**query:**
+
+```
+Usage: rosetta-provenance query [OPTIONS] INPUT
+
+Options:
+  --format TEXT   Output format: text, json  [default: text]
+```
+
+**Example:**
+
+```bash
+# Stamp in-place
+uv run rosetta-provenance stamp mapping.rml.ttl --label "Initial NOR→USA mapping"
+
+# Stamp to new file
+uv run rosetta-provenance stamp mapping.rml.ttl -o mapping.rml.v2.ttl --label "Reviewed"
+
+# Query provenance history (text)
+uv run rosetta-provenance query mapping.rml.ttl
+# v1  2026-04-13T12:00:00+00:00  http://rosetta.interop/ns/agent/rosetta-cli  Initial NOR→USA mapping
+
+# Query as JSON
+uv run rosetta-provenance query mapping.rml.ttl --format json
+```
+
+The artifact URI is derived from the input filename stem: `mapping.rml.ttl` → `rose:mapping.rml`.
+
+**Exit codes:** 0 on success, 1 on error.
 
 ---
 
