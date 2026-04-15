@@ -48,6 +48,7 @@ class EmbeddingVectors(BaseModel):
     label: str = ""
     lexical: list[float]
     structural: list[float] = []
+    datatype: str | None = None
 
 
 class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
@@ -86,6 +87,8 @@ class SSSOMRow(BaseModel):
     object_label: str = ""
     mapping_date: datetime | None = None  # stamped by accredit ingest
     record_id: str | None = None  # UUID4 stamped by accredit ingest
+    subject_datatype: str | None = None
+    object_datatype: str | None = None
 
 
 # --- Provenance ---

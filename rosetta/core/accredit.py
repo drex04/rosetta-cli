@@ -15,7 +15,7 @@ MMC_JUSTIFICATION = "semapv:ManualMappingCuration"
 HC_JUSTIFICATION = "semapv:HumanCuration"
 
 # Sentinel for datetime comparisons — tz-aware, sorts before any real audit date.
-_DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
+DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
 
 AUDIT_LOG_COLUMNS = [
     "subject_id",
@@ -57,6 +57,8 @@ def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
         object_label=raw.get("object_label", "") or "",
         mapping_date=mapping_date,
         record_id=raw.get("record_id") or None,
+        subject_datatype=raw.get("subject_datatype") or None,
+        object_datatype=raw.get("object_datatype") or None,
     )
 
 
@@ -141,7 +143,7 @@ def current_state_for_pair(log: list[SSSOMRow], subject_id: str, object_id: str)
     if not matching:
         return None
 
-    return max(matching, key=lambda r: r.mapping_date or _DATETIME_MIN)
+    return max(matching, key=lambda r: r.mapping_date or DATETIME_MIN)
 
 
 def query_pending(log: list[SSSOMRow]) -> list[SSSOMRow]:
@@ -167,8 +169,8 @@ def query_pending(log: list[SSSOMRow]) -> list[SSSOMRow]:
             result.append(row)
         else:
             # MMC is pending only if it is newer than the latest HC for this pair
-            latest_hc = max(hc_rows, key=lambda r: r.mapping_date or _DATETIME_MIN)
-            if (row.mapping_date or _DATETIME_MIN) > (latest_hc.mapping_date or _DATETIME_MIN):
+            latest_hc = max(hc_rows, key=lambda r: r.mapping_date or DATETIME_MIN)
+            if (row.mapping_date or DATETIME_MIN) > (latest_hc.mapping_date or DATETIME_MIN):
                 result.append(row)
 
     return result

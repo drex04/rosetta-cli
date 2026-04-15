@@ -10,7 +10,7 @@ from typing import Any
 import click
 import numpy as np
 
-from rosetta.core.accredit import _DATETIME_MIN, load_log
+from rosetta.core.accredit import DATETIME_MIN, load_log
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import (
@@ -38,6 +38,8 @@ _SSSOM_COLUMNS = [
     "object_label",
     "mapping_date",
     "record_id",
+    "subject_datatype",
+    "object_datatype",
 ]
 
 
@@ -163,8 +165,8 @@ def cli(
             if not row.mapping_justification.endswith("CompositeMatching"):
                 key = (row.subject_id, row.object_id)
                 existing = log_index.get(key)
-                if existing is None or (row.mapping_date or _DATETIME_MIN) >= (
-                    existing.mapping_date or _DATETIME_MIN
+                if existing is None or (row.mapping_date or DATETIME_MIN) >= (
+                    existing.mapping_date or DATETIME_MIN
                 ):
                     log_index[key] = row
 
@@ -204,6 +206,12 @@ def cli(
                         object_label=obj_label,
                         mapping_date=cand.get("mapping_date") or None,  # pyright: ignore[reportAny]
                         record_id=cand.get("record_id") or None,  # pyright: ignore[reportAny]
+                        subject_datatype=src_report.root[src_uri].datatype,
+                        object_datatype=(
+                            master_report.root[obj_uri].datatype
+                            if obj_uri in master_report.root
+                            else None
+                        ),
                     )
                 )
 
@@ -227,6 +235,8 @@ def cli(
                         row.object_label,
                         row.mapping_date.isoformat() if row.mapping_date else "",
                         row.record_id or "",
+                        row.subject_datatype or "",
+                        row.object_datatype or "",
                     ]
                 )
             fh.write(buf.getvalue())

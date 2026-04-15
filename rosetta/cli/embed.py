@@ -66,6 +66,7 @@ def cli(
 ) -> None:
     """Embed a LinkML schema using a sentence-transformer model."""
     try:
+        from typing import Any
         from typing import cast as _cast
 
         from linkml_runtime.linkml_model import SchemaDefinition
@@ -95,6 +96,13 @@ def cli(
 
         struct_map = extract_structural_features_linkml(schema)
 
+        schema_name: str = schema.name or "schema"
+        slots = _cast("dict[str, Any]", schema.slots)
+        datatype_map: dict[str, str | None] = {
+            f"{schema_name}/{name}": (str(slot.range) if slot.range else None)  # pyright: ignore[reportUnknownMemberType]
+            for name, slot in slots.items()
+        }
+
         em = EmbeddingModel(model_name)
         texts = [text for _, _, text in pairs]
         vectors = em.encode(texts)
@@ -105,6 +113,7 @@ def cli(
                     label=label,
                     lexical=vec,
                     structural=struct_map.get(node_id, []),
+                    datatype=datatype_map.get(node_id),
                 )
                 for (node_id, label, _), vec in zip(pairs, vectors, strict=True)
             }

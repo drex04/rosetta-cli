@@ -18,18 +18,25 @@ SOURCE_EMB = {
     "http://rosetta.interop/field/NOR/nor_radar/hoyde_m": {
         "label": "Height M",
         "lexical": [1.0, 0.0, 0.0],
+        "datatype": None,
     },
     "http://rosetta.interop/field/NOR/nor_radar/azimut": {
         "label": "Azimut",
         "lexical": [0.0, 1.0, 0.0],
+        "datatype": None,
     },
 }
 MASTER_EMB = {
     "http://rosetta.interop/master/attr/altitude": {
         "label": "Altitude",
         "lexical": [0.9, 0.1, 0.0],
+        "datatype": None,
     },
-    "http://rosetta.interop/master/attr/bearing": {"label": "Bearing", "lexical": [0.1, 0.9, 0.0]},
+    "http://rosetta.interop/master/attr/bearing": {
+        "label": "Bearing",
+        "lexical": [0.1, 0.9, 0.0],
+        "datatype": None,
+    },
 }
 
 
@@ -492,6 +499,22 @@ def test_suggest_cli_output_file(tmp_path: Path, src_file: str, mst_file: str) -
     assert out_file.exists()
     content = out_file.read_text()
     assert "subject_id" in content
+
+
+def test_suggest_cli_header_has_11_columns(src_file: str, mst_file: str) -> None:
+    """TSV header must have 11 columns including subject_datatype and object_datatype."""
+    from rosetta.cli.suggest import cli
+
+    result = CliRunner().invoke(cli, [src_file, mst_file])
+    assert result.exit_code == 0, result.output
+
+    # Find the header line (not a comment line)
+    columns = next(
+        ln for ln in result.output.splitlines() if ln.strip() and not ln.startswith("#")
+    ).split("\t")
+    assert len(columns) == 11, f"Expected 11 columns, got {len(columns)}: {columns}"
+    assert "subject_datatype" in columns
+    assert "object_datatype" in columns
 
 
 # ---------------------------------------------------------------------------

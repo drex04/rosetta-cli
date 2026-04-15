@@ -156,6 +156,11 @@ def test_sssom_row_round_trip() -> None:
     assert data["subject_id"] == "http://ex.org/FieldA"
     assert data["confidence"] == 0.85
     assert data["subject_label"] == "FieldA"
+    # New optional fields default to None in serialisation
+    assert "subject_datatype" in data
+    assert data["subject_datatype"] is None
+    assert "object_datatype" in data
+    assert data["object_datatype"] is None
     roundtrip = SSSOMRow.model_validate(data)
     assert roundtrip == row
 
@@ -168,9 +173,13 @@ def test_sssom_row_round_trip() -> None:
         confidence=0.95,
         mapping_date=datetime(2026, 1, 1, tzinfo=UTC),
         record_id="abc-123",
+        subject_datatype="integer",
+        object_datatype="string",
     )
     assert row_with_extras.mapping_date == datetime(2026, 1, 1, tzinfo=UTC)
     assert row_with_extras.record_id == "abc-123"
+    assert row_with_extras.subject_datatype == "integer"
+    assert row_with_extras.object_datatype == "string"
 
     # Backward compat: row without new fields defaults to None
     row_minimal = SSSOMRow(
@@ -182,6 +191,8 @@ def test_sssom_row_round_trip() -> None:
     )
     assert row_minimal.mapping_date is None
     assert row_minimal.record_id is None
+    assert row_minimal.subject_datatype is None
+    assert row_minimal.object_datatype is None
 
 
 # ---------------------------------------------------------------------------
@@ -199,3 +210,35 @@ def test_embedding_report_root_model_serialisation() -> None:
     assert isinstance(data, dict)
     assert "urn:field:beta" in data
     assert data["urn:field:beta"]["lexical"] == pytest.approx([0.1, 0.2, 0.3])
+
+
+def test_embedding_vectors_datatype_optional() -> None:
+    """EmbeddingVectors.datatype is optional and defaults to None."""
+    ev = EmbeddingVectors(lexical=[1.0, 2.0])
+    assert ev.datatype is None
+    ev2 = EmbeddingVectors(lexical=[1.0], datatype="integer")
+    assert ev2.datatype == "integer"
+
+
+def test_sssom_row_datatype_fields_optional() -> None:
+    """SSSOMRow.subject_datatype and object_datatype are optional and default to None."""
+    row = SSSOMRow(
+        subject_id="a",
+        predicate_id="b",
+        object_id="c",
+        mapping_justification="j",
+        confidence=0.5,
+    )
+    assert row.subject_datatype is None
+    assert row.object_datatype is None
+    row2 = SSSOMRow(
+        subject_id="a",
+        predicate_id="b",
+        object_id="c",
+        mapping_justification="j",
+        confidence=0.5,
+        subject_datatype="integer",
+        object_datatype="string",
+    )
+    assert row2.subject_datatype == "integer"
+    assert row2.object_datatype == "string"

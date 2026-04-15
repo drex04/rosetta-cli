@@ -286,3 +286,62 @@ def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.Fixt
     # Assert structural field is present and has length 5
     assert "structural" in first_val
     assert len(first_val["structural"]) == 5
+
+
+def test_embed_cli_datatype_propagation(
+    tmp_path: Path, mock_sentence_transformer: pytest.FixtureRequest
+) -> None:
+    """Slot with explicit range → EmbeddingVectors.datatype is populated in JSON output."""
+    from click.testing import CliRunner
+
+    from rosetta.cli.embed import cli
+
+    schema_content = {
+        "id": "https://example.org/dtype_test",
+        "name": "dtype_schema",
+        "classes": {
+            "Track": {
+                "title": "Track",
+                "description": "A tracked object",
+                "slots": ["callsign"],
+            }
+        },
+        "slots": {
+            "callsign": {
+                "title": "Callsign",
+                "range": "string",
+            }
+        },
+    }
+    schema_file = tmp_path / "dtype.linkml.yaml"
+    schema_file.write_text(yaml.dump(schema_content))
+    output_file = tmp_path / "dtype_out.json"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--input",
+            str(schema_file),
+            "--output",
+            str(output_file),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    data = json.loads(output_file.read_text())
+
+    # Find the slot entry — its key should contain "callsign"
+    slot_entries = {k: v for k, v in data.items() if "callsign" in k}
+    assert slot_entries, (
+        f"Expected a 'callsign' slot entry in output, got keys: {list(data.keys())}"
+    )
+    slot_val = next(iter(slot_entries.values()))
+    assert "datatype" in slot_val, "Expected 'datatype' key in slot embedding entry"
+    assert slot_val["datatype"] == "string", (
+        f"Expected datatype='string', got {slot_val['datatype']}"
+    )
+
+    # Class entries should have datatype=null
+    class_entries = {k: v for k, v in data.items() if "callsign" not in k}
+    for val in class_entries.values():
+        assert "datatype" in val
+        assert val["datatype"] is None

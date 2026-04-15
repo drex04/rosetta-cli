@@ -211,78 +211,52 @@ This means `candidates.sssom.tsv` provides a complete picture: newly computed ca
 
 ### rosetta-lint
 
-Validates mapping artifacts. Supports two modes: **schema mode** (unit/datatype checks on RDF suggestions) and **SSSOM mode** (structural checks on analyst-proposed SSSOM TSV files).
-
-#### Schema mode
+Validates analyst-proposed SSSOM TSV files before they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].log`) to check for conflicts with existing decisions.
 
 ```
 Usage: rosetta-lint [OPTIONS]
 
 Options:
-  --source PATH       National schema RDF (Turtle)   [required]
-  --master PATH       Master ontology RDF (Turtle)   [required]
-  --suggestions PATH  Suggestions JSON from rosetta-suggest  [required]
-  --output PATH       Output file  (default: stdout)
-  --strict            Treat WARNINGs as BLOCKs
-  --config PATH       Path to rosetta.toml
+  --sssom PATH    SSSOM TSV file to validate  [required]
+  --output PATH   Output file (default: stdout)
+  --strict        Treat WARNINGs as BLOCKs (useful as a CI gate)
+  --config PATH   Path to rosetta.toml
 ```
 
-**Findings:**
+**Lint rules:**
 
-| Severity | Rule                       | Meaning                                                       |
-| -------- | -------------------------- | ------------------------------------------------------------- |
-| BLOCK    | `unit_dimension_mismatch`  | Source and target units measure different physical quantities |
-| WARNING  | `unit_conversion_required` | Same dimension, different scale — FnML conversion suggested   |
-| WARNING  | `datatype_mismatch`        | Numeric vs string type clash                                  |
-| INFO     | `unit_not_detected`        | Source field has no detectable unit                           |
-| INFO     | `master_unit_missing`      | Master field has no `qudt:unit` annotation                    |
-| INFO     | `unit_vector_missing`      | QUDT dimension vector absent for one or both units            |
+| Rule | Severity | Description |
+| ---- | -------- | ----------- |
+| `unit_dimension_mismatch` | BLOCK | Subject and object fields have incompatible physical dimensions |
+| `unit_conversion_required` | WARNING | Fields share the same dimension but use different units (FnML conversion suggested) |
+| `unit_not_detected` | INFO | No recognizable unit in field name, or unit has no QUDT IRI mapping |
+| `unit_vector_missing` | INFO | QUDT dimension vector missing for a recognized unit |
+| `datatype_mismatch` | WARNING | Subject/object differ in numeric vs string datatype |
+| `max_one_mmc_per_pair` | BLOCK | More than one ManualMappingCuration row for the same pair |
+| `reproposal_of_approved` | BLOCK | Pair already has an approved HumanCuration decision in the audit log |
+| `reproposal_of_rejected` | BLOCK | Pair already has a rejected HumanCuration decision in the audit log |
+| `invalid_predicate` | BLOCK | Predicate is not one of the allowed SKOS/OWL predicates |
+
+When `--strict` is passed, all WARNINGs are upgraded to BLOCKs.
+
+**Output format:** JSON `LintReport` with a `findings` list (each entry has `rule`, `severity`, `source_uri`, `target_uri`, `message`, `fnml_suggestion`) and a `summary` with block/warning/info counts.
 
 **Example:**
 
 ```bash
-uv run rosetta-lint \
-  --source nor.ttl \
-  --master usa.ttl \
-  --suggestions suggestions.json \
-  --output lint.json
+rosetta-lint --sssom proposals.sssom.tsv [--output report.json] [--strict] [--config rosetta.toml]
 
-# Strict mode — WARNINGs become BLOCKs (useful as a CI gate)
-uv run rosetta-lint --strict \
-  --source nor.ttl \
-  --master usa.ttl \
-  --suggestions suggestions.json
-```
-
-**Exit codes:** 0 if no BLOCKs, 1 if any BLOCKs found.
-
-#### SSSOM mode
-
-Validates analyst-proposed `candidates.sssom.tsv` files before they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].log`) to check for conflicts with existing decisions.
-
-```
-Usage: rosetta-lint --sssom FILE [--config PATH]
-```
-
-**Findings (all reported to stderr; errors cause exit 1):**
-
-| Code                        | Meaning                                                                                                                                 |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `MaxOneMmcPerPair`          | More than one `ManualMappingCuration` row for the same (subject_id, object_id) pair                                                     |
-| `NoHumanCurationReproposal` | `ManualMappingCuration` proposed for a pair that already has a `HumanCuration` decision in the audit log (approved or rejected — final) |
-| `ValidPredicate`            | `predicate_id` is not a recognised SKOS or OWL mapping predicate                                                                        |
-
-**Example:**
-
-```bash
 # Validate analyst proposals
 uv run rosetta-lint --sssom candidates.sssom.tsv
+
+# Strict mode — WARNINGs become BLOCKs (useful as a CI gate)
+uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json
 
 # Then stage for accreditor review if clean
 uv run rosetta-accredit ingest candidates.sssom.tsv
 ```
 
-**Exit codes:** 0 if no errors, 1 if any errors found.
+**Exit codes:** 0 if no BLOCKs, 1 if at least one BLOCK found.
 
 ---
 
