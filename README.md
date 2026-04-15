@@ -20,15 +20,15 @@ Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input form
 
 #### Supported formats
 
-| Extension / `--format` | Format              | Notes                                                              |
-| ---------------------- | ------------------- | ------------------------------------------------------------------ |
-| `.csv` / `csv`         | CSV                 | Auto-detected                                                      |
-| `.tsv` / `tsv`         | TSV                 | Auto-detected                                                      |
-| `.json` / `json-schema`| JSON Schema         | Auto-detected from `.json`                                         |
-| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x   | Auto-detected                                                      |
-| `.xsd` / `xsd`         | XML Schema          | Auto-detected                                                      |
-| `json-sample`          | JSON sample data    | **Must pass `--format json-sample`** — no extension auto-detect    |
-| `rdfs`                 | RDFS/OWL vocabulary | **Must pass `--format rdfs`** (e.g. `.ttl`, `.owl` files)         |
+| Extension / `--format`            | Format              | Notes                                                           |
+| --------------------------------- | ------------------- | --------------------------------------------------------------- |
+| `.csv` / `csv`                    | CSV                 | Auto-detected                                                   |
+| `.tsv` / `tsv`                    | TSV                 | Auto-detected                                                   |
+| `.json` / `json-schema`           | JSON Schema         | Auto-detected from `.json`                                      |
+| `.yaml` / `.yml` / `openapi`      | OpenAPI 3.x         | Auto-detected                                                   |
+| `.xsd` / `xsd`                    | XML Schema          | Auto-detected                                                   |
+| `json-sample`                     | JSON sample data    | **Must pass `--format json-sample`** — no extension auto-detect |
+| `.ttl` / `.owl` / `.rdf` / `rdfs` | RDFS/OWL vocabulary | Auto-detected from `.ttl`, `.owl`, `.rdf`                       |
 
 **json-sample** accepts three input shapes:
 
@@ -36,7 +36,7 @@ Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input form
 - Flat object (treated as single-row sample): `{"field": value, ...}`
 - Single-key envelope: `{"key": [{"field": value, ...}, ...]}`
 
-Nested objects are preserved as nested classes in the LinkML output. Leaf field statistics (count, min, max, mean, stddev, histogram) are computed from the actual sample values.
+Nested objects are preserved as nested classes in the LinkML output.
 
 ```
 Usage: rosetta-ingest [OPTIONS]
@@ -77,7 +77,7 @@ rosetta-translate [OPTIONS]
 | -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--input PATH`       | —       | LinkML YAML input file **[required]**                                                                                                          |
 | `--output PATH`      | —       | Output path for translated `.linkml.yaml` **[required]**                                                                                       |
-| `--source-lang LANG` | `auto`  | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
+| `--source-lang LANG` | `auto`  | Source language code (`DE`, `NB`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
 | `--deepl-key TEXT`   | —       | DeepL API key (overrides `DEEPL_API_KEY` env var)                                                                                              |
 
 **Requirements**
@@ -188,7 +188,7 @@ uv run rosetta-suggest nor_emb.json usa_emb.json --output candidates.sssom.tsv
 #   skos: http://www.w3.org/2004/02/skos/core#
 #   semapv: https://w3id.org/semapv/vocab/
 subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label	mapping_date	record_id
-http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude		
+http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude
 ```
 
 Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`, `mapping_date`, `record_id`.
@@ -198,6 +198,7 @@ Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `co
 **Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
 **Audit log integration:** When `[accredit].log` is set in `rosetta.toml` and the log file exists, `rosetta-suggest` automatically:
+
 - **Boosts** candidates whose (subject, object) pair has an approved `HumanCuration` row in the log
 - **Deranks** candidates whose pair has a rejected `HumanCuration` row (`predicate_id = owl:differentFrom`)
 - **Preserves log row justification and predicate** for already-tracked pairs: if a source–target pair already appears in the audit log with a `ManualMappingCuration` or `HumanCuration` row, that row is included in `candidates.sssom.tsv` with its existing justification and predicate, but with a freshly computed confidence score. All other pairs appear as new `CompositeMatching` (or `LexicalMatching`) candidates.
@@ -265,11 +266,11 @@ Usage: rosetta-lint --sssom FILE [--config PATH]
 
 **Findings (all reported to stderr; errors cause exit 1):**
 
-| Code | Meaning |
-| ---- | ------- |
-| `MaxOneMmcPerPair` | More than one `ManualMappingCuration` row for the same (subject_id, object_id) pair |
+| Code                        | Meaning                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `MaxOneMmcPerPair`          | More than one `ManualMappingCuration` row for the same (subject_id, object_id) pair                                                     |
 | `NoHumanCurationReproposal` | `ManualMappingCuration` proposed for a pair that already has a `HumanCuration` decision in the audit log (approved or rejected — final) |
-| `ValidPredicate` | `predicate_id` is not a recognised SKOS or OWL mapping predicate |
+| `ValidPredicate`            | `predicate_id` is not a recognised SKOS or OWL mapping predicate                                                                        |
 
 **Example:**
 
@@ -329,8 +330,8 @@ rosetta-suggest → candidates.sssom.tsv
 4. **Stage proposals** — `rosetta-accredit ingest candidates.sssom.tsv` reads `ManualMappingCuration` rows, validates them against the state machine, and appends them to the audit log with a `mapping_date` timestamp and `record_id`.
 
 5. **Accreditor reviews** — `rosetta-accredit review -o review.sssom.tsv` generates a work list of all pending proposals (ManualMappingCuration rows with no decision yet). The accreditor edits `review.sssom.tsv`:
-   - **Approve**: change `mapping_justification` → `semapv:HumanCuration` (keep or refine `predicate_id`)
-   - **Reject**: change `mapping_justification` → `semapv:HumanCuration`, set `predicate_id` → `owl:differentFrom`
+    - **Approve**: change `mapping_justification` → `semapv:HumanCuration` (keep or refine `predicate_id`)
+    - **Reject**: change `mapping_justification` → `semapv:HumanCuration`, set `predicate_id` → `owl:differentFrom`
 
 6. **Ingest decisions** — `rosetta-accredit ingest review.sssom.tsv` validates each `HumanCuration` row has a `ManualMappingCuration` predecessor, then appends to the audit log.
 
@@ -338,26 +339,26 @@ rosetta-suggest → candidates.sssom.tsv
 
 #### Business rules
 
-| Rule | Enforced by |
-| ---- | ----------- |
-| Max 1 `ManualMappingCuration` per (subject_id, object_id) | `rosetta-lint --sssom` |
-| Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected) | `rosetta-accredit ingest` + `rosetta-lint --sssom` |
-| `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists | `rosetta-accredit ingest` |
-| Once rejected, only the Accreditor can un-reject (by ingesting a corrected `HumanCuration` row) | Workflow convention |
-| Approved mappings boost future `rosetta-suggest` results | `rosetta-suggest` (log integration) |
-| Rejected mappings (`owl:differentFrom`) derank future `rosetta-suggest` results | `rosetta-suggest` (log integration) |
+| Rule                                                                                            | Enforced by                                        |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Max 1 `ManualMappingCuration` per (subject_id, object_id)                                       | `rosetta-lint --sssom`                             |
+| Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected)             | `rosetta-accredit ingest` + `rosetta-lint --sssom` |
+| `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists            | `rosetta-accredit ingest`                          |
+| Once rejected, only the Accreditor can un-reject (by ingesting a corrected `HumanCuration` row) | Workflow convention                                |
+| Approved mappings boost future `rosetta-suggest` results                                        | `rosetta-suggest` (log integration)                |
+| Rejected mappings (`owl:differentFrom`) derank future `rosetta-suggest` results                 | `rosetta-suggest` (log integration)                |
 
 #### Predicate guide
 
-| Situation | `predicate_id` |
-| --------- | -------------- |
-| Same concept, same units | `skos:exactMatch` |
+| Situation                                         | `predicate_id`                               |
+| ------------------------------------------------- | -------------------------------------------- |
+| Same concept, same units                          | `skos:exactMatch`                            |
 | Same concept, different units (conversion needed) | `skos:exactMatch` — lint flags unit mismatch |
-| Close but not exact semantic match | `skos:closeMatch` |
-| Source is narrower than target | `skos:narrowMatch` |
-| Source is broader than target | `skos:broadMatch` |
-| Related, neither narrows nor broadens | `skos:relatedMatch` |
-| Reject — different concept | `owl:differentFrom` |
+| Close but not exact semantic match                | `skos:closeMatch`                            |
+| Source is narrower than target                    | `skos:narrowMatch`                           |
+| Source is broader than target                     | `skos:broadMatch`                            |
+| Related, neither narrows nor broadens             | `skos:relatedMatch`                          |
+| Reject — different concept                        | `owl:differentFrom`                          |
 
 #### Commands
 
@@ -422,10 +423,10 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for exter
 
 `audit-log.sssom.tsv` is an append-only SSSOM TSV file. Two additional columns are stamped at ingest time:
 
-| Column | Description |
-| ------ | ----------- |
+| Column         | Description                                         |
+| -------------- | --------------------------------------------------- |
 | `mapping_date` | ISO 8601 UTC timestamp — when this row was ingested |
-| `record_id` | UUID4 — unique identifier for this log entry |
+| `record_id`    | UUID4 — unique identifier for this log entry        |
 
 A complete history for an approved mapping:
 
@@ -650,9 +651,9 @@ log = "store/audit-log.sssom.tsv"
 
 ## End-to-end scripts
 
-| Script                       | Covers                                                                               |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| `scripts/pipeline-demo.sh`   | Full accreditation walkthrough: ingest → translate → embed → suggest → lint → accredit, with interactive pauses for analyst and accreditor edits |
+| Script                     | Covers                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts/pipeline-demo.sh` | Full accreditation walkthrough: ingest → translate → embed → suggest → lint → accredit, with interactive pauses for analyst and accreditor edits |
 
 ```bash
 bash scripts/pipeline-demo.sh          # writes output to demo_out/
