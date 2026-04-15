@@ -408,6 +408,35 @@ def test_accredit_ingest_hc_correction_over_existing_hc(
     assert len(rows) == 3
 
 
+def test_accredit_ingest_cli_skips_mmc_already_in_log(
+    tmp_path: Path, tmp_rosetta_toml: Path
+) -> None:
+    """MMC rows already present in the log are skipped silently on re-ingest."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
+
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            }
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)]
+    )
+    assert result.exit_code == 0, result.output + str(result.exception)
+    rows = load_log(log_path)
+    assert len(rows) == 1  # no new row appended
+    stderr = result.stderr if hasattr(result, "stderr") else result.output
+    assert "1 duplicate MMC rows" in stderr
+
+
 # ---------------------------------------------------------------------------
 # CLI — review
 # ---------------------------------------------------------------------------

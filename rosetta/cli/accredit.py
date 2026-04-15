@@ -69,11 +69,21 @@ def ingest(ctx: click.Context, file: Path) -> None:
                 errors.append(f"Duplicate MMC pair in file: ({row.subject_id}, {row.object_id})")
             seen.add(pair)
 
+    # Pairs that are pending review (MMC with no subsequent HC) — re-ingesting MMC is a no-op
+    pending_pairs: set[tuple[str, str]] = {(r.subject_id, r.object_id) for r in query_pending(log)}
+
     # Validate each MMC/HC row against the log
     passing_rows = []
     skipped = 0
+    skipped_dupes = 0
     for row in incoming:
         if row.mapping_justification in {MMC_JUSTIFICATION, HC_JUSTIFICATION}:
+            if (
+                row.mapping_justification == MMC_JUSTIFICATION
+                and (row.subject_id, row.object_id) in pending_pairs
+            ):
+                skipped_dupes += 1
+                continue
             try:
                 check_ingest_row(row, log)
                 passing_rows.append(row)
@@ -89,7 +99,8 @@ def ingest(ctx: click.Context, file: Path) -> None:
 
     append_log(passing_rows, log_path)
     click.echo(
-        f"Ingested {len(passing_rows)} rows, skipped {skipped} CompositeMatching rows",
+        f"Ingested {len(passing_rows)} rows, skipped {skipped} CompositeMatching rows, "
+        f"{skipped_dupes} duplicate MMC rows",
         err=True,
     )
 
