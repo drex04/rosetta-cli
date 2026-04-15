@@ -55,8 +55,24 @@ markers = ["slow: marks tests as slow (deselect with '-m not slow')"]
 
 [dependency-groups]
 dev = [
+    "bandit>=1.8",
     "basedpyright>=1.39.0",
     "pre-commit>=4.5.1",
     "pytest>=9.0.3",
+    "radon>=6.0",
     "ruff>=0.15.10",
+    "vulture>=2.14",
+    "refurb>=2.0",
 ]
+
+[tool.radon]
+exclude = "rosetta/tests/*,rosetta/cli/*"
+
+[tool.vulture]
+min_confidence = 80
+paths = ["rosetta"]
+exclude = ["rosetta/tests"]
+
+[tool.bandit]
+exclude_dirs = ["rosetta/tests"]
+skips = []

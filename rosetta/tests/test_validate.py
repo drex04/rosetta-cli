@@ -81,8 +81,7 @@ def tmp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
 
 
 def test_validate_conformant(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         ["--data", str(tmp_files["conformant"]), "--shapes", str(SHAPES_FILE)],
     )
@@ -93,8 +92,7 @@ def test_validate_conformant(tmp_files: dict[str, Path]) -> None:
 
 
 def test_validate_violation(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
     )
@@ -106,14 +104,12 @@ def test_validate_violation(tmp_files: dict[str, Path]) -> None:
 
 
 def test_validate_missing_shapes_arg(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--data", str(tmp_files["conformant"])])
+    result = CliRunner().invoke(cli, ["--data", str(tmp_files["conformant"])])
     assert result.exit_code != 0
 
 
 def test_validate_shapes_dir(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             "--data",
@@ -129,8 +125,7 @@ def test_validate_shapes_dir(tmp_files: dict[str, Path]) -> None:
 
 def test_validate_output_file(tmp_files: dict[str, Path]) -> None:
     out_file = tmp_files["base"] / "report.json"
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             "--data",
@@ -149,8 +144,7 @@ def test_validate_output_file(tmp_files: dict[str, Path]) -> None:
 
 
 def test_validate_report_schema(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
     )
@@ -161,8 +155,7 @@ def test_validate_report_schema(tmp_files: dict[str, Path]) -> None:
 
 
 def test_validate_finding_fields(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
     )
@@ -177,8 +170,7 @@ def test_validate_finding_fields(tmp_files: dict[str, Path]) -> None:
 
 
 def test_validate_shapes_dir_empty(tmp_files: dict[str, Path]) -> None:
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             "--data",
@@ -195,8 +187,7 @@ def test_validate_finding_message_none(tmp_files: dict[str, Path]) -> None:
     must not silently drop violations. pySHACL auto-generates sh:resultMessage even
     when sh:message is absent, so message is a string here; the model supports None
     for implementations that truly omit sh:resultMessage."""
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             "--data",

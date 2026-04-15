@@ -37,8 +37,7 @@ def test_embedding_model_encode_shape(mock_sentence_transformer):
     """EmbeddingModel.encode returns a list of vectors with the expected shape."""
     from rosetta.core.embedding import EmbeddingModel
 
-    model = EmbeddingModel("fake")
-    result = model.encode(["a", "b"])
+    result = EmbeddingModel("fake").encode(["a", "b"])
 
     assert len(result) == 2
     assert len(result[0]) == 4
@@ -265,8 +264,7 @@ def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.Fixt
     schema_file.write_text(yaml.dump(schema_content))
     output_file = tmp_path / "out.json"
 
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             "--input",

@@ -21,6 +21,67 @@ def _e5_passage_prefix(model_name: str) -> str:
     return ""
 
 
+def _label_for(name: str, node: Any) -> str:
+    """Return the human-readable label for a schema node (title or titlecased name)."""
+    return (node.title if node is not None else None) or name.replace("_", " ").title()
+
+
+def _ancestor_labels(
+    node_name: str, view: Any, classes: dict[str, Any], slots: dict[str, Any]
+) -> list[str]:
+    try:
+        ancs: list[str] = [str(a) for a in view.class_ancestors(node_name)[1:]]  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType,reportUnknownArgumentType]
+    except Exception:  # noqa: BLE001
+        return []
+    return [_label_for(anc, classes.get(anc) or slots.get(anc)) for anc in ancs]
+
+
+def _parent_label(node: Any, classes: dict[str, Any], slots: dict[str, Any]) -> str | None:
+    parent: str | None = getattr(node, "is_a", None)
+    if not parent:
+        return None
+    return _label_for(parent, classes.get(parent) or slots.get(parent))
+
+
+def _child_labels(node_name: str, classes: dict[str, Any]) -> list[str]:
+    return [
+        n.replace("_", " ").title()
+        for n, c in classes.items()
+        if getattr(c, "is_a", None) == node_name
+    ]
+
+
+def _node_text_parts(
+    node_name: str,
+    node: Any,
+    classes: dict[str, Any],
+    slots: dict[str, Any],
+    view: Any,
+    *,
+    include_definitions: bool,
+    include_parents: bool,
+    include_ancestors: bool,
+    include_children: bool,
+) -> list[str]:
+    """Build the text parts list for a single schema node."""
+    parts: list[str] = [_label_for(node_name, node)]
+
+    if include_definitions and node.description:
+        parts.append(node.description)
+
+    if include_ancestors and view is not None:
+        parts.extend(_ancestor_labels(node_name, view, classes, slots))
+    elif include_parents:
+        parent_label = _parent_label(node, classes, slots)
+        if parent_label:
+            parts.append(parent_label)
+
+    if include_children:
+        parts.extend(_child_labels(node_name, classes))
+
+    return parts
+
+
 def extract_text_inputs_linkml(
     schema: SchemaDefinition,
     *,
@@ -39,44 +100,24 @@ def extract_text_inputs_linkml(
     schema_name: str = schema.name or "schema"  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
     need_view = include_parents or include_ancestors or include_children
     view = SchemaView(schema) if need_view else None
-    results: list[tuple[str, str, str]] = []
 
     classes: dict[str, Any] = cast("dict[str, Any]", schema.classes)  # pyright: ignore[reportUnknownMemberType]
     slots: dict[str, Any] = cast("dict[str, Any]", schema.slots)  # pyright: ignore[reportUnknownMemberType]
-    all_nodes: dict[str, Any] = {**classes, **slots}
 
-    for node_name, node in all_nodes.items():
-        label: str = node.title or node_name.replace("_", " ").title()
-        parts: list[str] = [label]
-
-        if include_definitions and node.description:
-            parts.append(node.description)
-
-        if include_ancestors and view is not None:
-            try:
-                ancs: list[str] = [str(a) for a in view.class_ancestors(node_name)[1:]]  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType,reportUnknownArgumentType]
-            except Exception:  # noqa: BLE001
-                ancs = []
-            for anc in ancs:
-                anc_node: Any = classes.get(anc) or slots.get(anc)
-                anc_label: str = (anc_node.title if anc_node else None) or anc.replace(
-                    "_", " "
-                ).title()
-                parts.append(anc_label)
-        elif include_parents:
-            parent: str | None = getattr(node, "is_a", None)
-            if parent:
-                parent_node: Any = classes.get(parent) or slots.get(parent)
-                parent_label: str = (parent_node.title if parent_node else None) or parent.replace(
-                    "_", " "
-                ).title()
-                parts.append(parent_label)
-
-        if include_children:
-            children = [n for n, c in classes.items() if getattr(c, "is_a", None) == node_name]
-            parts.extend(ch.replace("_", " ").title() for ch in children)
-
-        results.append((f"{schema_name}/{node_name}", label, ". ".join(parts)))
+    results: list[tuple[str, str, str]] = []
+    for node_name, node in (classes | slots).items():
+        parts = _node_text_parts(
+            node_name,
+            node,
+            classes,
+            slots,
+            view,
+            include_definitions=include_definitions,
+            include_parents=include_parents,
+            include_ancestors=include_ancestors,
+            include_children=include_children,
+        )
+        results.append((f"{schema_name}/{node_name}", parts[0], ". ".join(parts)))
 
     return results
 

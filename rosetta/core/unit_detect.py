@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import statistics as _statistics
+from contextlib import suppress
 from typing import Any
 
 # Each entry: (pattern, unit_string, apply_to_name, apply_to_description)
@@ -49,6 +50,37 @@ def detect_unit(name: str, description: str) -> str | None:
     return None
 
 
+def _compute_numeric_stats(numeric: list[float], total: int, null_rate: float) -> dict[str, object]:
+    """Build the numeric stats dict including a 10-bin equal-width histogram."""
+    min_val = min(numeric)
+    max_val = max(numeric)
+    mean_val = sum(numeric) / len(numeric)
+    stddev_val = _statistics.stdev(numeric) if len(numeric) >= 2 else 0.0
+
+    if len(numeric) >= 2 and min_val != max_val:
+        bin_width = (max_val - min_val) / 10
+        edges = [min_val + i * bin_width for i in range(11)]
+        counts = [0] * 10
+        for v in numeric:
+            idx = min(int((v - min_val) / bin_width), 9)
+            counts[idx] += 1
+    else:
+        edges = [min_val] * 11
+        counts = [len(numeric)] + [0] * 9
+
+    return {
+        "count": total,
+        "min": min_val,
+        "max": max_val,
+        "mean": mean_val,
+        "stddev": stddev_val,
+        "null_rate": null_rate,
+        "cardinality": len(set(numeric)),
+        "histogram": json.dumps(counts),
+        "histogram_edges": json.dumps([round(e, 9) for e in edges]),
+    }
+
+
 def compute_stats(
     sample_values: list[Any],
 ) -> tuple[dict[str, object] | None, dict[str, object] | None]:
@@ -67,59 +99,24 @@ def compute_stats(
     if total_raw == 0:
         return (None, None)
 
-    # Filter out None and empty strings
     filtered = [v for v in sample_values if v is not None and v != ""]
-
     if not filtered:
         return (None, None)
 
     null_rate = (total_raw - len(filtered)) / total_raw
-
-    # Try to parse each value as float
-    numeric: list[float] = []
-    for v in filtered:
-        try:
-            numeric.append(float(v))
-        except (ValueError, TypeError):
-            pass
-
     total = len(filtered)
 
+    numeric: list[float] = []
+    for v in filtered:
+        with suppress(ValueError, TypeError):
+            numeric.append(float(v))
+
     if len(numeric) / total >= 0.5:
-        min_val = min(numeric)
-        max_val = max(numeric)
-        mean_val = sum(numeric) / len(numeric)
-        stddev_val = _statistics.stdev(numeric) if len(numeric) >= 2 else 0.0
+        return (_compute_numeric_stats(numeric, total, null_rate), None)
 
-        # 10-bin equal-width histogram
-        if len(numeric) >= 2 and min_val != max_val:
-            bin_width = (max_val - min_val) / 10
-            edges = [min_val + i * bin_width for i in range(11)]
-            counts = [0] * 10
-            for v in numeric:
-                idx = min(int((v - min_val) / bin_width), 9)
-                counts[idx] += 1
-        else:
-            edges = [min_val] * 11
-            counts = [len(numeric)] + [0] * 9
-
-        stats: dict[str, object] = {
-            "count": total,
-            "min": float(min_val),
-            "max": float(max_val),
-            "mean": float(mean_val),
-            "stddev": float(stddev_val),
-            "null_rate": float(null_rate),
-            "cardinality": len(set(numeric)),
-            "histogram": json.dumps(counts),
-            "histogram_edges": json.dumps([round(e, 9) for e in edges]),
-        }
-        return (stats, None)
-    else:
-        # Treat as categorical
-        cat_stats: dict[str, object] = {
-            "count": total,
-            "distinct_count": len(set(str(v) for v in filtered)),
-            "null_rate": float(null_rate),
-        }
-        return (None, cat_stats)
+    cat_stats: dict[str, object] = {
+        "count": total,
+        "distinct_count": len(set(str(v) for v in filtered)),
+        "null_rate": null_rate,
+    }
+    return (None, cat_stats)

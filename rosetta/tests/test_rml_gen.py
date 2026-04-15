@@ -61,8 +61,7 @@ def test_basic_rml_two_decisions() -> None:
     refs: set[str] = set()
     for pom in poms:
         for obj_map in g.objects(pom, RR.objectMap):
-            for ref in g.objects(obj_map, RML.reference):
-                refs.add(str(ref))
+            refs.update(str(ref) for ref in g.objects(obj_map, RML.reference))
     assert refs == {"$.hoyde_m", "$.bredde_deg"}
 
 
@@ -122,16 +121,14 @@ def test_unsupported_format_raises() -> None:
 def test_cli_empty_decisions_exits_1(tmp_path: Path) -> None:
     f = tmp_path / "decisions.json"
     f.write_text("{}")
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
+    result = CliRunner().invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
     assert result.exit_code == 1
 
 
 def test_cli_missing_target_uri_exits_1(tmp_path: Path) -> None:
     f = tmp_path / "decisions.json"
     f.write_text(json.dumps({"http://example.org/field/x": {"field_ref": "x"}}))
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
+    result = CliRunner().invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
     assert result.exit_code == 1
 
 
@@ -147,8 +144,7 @@ def test_cli_writes_turtle_to_stdout(tmp_path: Path) -> None:
             }
         )
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
+    result = CliRunner().invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
     assert result.exit_code == 0
     assert "rml:logicalSource" in result.output
 
@@ -156,8 +152,7 @@ def test_cli_writes_turtle_to_stdout(tmp_path: Path) -> None:
 def test_cli_json_array_input_exits_1(tmp_path: Path) -> None:
     f = tmp_path / "decisions.json"
     f.write_text("[]")
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
+    result = CliRunner().invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
     assert result.exit_code == 1
     assert "must be a JSON object" in result.output or "must be a JSON object" in (
         result.stderr or ""
@@ -176,6 +171,5 @@ def test_cli_invalid_decision_type_exits_1(tmp_path: Path) -> None:
             }
         )
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
+    result = CliRunner().invoke(cli, ["--decisions", str(f), "--source-file", "data.json"])
     assert result.exit_code == 1

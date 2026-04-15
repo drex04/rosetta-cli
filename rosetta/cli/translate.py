@@ -63,7 +63,7 @@ def cli(
         result = translate_schema(
             schema,
             source_lang=source_lang,
-            target_lang="EN",
+            target_lang="EN-US",
             deepl_key=key,
         )
         output.parent.mkdir(parents=True, exist_ok=True)

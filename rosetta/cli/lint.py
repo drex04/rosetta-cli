@@ -190,7 +190,7 @@ def cli(  # noqa: E501
             click.echo(err, err=True)
 
     # If --sssom was the only mode requested, exit now.
-    if sssom is not None and source is None and master is None and suggestions is None:
+    if sssom is not None and source is None is master is None is suggestions:
         sys.exit(1 if sssom_errors else 0)
 
     # If schema lint mode was requested, require all three options.

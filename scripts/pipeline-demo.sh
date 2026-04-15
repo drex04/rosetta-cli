@@ -16,7 +16,6 @@
 # Requirements:
 #   uv sync            Install dependencies before running.
 #   DEEPL_API_KEY      Only needed for non-English source schemas.
-#                      This demo passes --source-lang EN so DeepL is not called.
 #
 # The audit log is written to store/audit-log.sssom.tsv (rosetta.toml default).
 # Re-running the script will accumulate entries in the same log.
@@ -94,12 +93,11 @@ ok "$OUT/master_cop.linkml.yaml"
 # ── Step 2: Translate ─────────────────────────────────────────────────────────
 
 info "Step 2 — Translate schemas to English"
-echo "  (--source-lang EN: passthrough — no DeepL API call required)"
 
 uv run rosetta-translate \
     --input       "$OUT/nor_radar.linkml.yaml" \
     --output      "$OUT/nor_radar_en.linkml.yaml" \
-    --source-lang EN
+    --source-lang NB
 ok "$OUT/nor_radar_en.linkml.yaml"
 
 uv run rosetta-translate \

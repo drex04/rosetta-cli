@@ -80,7 +80,7 @@ def _make_sssom_tsv(
 
 
 def test_load_log_returns_empty_when_file_absent(tmp_path: Path) -> None:
-    assert load_log(tmp_path / "nope.tsv") == []
+    assert not load_log(tmp_path / "nope.tsv")
 
 
 def test_append_log_creates_file_with_sssom_header(tmp_path: Path) -> None:
@@ -138,7 +138,7 @@ def test_query_pending_excludes_mmc_with_subsequent_hc(tmp_path: Path) -> None:
     append_log([_row("a", "b", MMC_JUSTIFICATION)], path)
     append_log([_row("a", "b", HC_JUSTIFICATION)], path)
     rows = load_log(path)
-    assert query_pending(rows) == []
+    assert not query_pending(rows)
 
 
 def test_check_ingest_mmc_blocked_by_any_human_curation() -> None:
@@ -198,8 +198,7 @@ def test_accredit_ingest_cli_adds_mmc_rows_to_log(tmp_path: Path, tmp_rosetta_to
             }
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 0, result.output + str(result.exception)
     log_path = tmp_path / "audit-log.sssom.tsv"
     rows = load_log(log_path)
@@ -223,8 +222,7 @@ def test_accredit_ingest_cli_adds_hc_rows_to_log(tmp_path: Path, tmp_rosetta_tom
             }
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = load_log(log_path)
     assert len(rows) == 2
@@ -250,8 +248,7 @@ def test_accredit_ingest_cli_rejects_mmc_with_human_curation(
             }
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 1
 
 
@@ -270,8 +267,7 @@ def test_accredit_ingest_cli_rejects_hc_without_predecessor(
             }
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 1
 
 
@@ -299,11 +295,10 @@ def test_accredit_ingest_cli_no_partial_write_on_mixed_file(
             },
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 1
     # Log should not exist or be empty
-    assert not log_path.exists() or load_log(log_path) == []
+    assert not log_path.exists() or not load_log(log_path)
 
 
 def test_accredit_ingest_cli_skips_composite_matching_rows(
@@ -328,8 +323,7 @@ def test_accredit_ingest_cli_skips_composite_matching_rows(
             },
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 0
     assert "skipped 2" in result.output or "skipped 2" in (result.stderr or "")
 
@@ -356,8 +350,7 @@ def test_accredit_ingest_cli_rejects_in_file_duplicate_mmc(
             },
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 1
 
 
@@ -381,8 +374,9 @@ def test_accredit_ingest_cli_prints_count_to_stderr(tmp_path: Path, tmp_rosetta_
             },
         ],
     )
-    runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner(mix_stderr=False).invoke(
+        cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)]
+    )
     assert result.exit_code == 0
     stderr = result.stderr if hasattr(result, "stderr") else result.output
     assert "Ingested" in stderr
@@ -408,8 +402,7 @@ def test_accredit_ingest_hc_correction_over_existing_hc(
             }
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "ingest", str(tsv)])
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = load_log(log_path)
     assert len(rows) == 3
@@ -424,8 +417,7 @@ def test_accredit_review_cli_outputs_pending_rows(tmp_path: Path, tmp_rosetta_to
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
     assert result.exit_code == 0, result.output
     assert "src:A" in result.output
 
@@ -435,8 +427,7 @@ def test_accredit_review_cli_empty_when_all_decided(tmp_path: Path, tmp_rosetta_
     append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
     append_log([_row("src:A", "mst:B", HC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
     assert result.exit_code == 0
     # No data rows — only header block
     data_lines = [
@@ -460,7 +451,7 @@ def test_accredit_review_cli_empty_when_all_decided(tmp_path: Path, tmp_rosetta_
         )
         and not ln.startswith("subject_id")
     ]
-    assert data_lines == []
+    assert not data_lines
 
 
 def test_accredit_review_cli_outputs_valid_sssom_tsv(
@@ -469,8 +460,7 @@ def test_accredit_review_cli_outputs_valid_sssom_tsv(
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("src:X", "mst:Y", MMC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
     assert result.exit_code == 0
     assert result.output.startswith("# sssom_version")
     assert "subject_id" in result.output
@@ -482,8 +472,7 @@ def test_accredit_review_cli_empty_when_log_absent(tmp_path: Path) -> None:
     config = tmp_path / "rosetta.toml"
     config.write_text(f'[accredit]\nlog = "{log_path}"\n')
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(config), "review"])
+    result = CliRunner().invoke(cli, ["--config", str(config), "review"])
     assert result.exit_code == 0
     assert "subject_id" in result.output  # header-only TSV
 
@@ -500,8 +489,7 @@ def test_accredit_dump_cli_outputs_latest_hc_per_pair(
     append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
     append_log([_row("src:A", "mst:B", HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
     assert result.exit_code == 0
     assert "src:A" in result.output
     assert HC_JUSTIFICATION in result.output
@@ -511,16 +499,15 @@ def test_accredit_dump_cli_omits_mmc_only_pairs(tmp_path: Path, tmp_rosetta_toml
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
     assert result.exit_code == 0
     # No data rows for MMC-only pair
     data_lines = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert data_lines == []
+    assert not data_lines
 
 
 # ---------------------------------------------------------------------------
@@ -553,8 +540,7 @@ def test_accredit_status_cli_empty_when_log_absent(tmp_path: Path) -> None:
     config = tmp_path / "rosetta.toml"
     config.write_text(f'[accredit]\nlog = "{log_path}"\n')
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(config), "status"])
+    result = CliRunner().invoke(cli, ["--config", str(config), "status"])
     assert result.exit_code == 0
     assert result.output.strip() == "[]"
 
@@ -568,14 +554,14 @@ def test_parse_sssom_tsv_returns_empty_for_empty_file(tmp_path: Path) -> None:
     """parse_sssom_tsv returns [] for a zero-byte file."""
     path = tmp_path / "empty.sssom.tsv"
     path.write_text("")
-    assert parse_sssom_tsv(path) == []
+    assert not parse_sssom_tsv(path)
 
 
 def test_parse_sssom_tsv_returns_empty_for_header_only_file(tmp_path: Path) -> None:
     """parse_sssom_tsv returns [] for a file with only SSSOM comment header (no data rows)."""
     path = tmp_path / "header-only.sssom.tsv"
     path.write_text("# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n")
-    assert parse_sssom_tsv(path) == []
+    assert not parse_sssom_tsv(path)
 
 
 def test_parse_sssom_tsv_coerces_tz_naive_date_to_utc(tmp_path: Path) -> None:
@@ -638,14 +624,13 @@ def test_accredit_dump_cli_outputs_latest_hc_after_correction(
     # Accreditor corrects the decision
     append_log([_row("src:A", "mst:B", HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
     assert result.exit_code == 0
 
     data_lines = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     assert len(data_lines) == 1
     assert "skos:exactMatch" in data_lines[0]
@@ -662,8 +647,7 @@ def test_review_ingest_round_trip(tmp_path: Path, tmp_rosetta_toml: Path) -> Non
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
+    result = CliRunner().invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
     assert result.exit_code == 0
 
     review_output = tmp_path / "review-output.sssom.tsv"

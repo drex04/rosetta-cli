@@ -39,6 +39,27 @@ SSSOM_HEADER = """\
 """
 
 
+def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
+    """Construct a SSSOMRow from a raw DictReader row dict."""
+    mapping_date: datetime | None = None
+    raw_date = raw.get("mapping_date") or ""
+    if raw_date.strip():
+        dt = datetime.fromisoformat(raw_date.strip())
+        mapping_date = dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+    return SSSOMRow(
+        subject_id=raw.get("subject_id", ""),
+        predicate_id=raw.get("predicate_id", ""),
+        object_id=raw.get("object_id", ""),
+        mapping_justification=raw.get("mapping_justification", ""),
+        confidence=float(raw.get("confidence", "0.0") or "0.0"),
+        subject_label=raw.get("subject_label", "") or "",
+        object_label=raw.get("object_label", "") or "",
+        mapping_date=mapping_date,
+        record_id=raw.get("record_id") or None,
+    )
+
+
 def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
     """Parse a SSSOM TSV file. Returns [] if file absent.
 
@@ -48,35 +69,17 @@ def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
     if not path.exists():
         return []
 
-    rows: list[SSSOMRow] = []
     text = path.read_text(encoding="utf-8")
-    # Strip comment lines for CSV parsing
     data_lines = [line for line in text.splitlines() if not line.startswith("#")]
     if not data_lines:
         return []
 
+    rows: list[SSSOMRow] = []
     try:
         reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter="\t")
         for lineno, raw in enumerate(reader, start=2):  # 1-based; header is line 1
             try:
-                mapping_date: datetime | None = None
-                raw_date = raw.get("mapping_date") or ""
-                if raw_date.strip():
-                    dt = datetime.fromisoformat(raw_date.strip())
-                    mapping_date = dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
-
-                row = SSSOMRow(
-                    subject_id=raw.get("subject_id", ""),
-                    predicate_id=raw.get("predicate_id", ""),
-                    object_id=raw.get("object_id", ""),
-                    mapping_justification=raw.get("mapping_justification", ""),
-                    confidence=float(raw.get("confidence", "0.0") or "0.0"),
-                    subject_label=raw.get("subject_label", "") or "",
-                    object_label=raw.get("object_label", "") or "",
-                    mapping_date=mapping_date,
-                    record_id=raw.get("record_id") or None,
-                )
-                rows.append(row)
+                rows.append(_parse_sssom_row(raw.copy()))
             except (ValueError, KeyError) as exc:
                 print(
                     f"WARNING: skipping malformed row {lineno} in {path}: {exc}",
@@ -171,6 +174,22 @@ def query_pending(log: list[SSSOMRow]) -> list[SSSOMRow]:
     return result
 
 
+def _check_mmc_transition(pair_rows: list[SSSOMRow], subject_id: str, object_id: str) -> None:
+    if any(r.mapping_justification == HC_JUSTIFICATION for r in pair_rows):
+        raise ValueError(
+            f"Cannot ingest ManualMappingCuration for ({subject_id}, {object_id}): "
+            f"pair already has HumanCuration row(s) in the audit log."
+        )
+
+
+def _check_hc_transition(pair_rows: list[SSSOMRow], subject_id: str, object_id: str) -> None:
+    if not any(r.mapping_justification == MMC_JUSTIFICATION for r in pair_rows):
+        raise ValueError(
+            f"Cannot ingest HumanCuration for ({subject_id}, {object_id}): "
+            f"pair has no ManualMappingCuration row in the audit log."
+        )
+
+
 def check_ingest_row(row: SSSOMRow, log: list[SSSOMRow]) -> None:
     """Raise ValueError with a descriptive message if:
     - row.mapping_justification == MMC_JUSTIFICATION AND pair has any HumanCuration row in log
@@ -180,19 +199,7 @@ def check_ingest_row(row: SSSOMRow, log: list[SSSOMRow]) -> None:
     HumanCuration over existing HumanCuration is ALLOWED (accreditor correction).
     """
     pair_rows = [r for r in log if r.subject_id == row.subject_id and r.object_id == row.object_id]
-
     if row.mapping_justification == MMC_JUSTIFICATION:
-        hc_rows = [r for r in pair_rows if r.mapping_justification == HC_JUSTIFICATION]
-        if hc_rows:
-            raise ValueError(
-                f"Cannot ingest ManualMappingCuration for ({row.subject_id}, {row.object_id}): "
-                f"pair already has HumanCuration row(s) in the audit log."
-            )
-
+        _check_mmc_transition(pair_rows, row.subject_id, row.object_id)
     elif row.mapping_justification == HC_JUSTIFICATION:
-        mmc_rows = [r for r in pair_rows if r.mapping_justification == MMC_JUSTIFICATION]
-        if not mmc_rows:
-            raise ValueError(
-                f"Cannot ingest HumanCuration for ({row.subject_id}, {row.object_id}): "
-                f"pair has no ManualMappingCuration row in the audit log."
-            )
+        _check_hc_transition(pair_rows, row.subject_id, row.object_id)

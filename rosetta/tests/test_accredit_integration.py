@@ -151,7 +151,7 @@ def test_empty_candidates() -> None:
 
     approved_rows = make_approved_rows("skos:relatedMatch")
     result = apply_sssom_feedback(SRC_URI, [], approved_rows)
-    assert result == []
+    assert not result
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +284,7 @@ def test_suggest_existing_pair_merge_preserves_justification(
     # Ingest MMC only (no HC)
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
 
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)

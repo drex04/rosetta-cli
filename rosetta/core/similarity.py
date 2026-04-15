@@ -98,6 +98,30 @@ def rank_suggestions(
     return result
 
 
+def _adjusted_score(
+    cand_score: float,
+    obj_id: str,
+    subject_id: str,
+    diff_from_object_ids: set[str],
+    has_diff_from: bool,
+    approved_rows: list[SSSOMRow],
+    boost: float,
+    penalty: float,
+) -> float:
+    """Compute the feedback-adjusted score for a single candidate."""
+    if obj_id in diff_from_object_ids:
+        return max(cand_score - penalty, 0.0)
+    if has_diff_from:
+        return max(cand_score - penalty * 0.25, 0.0)
+    boost_match = any(
+        r.subject_id == subject_id
+        and r.object_id == obj_id
+        and r.predicate_id != "owl:differentFrom"
+        for r in approved_rows
+    )
+    return min(cand_score + boost, 1.0) if boost_match else cand_score
+
+
 def apply_sssom_feedback(
     subject_id: str,
     candidates: list[dict[str, Any]],
@@ -117,33 +141,24 @@ def apply_sssom_feedback(
 
     result = copy.deepcopy(candidates)
 
-    # Find differentFrom rows for this subject
-    diff_from_rows = [
-        r
+    diff_from_object_ids = {
+        r.object_id
         for r in approved_rows
         if r.subject_id == subject_id and r.predicate_id == "owl:differentFrom"
-    ]
-    diff_from_object_ids = {r.object_id for r in diff_from_rows}
-    has_diff_from = len(diff_from_rows) > 0
+    }
+    has_diff_from = bool(diff_from_object_ids)
 
     for cand in result:
         obj_id = str(cand.get("uri", ""))
-        if obj_id in diff_from_object_ids:
-            # Hard derank: subtract penalty, floor at 0.0
-            cand["score"] = max(float(cand["score"]) - penalty, 0.0)
-        elif has_diff_from:
-            # Soft breadth penalty: other candidates get penalty * 0.25
-            cand["score"] = max(float(cand["score"]) - penalty * 0.25, 0.0)
-        else:
-            # Check for boost: any non-differentFrom row matching this pair
-            boost_rows = [
-                r
-                for r in approved_rows
-                if r.subject_id == subject_id
-                and r.object_id == obj_id
-                and r.predicate_id != "owl:differentFrom"
-            ]
-            if boost_rows:
-                cand["score"] = min(float(cand["score"]) + boost, 1.0)
+        cand["score"] = _adjusted_score(
+            float(cand["score"]),
+            obj_id,
+            subject_id,
+            diff_from_object_ids,
+            has_diff_from,
+            approved_rows,
+            boost,
+            penalty,
+        )
 
     return result

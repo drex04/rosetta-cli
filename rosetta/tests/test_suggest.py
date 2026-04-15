@@ -175,8 +175,7 @@ def test_suggest_cli_basic(src_file, mst_file) -> None:
     """CLI with pre-baked JSON fixture exits 0, SSSOM TSV output."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
-    result = runner.invoke(cli, [src_file, mst_file])
+    result = CliRunner().invoke(cli, [src_file, mst_file])
 
     err_detail = result.output + (str(result.exception) if result.exception else "")
     assert result.exit_code == 0, err_detail
@@ -190,8 +189,7 @@ def test_suggest_cli_stdout(src_file, mst_file) -> None:
     """CLI without --output writes SSSOM TSV to stdout."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
-    result = runner.invoke(cli, [src_file, mst_file])
+    result = CliRunner().invoke(cli, [src_file, mst_file])
 
     assert result.exit_code == 0, result.output
     assert "subject_id" in result.output
@@ -204,11 +202,10 @@ def test_suggest_cli_empty_source(tmp_path, mst_file) -> None:
     """CLI exits 1 with 'source file' in output when source has no embeddings."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
     empty = tmp_path / "empty_source.json"
     empty.write_text("{}")
 
-    result = runner.invoke(cli, [str(empty), mst_file])
+    result = CliRunner().invoke(cli, [str(empty), mst_file])
 
     assert result.exit_code == 1
     assert "source file" in result.output
@@ -218,11 +215,10 @@ def test_suggest_cli_empty_master(tmp_path, src_file) -> None:
     """CLI exits 1 with 'master file' in output when master has no embeddings."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
     empty = tmp_path / "empty_master.json"
     empty.write_text("{}")
 
-    result = runner.invoke(cli, [src_file, str(empty)])
+    result = CliRunner().invoke(cli, [src_file, str(empty)])
 
     assert result.exit_code == 1
     assert "master file" in result.output
@@ -232,12 +228,11 @@ def test_suggest_cli_missing_lexical_key(tmp_path, mst_file) -> None:
     """CLI exits 1 with offending URI in output when a JSON entry lacks 'lexical'."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
     bad_uri = "http://example.org/field/x"
     bad_src = tmp_path / "bad_source.json"
     bad_src.write_text(json.dumps({bad_uri: {"label": "x"}}))
 
-    result = runner.invoke(cli, [str(bad_src), mst_file])
+    result = CliRunner().invoke(cli, [str(bad_src), mst_file])
 
     assert result.exit_code == 1
     assert bad_uri in result.output
@@ -247,17 +242,12 @@ def test_suggest_cli_top_k(src_file, mst_file) -> None:
     """--top-k 1 returns exactly 1 data row per source field."""
     from rosetta.cli.suggest import cli
 
-    runner = CliRunner()
-    result = runner.invoke(cli, [src_file, mst_file, "--top-k", "1"])
+    result = CliRunner().invoke(cli, [src_file, mst_file, "--top-k", "1"])
 
     assert result.exit_code == 0, result.output
     # Count data rows (non-comment, non-header lines)
     lines = result.output.splitlines()
-    data_rows = [
-        ln
-        for ln in lines
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
-    ]
+    data_rows = [ln for ln in lines if ln.strip() and not ln.startswith(("#", "subject_id"))]
     assert len(data_rows) == len(SOURCE_EMB)
 
 
@@ -273,8 +263,7 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     toml_cfg = tmp_path / "rosetta.toml"
     toml_cfg.write_text("[suggest]\ntop_k = 10\n")
 
-    runner = CliRunner()
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [
             str(src),
@@ -289,11 +278,7 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     err_detail = result.output + (str(result.exception) if result.exception else "")
     assert result.exit_code == 0, err_detail
     lines = result.output.splitlines()
-    data_rows = [
-        ln
-        for ln in lines
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
-    ]
+    data_rows = [ln for ln in lines if ln.strip() and not ln.startswith(("#", "subject_id"))]
     # 1 result per source field (2 fields × 1 = 2 rows)
     assert len(data_rows) <= len(SOURCE_EMB)
 
@@ -322,7 +307,7 @@ def test_suggest_cli_log_based_boost(tmp_path: Path, tmp_rosetta_toml: Path) -> 
     baseline_data = [
         ln
         for ln in baseline.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     baseline_score = float(baseline_data[0].split("\t")[4])
 
@@ -357,7 +342,7 @@ def test_suggest_cli_log_based_boost(tmp_path: Path, tmp_rosetta_toml: Path) -> 
     boosted_data = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     boosted_score = float(boosted_data[0].split("\t")[4])
     assert boosted_score > baseline_score
@@ -386,7 +371,7 @@ def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) ->
     baseline_data = [
         ln
         for ln in baseline.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     baseline_score = float(baseline_data[0].split("\t")[4])
 
@@ -421,7 +406,7 @@ def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) ->
     deranked_data = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     deranked_score = float(deranked_data[0].split("\t")[4])
     assert deranked_score < baseline_score
@@ -441,15 +426,14 @@ def test_suggest_cli_no_log_configured_passthrough(tmp_path: Path) -> None:
     mst_f = tmp_path / "master.json"
     mst_f.write_text(json.dumps(master_emb))
 
-    runner = CliRunner()
-    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(config)])
+    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(config)])
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert len(data_rows) >= 1
+    assert data_rows
     # No log-based justification override — row has LexicalMatching
     assert "LexicalMatching" in data_rows[0]
 
@@ -484,15 +468,16 @@ def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path)
         log_path,
     )
 
-    runner = CliRunner()
-    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
+    result = CliRunner().invoke(
+        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
+    )
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert len(data_rows) >= 1
+    assert data_rows
     assert MMC_JUSTIFICATION in data_rows[0]
 
 
@@ -501,8 +486,7 @@ def test_suggest_cli_output_file(tmp_path: Path, src_file: str, mst_file: str) -
     from rosetta.cli.suggest import cli
 
     out_file = tmp_path / "out.sssom.tsv"
-    runner = CliRunner()
-    result = runner.invoke(cli, [src_file, mst_file, "--output", str(out_file)])
+    result = CliRunner().invoke(cli, [src_file, mst_file, "--output", str(out_file)])
 
     assert result.exit_code == 0, result.output
     assert out_file.exists()
@@ -712,12 +696,8 @@ def test_suggest_cli_structural_weight_config(tmp_path) -> None:
         )
         assert result.exit_code == 0, f"CLI failed (weight={weight}): {result.output}"
         lines = result.output.splitlines()
-        data_rows = [
-            ln
-            for ln in lines
-            if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
-        ]
-        assert len(data_rows) >= 1, "Expected at least one data row"
+        data_rows = [ln for ln in lines if ln.strip() and not ln.startswith(("#", "subject_id"))]
+        assert data_rows, "Expected at least one data row"
         fields = data_rows[0].split("\t")
         return float(fields[4])  # confidence column index 4
 
@@ -739,8 +719,6 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     import json as _json
 
     from rosetta.cli.suggest import cli
-
-    runner = CliRunner()
 
     src_emb = {
         "schema/A": {
@@ -765,7 +743,7 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     toml_file = tmp_path / "rosetta_zero.toml"
     toml_file.write_text("[suggest]\nstructural_weight = 0.0\n")
 
-    result = runner.invoke(
+    result = CliRunner().invoke(
         cli,
         [str(src_file), str(mst_file), "--config", str(toml_file)],
     )
@@ -774,9 +752,9 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     data_rows = [
         ln
         for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert len(data_rows) >= 1, "Expected at least one data row"
+    assert data_rows, "Expected at least one data row"
     fields = data_rows[0].split("\t")
     mapping_justification = fields[3]
 

@@ -115,12 +115,8 @@ def cli(
         A_struct: np.ndarray | None = None
         B_struct: np.ndarray | None = None
         if struct_dim > 0:
-            A_struct = np.array(
-                [v if v else [0.0] * struct_dim for v in src_structs], dtype=np.float32
-            )
-            B_struct = np.array(
-                [v if v else [0.0] * struct_dim for v in master_structs], dtype=np.float32
-            )
+            A_struct = np.array([v or [0.0] * struct_dim for v in src_structs], dtype=np.float32)
+            B_struct = np.array([v or [0.0] * struct_dim for v in master_structs], dtype=np.float32)
 
         src_has_struct = any(len(v) > 0 for v in src_structs)
         master_has_struct = any(len(v) > 0 for v in master_structs)
@@ -164,7 +160,7 @@ def cli(
         # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row
         log_index: dict[tuple[str, str], SSSOMRow] = {}
         for row in log:
-            if not (row.mapping_justification or "").endswith("CompositeMatching"):
+            if not row.mapping_justification.endswith("CompositeMatching"):
                 key = (row.subject_id, row.object_id)
                 existing = log_index.get(key)
                 if existing is None or (row.mapping_date or _DATETIME_MIN) >= (

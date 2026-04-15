@@ -44,13 +44,12 @@ def test_lint_finding_valid_severities() -> None:
 
 
 def test_lint_finding_fnml_suggestion_none_serialises() -> None:
-    f = LintFinding(
+    data = LintFinding(
         rule="E1",
         severity="INFO",
         source_uri="urn:test:field1",
         message="no suggestion",
-    )
-    data = f.model_dump(mode="json")
+    ).model_dump(mode="json")
     assert "fnml_suggestion" in data
     assert data["fnml_suggestion"] is None
 
@@ -116,8 +115,7 @@ def test_lint_report_model_dump_round_trip() -> None:
 
 
 def test_fnml_suggestion_label_none_serialises() -> None:
-    s = FnmlSuggestion(fnml_function="fno:Multiply")
-    data = s.model_dump(mode="json")
+    data = FnmlSuggestion(fnml_function="fno:Multiply").model_dump(mode="json")
     assert "label" in data
     assert data["label"] is None
 
@@ -192,12 +190,11 @@ def test_sssom_row_round_trip() -> None:
 
 
 def test_embedding_report_root_model_serialisation() -> None:
-    report = EmbeddingReport(
+    data = EmbeddingReport(
         root={
             "urn:field:beta": EmbeddingVectors(lexical=[0.1, 0.2, 0.3]),
         }
-    )
-    data = report.model_dump(mode="json")
+    ).model_dump(mode="json")
 
     assert isinstance(data, dict)
     assert "urn:field:beta" in data

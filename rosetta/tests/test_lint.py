@@ -210,12 +210,10 @@ def _invoke(tmp_path, src_ttl, mst_ttl, extra_args=None):
     src = _write(tmp_path, "src.ttl", src_ttl)
     mst = _write(tmp_path, "mst.ttl", mst_ttl)
     sug = _write(tmp_path, "sug.json", _SUGGESTIONS)
-    runner = CliRunner()
     args = ["--source", src, "--master", mst, "--suggestions", sug]
     if extra_args:
         args.extend(extra_args)
-    result = runner.invoke(cli, args)
-    return result
+    return CliRunner().invoke(cli, args)
 
 
 def test_lint_cli_block_on_dimension_mismatch(tmp_path):
@@ -257,8 +255,7 @@ def test_lint_cli_output_file(tmp_path):
     src = _write(tmp_path, "src.ttl", _SRC_FOOT)
     mst = _write(tmp_path, "mst.ttl", _MST_METRE)
     sug = _write(tmp_path, "sug.json", _SUGGESTIONS)
-    runner = CliRunner()
-    runner.invoke(
+    CliRunner().invoke(
         cli,
         [
             "--source",
@@ -439,8 +436,7 @@ def test_lint_cli_multi_mapping_summary(tmp_path):
     sug = _write(tmp_path, "sug.json", _SUGGESTIONS_MULTI)
     src = _write(tmp_path, "src.ttl", _SRC_MULTI)
     mst = _write(tmp_path, "mst.ttl", _MST_MULTI)
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--source", src, "--master", mst, "--suggestions", sug])
+    result = CliRunner().invoke(cli, ["--source", src, "--master", mst, "--suggestions", sug])
     data = json.loads(result.output)
     summary = data["summary"]
     # foot→KiloGM is BLOCK; meter→M is same unit (no unit finding); totals must reflect multi-pair
@@ -508,8 +504,7 @@ def test_lint_sssom_passes_clean_file(tmp_path: Path) -> None:
         ],
     )
     config = _no_accredit_toml(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
     assert result.exit_code == 0, result.output
 
 
@@ -535,8 +530,7 @@ def test_lint_sssom_max_one_mmc_per_pair_fails(tmp_path: Path) -> None:
         ],
     )
     config = _no_accredit_toml(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
     assert result.exit_code == 1
 
 
@@ -583,8 +577,7 @@ def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_
             },
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
     assert result.exit_code == 1
 
 
@@ -631,8 +624,7 @@ def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path, tmp_rosetta_
             },
         ],
     )
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
     assert result.exit_code == 1
 
 
@@ -651,8 +643,7 @@ def test_lint_sssom_invalid_predicate_fails(tmp_path: Path) -> None:
         ],
     )
     config = _no_accredit_toml(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
     assert result.exit_code == 1
 
 
@@ -672,6 +663,5 @@ def test_lint_sssom_no_log_configured_skips_reproposal_check(tmp_path: Path) -> 
         ],
     )
     config = _no_accredit_toml(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
     assert result.exit_code == 0

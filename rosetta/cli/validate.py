@@ -72,7 +72,7 @@ def cli(
 ) -> None:
     """Validate RDF graphs against SHACL constraints."""
     try:
-        if shapes is None and shapes_dir is None:
+        if shapes is None is shapes_dir:
             raise click.UsageError("At least one of --shapes or --shapes-dir must be provided.")
 
         # Load data graph

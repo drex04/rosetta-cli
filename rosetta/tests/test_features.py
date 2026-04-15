@@ -139,4 +139,4 @@ def test_structural_features_empty_schema() -> None:
     schema = _make_schema()
     result = extract_structural_features_linkml(schema)
 
-    assert result == {}
+    assert not result

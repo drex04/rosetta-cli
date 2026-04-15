@@ -103,21 +103,20 @@ def review(ctx: click.Context, output: str | None) -> None:
     log = load_log(log_path)
     pending = query_pending(log)
 
-    rows = []
-    for row in pending:
-        rows.append(
-            {
-                "subject_id": row.subject_id,
-                "predicate_id": row.predicate_id,
-                "object_id": row.object_id,
-                "mapping_justification": row.mapping_justification,
-                "confidence": str(row.confidence),
-                "subject_label": row.subject_label,
-                "object_label": row.object_label,
-                "mapping_date": row.mapping_date.isoformat() if row.mapping_date else "",
-                "record_id": row.record_id or "",
-            }
-        )
+    rows = [
+        {
+            "subject_id": row.subject_id,
+            "predicate_id": row.predicate_id,
+            "object_id": row.object_id,
+            "mapping_justification": row.mapping_justification,
+            "confidence": str(row.confidence),
+            "subject_label": row.subject_label,
+            "object_label": row.object_label,
+            "mapping_date": row.mapping_date.isoformat() if row.mapping_date else "",
+            "record_id": row.record_id or "",
+        }
+        for row in pending
+    ]
 
     with open_output(output) as out:
         _write_sssom_tsv(rows, out)

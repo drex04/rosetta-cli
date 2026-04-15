@@ -90,8 +90,8 @@ def query_graph(
     """
     results = g.query(sparql, initBindings=bindings or {})
     vars_ = results.vars or []
-    out: list[dict[str, Any]] = []
-    for row in results:
-        # rdflib ResultRow supports __getitem__ by Variable; pyright stubs don't model this
-        out.append({str(v): row[v] for v in vars_})  # pyright: ignore[reportArgumentType,reportIndexIssue,reportCallIssue]
-    return out
+    # rdflib ResultRow supports __getitem__ by Variable; pyright stubs don't model this
+    return [
+        {str(v): row[v] for v in vars_}  # pyright: ignore[reportArgumentType,reportIndexIssue,reportCallIssue]
+        for row in results
+    ]

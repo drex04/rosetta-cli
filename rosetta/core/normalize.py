@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import tempfile
 from pathlib import Path
@@ -56,6 +55,117 @@ def _hoist_nested_objects(schema: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _detect_format(input_path: Path) -> str:
+    """Infer schema format from file extension.  Raises ValueError if unrecognised."""
+    ext = input_path.suffix.lower()
+    match ext:
+        case ".json":
+            return "json-schema"
+        case ".xsd":
+            return "xsd"
+        case ".csv":
+            return "csv"
+        case ".tsv":
+            return "tsv"
+        case ".ttl" | ".owl" | ".rdf":
+            return "rdfs"
+        case ".yaml" | ".yml":
+            content = input_path.read_text(encoding="utf-8", errors="replace")[:512]
+            if "openapi:" in content:
+                return "openapi"
+    _fmts = "json-schema,openapi,xsd,csv,tsv,json-sample,rdfs"
+    raise ValueError(
+        f"Cannot infer format from extension {input_path.suffix!r}. Use --format {{{_fmts}}}."
+    )
+
+
+def _import_with_json_tempfile(data: dict[str, Any], name: str) -> SchemaDefinition:
+    """Dump *data* to a temp JSON file, convert via JsonSchemaImportEngine, clean up."""
+    from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
+        JsonSchemaImportEngine,
+    )
+
+    tmp_path_str: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as tmp:
+            json.dump(data, tmp)
+            tmp_path_str = tmp.name
+        return JsonSchemaImportEngine().convert(tmp_path_str, name=name)  # type: ignore[no-any-return]
+    finally:
+        if tmp_path_str and Path(tmp_path_str).exists():
+            Path(tmp_path_str).unlink()
+
+
+def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
+    """Run the appropriate schema-automator importer for *fmt*."""
+    match fmt:
+        case "json-schema":
+            from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
+                JsonSchemaImportEngine,
+            )
+
+            return JsonSchemaImportEngine().convert(str(input_path), name=name)  # type: ignore[no-any-return]
+
+        case "openapi":
+            import yaml as _yaml
+            from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
+                json_schema_from_open_api,
+            )
+
+            raw: dict[str, object] = _yaml.safe_load(
+                input_path.read_text(encoding="utf-8", errors="replace")
+            )
+            return _import_with_json_tempfile(json_schema_from_open_api(raw), name)
+
+        case "xsd":
+            from schema_automator.importers.xsd_import_engine import (  # type: ignore[import-untyped]
+                XsdImportEngine,
+            )
+
+            return XsdImportEngine().convert(str(input_path))  # type: ignore[no-any-return]
+
+        case "csv":
+            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
+                CsvDataGeneralizer,
+            )
+
+            return CsvDataGeneralizer(column_separator=",").convert(
+                str(input_path), schema_name=name
+            )  # type: ignore[no-any-return]
+
+        case "tsv":
+            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
+                CsvDataGeneralizer,
+            )
+
+            return CsvDataGeneralizer(column_separator="\t").convert(
+                str(input_path), schema_name=name
+            )  # type: ignore[no-any-return]
+
+        case "json-sample":
+            from genson import SchemaBuilder  # type: ignore[import-untyped]
+
+            data = json.loads(input_path.read_text(encoding="utf-8"))
+            builder = SchemaBuilder()
+            if isinstance(data, list):
+                for item in data:
+                    builder.add_object(item)
+            else:
+                builder.add_object(data)
+            return _import_with_json_tempfile(_hoist_nested_objects(builder.to_schema()), name)
+
+        case "rdfs":
+            from schema_automator.importers.rdfs_import_engine import (  # type: ignore[import-untyped]
+                RdfsImportEngine,
+            )
+
+            return RdfsImportEngine().convert(str(input_path), format="turtle")  # type: ignore[no-any-return]
+
+        case _:
+            _supported = "json-schema, openapi, xsd, csv, tsv, json-sample, rdfs"
+            raise ValueError(f"Unsupported format {fmt!r}. Supported: {_supported}.")
+
+
 def normalize_schema(
     input_path: Path,
     fmt: str | None = None,
@@ -75,132 +185,13 @@ def normalize_schema(
         ValueError: If the format cannot be inferred or is not supported.
     """
     name = schema_name or input_path.stem
+    resolved_fmt = fmt if fmt is not None else _detect_format(input_path)
 
-    # --- Format detection ---
-    if fmt is None:
-        ext = input_path.suffix.lower()
-        match ext:
-            case ".json":
-                fmt = "json-schema"
-            case ".xsd":
-                fmt = "xsd"
-            case ".csv":
-                fmt = "csv"
-            case ".tsv":
-                fmt = "tsv"
-            case ".ttl" | ".owl" | ".rdf":
-                fmt = "rdfs"
-            case ".yaml" | ".yml":
-                content = input_path.read_text(encoding="utf-8", errors="replace")[:512]
-                fmt = "openapi" if "openapi:" in content else None
-            case _:
-                fmt = None
-        if fmt is None:
-            _fmts = "json-schema,openapi,xsd,csv,tsv,json-sample,rdfs"
-            raise ValueError(
-                f"Cannot infer format from extension {input_path.suffix!r}."
-                f" Use --format {{{_fmts}}}."
-            )
-
-    # --- Importer dispatch ---
     # schema_automator/pydbml mutate pyparsing.ParserElement.DEFAULT_WHITE_CHARS
     # (strips '\n'), breaking rdflib's SPARQL parser in the same process.
     # Save and restore around every importer call.
     _saved_whitespace: str = _pp.ParserElement.DEFAULT_WHITE_CHARS
-    schema: SchemaDefinition
-    match fmt:
-        case "json-schema":
-            from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
-                JsonSchemaImportEngine,
-            )
-
-            schema = JsonSchemaImportEngine().convert(str(input_path), name=name)
-
-        case "openapi":
-            # json_schema_from_open_api takes a parsed dict, not a file path.
-            import yaml as _yaml
-            from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
-                JsonSchemaImportEngine,
-                json_schema_from_open_api,
-            )
-
-            raw: dict[str, object] = _yaml.safe_load(
-                input_path.read_text(encoding="utf-8", errors="replace")
-            )
-            js = json_schema_from_open_api(raw)
-            tmp_path_str: str | None = None
-            try:
-                with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as tmp:
-                    json.dump(js, tmp)
-                    tmp_path_str = tmp.name
-                schema = JsonSchemaImportEngine().convert(tmp_path_str, name=name)
-            finally:
-                if tmp_path_str and os.path.exists(tmp_path_str):
-                    os.unlink(tmp_path_str)
-
-        case "xsd":
-            from schema_automator.importers.xsd_import_engine import (  # type: ignore[import-untyped]
-                XsdImportEngine,
-            )
-
-            schema = XsdImportEngine().convert(str(input_path))
-
-        case "csv":
-            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
-                CsvDataGeneralizer,
-            )
-
-            # schema_name is forwarded via **kwargs → convert_dicts(schema_name=)
-            schema = CsvDataGeneralizer(column_separator=",").convert(
-                str(input_path), schema_name=name
-            )
-
-        case "tsv":
-            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
-                CsvDataGeneralizer,
-            )
-
-            schema = CsvDataGeneralizer(column_separator="\t").convert(
-                str(input_path), schema_name=name
-            )
-
-        case "json-sample":
-            from genson import SchemaBuilder  # type: ignore[import-untyped]
-            from schema_automator.importers.jsonschema_import_engine import (  # type: ignore[import-untyped]
-                JsonSchemaImportEngine,
-            )
-
-            data = json.loads(input_path.read_text(encoding="utf-8"))
-            builder = SchemaBuilder()
-            if isinstance(data, list):
-                for item in data:
-                    builder.add_object(item)
-            else:
-                builder.add_object(data)
-            inferred = _hoist_nested_objects(builder.to_schema())
-            tmp_path_str2: str | None = None
-            try:
-                with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as tmp:
-                    json.dump(inferred, tmp)
-                    tmp_path_str2 = tmp.name
-                schema = JsonSchemaImportEngine().convert(tmp_path_str2, name=name)
-            finally:
-                if tmp_path_str2 and os.path.exists(tmp_path_str2):
-                    os.unlink(tmp_path_str2)
-
-        case "rdfs":
-            from schema_automator.importers.rdfs_import_engine import (  # type: ignore[import-untyped]
-                RdfsImportEngine,
-            )
-
-            # RdfsImportEngine.convert accepts format= kwarg (default "turtle")
-            schema = RdfsImportEngine().convert(str(input_path), format="turtle")
-
-        case _:
-            _supported = "json-schema, openapi, xsd, csv, tsv, json-sample, rdfs"
-            raise ValueError(f"Unsupported format {fmt!r}. Supported: {_supported}.")
-
-    # Restore pyparsing whitespace mutated by schema_automator/pydbml imports
+    schema: SchemaDefinition = _dispatch_import(resolved_fmt, input_path, name)
     _pp.ParserElement.set_default_whitespace_chars(_saved_whitespace)
 
     # Post-assign schema name uniformly (XsdImportEngine lacks a name param)

@@ -71,7 +71,7 @@ def test_stamp_adds_prov_entity_triple(stamped_graph: tuple[Graph, int]) -> None
 def test_stamp_adds_activity_triple(stamped_graph: tuple[Graph, int]) -> None:
     g, _ = stamped_graph
     activities = list(g.subjects(RDF.type, PROV.Activity))  # type: ignore[attr-defined]
-    assert len(activities) >= 1
+    assert activities
 
 
 def test_stamp_adds_agent_triple(stamped_graph: tuple[Graph, int]) -> None:
@@ -98,7 +98,7 @@ def test_stamp_label_optional(empty_graph: Graph) -> None:
     stamp_artifact(empty_graph, _ARTIFACT_URI)
     labels = list(empty_graph.objects(predicate=RDFS.label))
     # No rdfs:label should have been added
-    assert len(labels) == 0
+    assert not labels
 
 
 def test_stamp_label_present(empty_graph: Graph) -> None:
@@ -116,7 +116,7 @@ def test_stamp_label_present(empty_graph: Graph) -> None:
 
 def test_query_empty_graph_returns_empty_list(empty_graph: Graph) -> None:
     records = query_provenance(empty_graph, _ARTIFACT_URI)
-    assert records == []
+    assert not records
 
 
 def test_query_returns_one_record_after_stamp(empty_graph: Graph) -> None:
@@ -182,8 +182,7 @@ def malformed_ttl_file(tmp_path: Path) -> Path:
 
 def test_cli_stamp_writes_valid_turtle(ttl_file: Path, tmp_path: Path) -> None:
     out = tmp_path / "out.ttl"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["stamp", str(ttl_file), "--output", str(out)])
+    result = CliRunner().invoke(cli, ["stamp", str(ttl_file), "--output", str(out)])
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
     g = Graph()
     g.parse(str(out), format="turtle")
@@ -195,14 +194,12 @@ def test_cli_stamp_writes_valid_turtle(ttl_file: Path, tmp_path: Path) -> None:
 
 
 def test_cli_stamp_exits_zero(ttl_file: Path) -> None:
-    runner = CliRunner()
-    result = runner.invoke(cli, ["stamp", str(ttl_file)])
+    result = CliRunner().invoke(cli, ["stamp", str(ttl_file)])
     assert result.exit_code == 0
 
 
 def test_cli_stamp_invalid_input(malformed_ttl_file: Path) -> None:
-    runner = CliRunner()
-    result = runner.invoke(cli, ["stamp", str(malformed_ttl_file)])
+    result = CliRunner().invoke(cli, ["stamp", str(malformed_ttl_file)])
     assert result.exit_code == 1
     # Error message should appear on stderr (mix_stderr=True by default in CliRunner)
     assert "Error" in result.output or "error" in result.output.lower()
@@ -211,8 +208,7 @@ def test_cli_stamp_invalid_input(malformed_ttl_file: Path) -> None:
 def test_cli_stamp_unwritable_output(ttl_file: Path, tmp_path: Path) -> None:
     """stamp with an unwritable output path exits 1 with an error on stderr."""
     bad_out = tmp_path / "no_such_dir" / "out.ttl"
-    runner = CliRunner()
-    result = runner.invoke(cli, ["stamp", str(ttl_file), "--output", str(bad_out)])
+    result = CliRunner().invoke(cli, ["stamp", str(ttl_file), "--output", str(bad_out)])
     assert result.exit_code == 1
     assert "Error" in result.output or "error" in result.output.lower()
 
@@ -241,8 +237,7 @@ def test_cli_query_json_format(ttl_file: Path) -> None:
 
 def test_cli_query_no_records(ttl_file: Path) -> None:
     """Querying an un-stamped artifact exits 0 with a message on stderr."""
-    runner = CliRunner()
-    result = runner.invoke(cli, ["query", str(ttl_file)])
+    result = CliRunner().invoke(cli, ["query", str(ttl_file)])
     assert result.exit_code == 0
     # CliRunner mixes stderr into output by default
     assert "No provenance records found" in result.output
