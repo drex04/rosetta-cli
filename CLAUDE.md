@@ -3,6 +3,7 @@
 ## Code Exploration
 
 Use claude-mem smart tools as the primary tools for understanding code:
+
 - `smart_outline` — see file structure without reading the full file
 - `smart_unfold` — read a specific function by name
 - `smart_search` — find symbols and patterns across the codebase
@@ -28,7 +29,6 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - `rosetta/cli/` — Click entrypoints (one per tool)
 - `rosetta/core/` — shared library (rdf_utils, embedding, similarity, units, provenance)
 - `rosetta/policies/` — SHACL shapes + Rego policies
-- `rosetta/store/` — local file-based RDF repository
 - `rosetta/tests/` — pytest tests + synthetic fixtures
 - `rosetta.toml` — shared config (all settings overridable via CLI flags)
 
@@ -55,8 +55,12 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - `uv run ruff check .` — lint (rules: E, W, F, I, UP)
 - `uv run basedpyright` — static type check (strict: source, basic: tests)
 - `uv run pytest -m "not slow"` — regression guard
+- `uv run radon cc rosetta/core/ -n C -s` — complexity check (core only; fails on grade C+)
+- `uv run vulture rosetta/ --exclude rosetta/tests --min-confidence 80` — dead code detection
+- `uv run bandit -r rosetta/ -x rosetta/tests -ll` — security scan
+- `uv run refurb rosetta/ rosetta/tests/` — Python modernization
 
-CI enforces all four on every push/PR (`.github/workflows/ci.yml`).
+CI enforces all eight on every push/PR (`.github/workflows/ci.yml`), including a dedicated `analysis` job for radon, vulture, and bandit.
 
 ### Type annotation rules
 
@@ -69,11 +73,11 @@ CI enforces all four on every push/PR (`.github/workflows/ci.yml`).
 
 User-facing JSON outputs are typed via Pydantic v2:
 
-| Output | Model |
-|--------|-------|
-| `rosetta-lint` | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
-| `rosetta-suggest` | `SuggestionReport` (RootModel) |
-| `rosetta-embed` | `EmbeddingReport` (RootModel) |
+| Output            | Model                                                                  |
+| ----------------- | ---------------------------------------------------------------------- |
+| `rosetta-lint`    | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
+| `rosetta-suggest` | `SuggestionReport` (RootModel)                                         |
+| `rosetta-embed`   | `EmbeddingReport` (RootModel)                                          |
 
 - Construct model instances in the CLI, not bare dicts.
 - Serialise with `model.model_dump(mode="json")` before `json.dumps()`.
@@ -82,10 +86,12 @@ User-facing JSON outputs are typed via Pydantic v2:
 
 ## Gotchas
 
-- **Orchestrator plan naming:** After `/fh:auto`, check `.planning/phases/NN-*/` for files named `plan0N-*.md`. If present, rename to `NN-01-PLAN.md` — the orchestrator expects this exact format and will fail plan-work on every resume if it doesn't find it. *(learnings: 2026-04-13)*
-- **basedpyright in tests:** `# type: ignore[arg-type]` may not suppress errors in test files. Use `# pyright: ignore[reportArgumentType]` instead. *(learnings: 2026-04-13)*
-- **rdflib SPARQL boundaries:** `row.attribute` access on query results is untyped — use `# pyright: ignore[reportAttributeAccessIssue]` at every access point. Standard solution for untyped library integration. *(learnings: 2026-04-13)*
+- **Orchestrator plan naming:** After `/fh:auto`, check `.planning/phases/NN-*/` for files named `plan0N-*.md`. If present, rename to `NN-01-PLAN.md` — the orchestrator expects this exact format and will fail plan-work on every resume if it doesn't find it. _(learnings: 2026-04-13)_
+- **basedpyright in tests:** `# type: ignore[arg-type]` may not suppress errors in test files. Use `# pyright: ignore[reportArgumentType]` instead. _(learnings: 2026-04-13)_
+- **rdflib SPARQL boundaries:** `row.attribute` access on query results is untyped — use `# pyright: ignore[reportAttributeAccessIssue]` at every access point. Standard solution for untyped library integration. _(learnings: 2026-04-13)_
+- **radon CLI exclusion:** `rosetta/cli/` is excluded from radon complexity checks — Click command handlers have inherently high CC scores (grade F, CC 45–56) that are not actionable. Only `rosetta/core/` business logic is checked. _(learnings: 2026-04-15)_
+- **vulture false positives:** Pydantic field declarations and Click decorators trigger vulture false positives — `--min-confidence 80` is required. Test fixtures also fire; tests are excluded via `--exclude rosetta/tests`. _(learnings: 2026-04-15)_
 
 ## Conventions
 
-- **Stub tests belong in the tool's own test file** — don't put `test_<tool>_stub_exits_1` in `test_ingest.py`. When the real implementation lands, the stub test should be in the right file to update, not delete. *(learnings: 2026-04-13)*
+- **Stub tests belong in the tool's own test file** — don't put `test_<tool>_stub_exits_1` in `test_ingest.py`. When the real implementation lands, the stub test should be in the right file to update, not delete. _(learnings: 2026-04-13)_
