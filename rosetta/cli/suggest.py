@@ -141,8 +141,11 @@ def cli(
         A = np.array([src_report.root[u].lexical for u in src_uris], dtype=np.float32)
         B = np.array([master_report.root[u].lexical for u in master_uris], dtype=np.float32)
 
-        resolved_structural_weight = float(
-            get_config_value(cfg, "suggest", "structural_weight", cli_value=None) or 0.2
+        _raw_structural_weight = get_config_value(
+            cfg, "suggest", "structural_weight", cli_value=None
+        )
+        resolved_structural_weight: float = (
+            float(_raw_structural_weight) if _raw_structural_weight is not None else 0.2
         )
 
         # Build structural numpy arrays (empty structural → zero-row matrix → fallback triggers)
@@ -174,6 +177,7 @@ def cli(
             and B_struct is not None
             and np.any(A_struct != 0)
             and np.any(B_struct != 0)  # pyright: ignore[reportOperatorIssue]
+            and resolved_structural_weight > 0.0
         )
         mapping_justification = (
             "semapv:CompositeMatching" if blending_active else "semapv:LexicalMatching"

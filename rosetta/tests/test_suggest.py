@@ -647,3 +647,58 @@ def test_suggest_cli_structural_weight_config(tmp_path) -> None:
         f"Different structural_weight values should produce different confidence: "
         f"0.5→{score_a}, 0.1→{score_b}"
     )
+
+
+def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
+    """structural_weight=0.0 in rosetta.toml → LexicalMatching, not CompositeMatching.
+
+    Regression guard for the falsy-zero bug: `get_config_value(...) or 0.2` would
+    override an explicit 0.0 with 0.2, activating blending against the user's intent.
+    """
+    import json as _json
+
+    from rosetta.cli.suggest import cli
+
+    runner = CliRunner()
+
+    src_emb = {
+        "schema/A": {
+            "label": "A",
+            "lexical": [1.0, 0.0, 0.0],
+            "structural": [1.0, 0.0, 0.0, 0.0, 0.0],
+        }
+    }
+    master_emb = {
+        "schema/B": {
+            "label": "B",
+            "lexical": [0.9, 0.1, 0.0],
+            "structural": [0.0, 1.0, 0.0, 0.0, 0.0],  # non-collinear → blending changes score
+        }
+    }
+
+    src_file = tmp_path / "src.json"
+    mst_file = tmp_path / "mst.json"
+    src_file.write_text(_json.dumps(src_emb))
+    mst_file.write_text(_json.dumps(master_emb))
+
+    toml_file = tmp_path / "rosetta_zero.toml"
+    toml_file.write_text("[suggest]\nstructural_weight = 0.0\n")
+
+    result = runner.invoke(
+        cli,
+        [str(src_file), str(mst_file), "--config", str(toml_file)],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+
+    data_rows = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_rows) >= 1, "Expected at least one data row"
+    fields = data_rows[0].split("\t")
+    mapping_justification = fields[3]
+
+    assert mapping_justification == "semapv:LexicalMatching", (
+        f"structural_weight=0.0 must emit LexicalMatching, got: {mapping_justification}"
+    )
