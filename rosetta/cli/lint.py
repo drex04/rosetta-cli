@@ -138,14 +138,24 @@ def _check_units(
     tgt_unit_str = detect_unit(_unit_label(row.object_id, row.object_label), "")
 
     if src_unit_str is None or tgt_unit_str is None:
-        findings.append(
-            LintFinding(
-                rule="unit_not_detected",
-                severity="INFO",
-                source_uri=row.subject_id,
-                message="No detectable unit in field name",
+        if src_unit_str is None:
+            findings.append(
+                LintFinding(
+                    rule="unit_not_detected",
+                    severity="INFO",
+                    source_uri=row.subject_id,
+                    message="No detectable unit in subject field name",
+                )
             )
-        )
+        if tgt_unit_str is None:
+            findings.append(
+                LintFinding(
+                    rule="unit_not_detected",
+                    severity="INFO",
+                    source_uri=row.object_id,
+                    message="No detectable unit in object field name",
+                )
+            )
         return
 
     src_iri = UNIT_STRING_TO_IRI.get(src_unit_str)
@@ -204,8 +214,8 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
     """Append a datatype_mismatch WARNING if numeric vs non-numeric mismatch detected."""
     if row.subject_datatype is None or row.object_datatype is None:
         return
-    src_numeric = row.subject_datatype.lower() in _NUMERIC_LINKML
-    tgt_numeric = row.object_datatype.lower() in _NUMERIC_LINKML
+    src_numeric = row.subject_datatype in _NUMERIC_LINKML
+    tgt_numeric = row.object_datatype in _NUMERIC_LINKML
     if src_numeric != tgt_numeric:
         findings.append(
             LintFinding(
@@ -259,7 +269,7 @@ def cli(sssom: str | None, output: str | None, strict: bool, config: str | None)
                 )
     except Exception as exc:  # noqa: BLE001
         findings.append(
-            LintFinding(rule="parse_error", severity="INFO", source_uri="", message=str(exc))
+            LintFinding(rule="parse_error", severity="WARNING", source_uri="", message=str(exc))
         )
 
     # 3. --strict: upgrade WARNINGs → BLOCKs

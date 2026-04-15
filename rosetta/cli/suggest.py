@@ -162,7 +162,7 @@ def cli(
         # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row
         log_index: dict[tuple[str, str], SSSOMRow] = {}
         for row in log:
-            if not row.mapping_justification.endswith("CompositeMatching"):
+            if row.mapping_justification != "semapv:CompositeMatching":
                 key = (row.subject_id, row.object_id)
                 existing = log_index.get(key)
                 if existing is None or (row.mapping_date or DATETIME_MIN) >= (
@@ -241,6 +241,6 @@ def cli(
                 )
             fh.write(buf.getvalue())
 
-    except Exception as e:
-        click.echo(f"Error: {e}")
+    except (ValueError, OSError, json.JSONDecodeError, KeyError) as e:
+        click.echo(f"Error: {e}", err=True)
         sys.exit(1)

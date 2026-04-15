@@ -587,6 +587,33 @@ def test_lint_sssom_strict_info_stays_info(tmp_path: Path) -> None:
     assert any(f["rule"] == "unit_not_detected" for f in infos)
 
 
+def test_lint_sssom_unit_vector_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both units have QUDT IRIs but dimension vector missing → unit_vector_missing INFO."""
+    import rosetta.cli.lint as lint_mod
+
+    monkeypatch.setattr(lint_mod, "units_compatible", lambda *_: None)
+    sssom = tmp_path / "vec_missing.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "ex:altitude_m",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:altitude_ft",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    infos = [f for f in data["findings"] if f["rule"] == "unit_vector_missing"]
+    assert infos, "Expected unit_vector_missing INFO finding"
+    assert infos[0]["severity"] == "INFO"
+
+
 def test_lint_sssom_proposals_json_finding(tmp_path: Path) -> None:
     """check_sssom_proposals findings appear in JSON report with correct rule/severity."""
     sssom = tmp_path / "dup2.sssom.tsv"
