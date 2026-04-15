@@ -84,6 +84,8 @@ class SSSOMRow(BaseModel):
     confidence: float
     subject_label: str = ""
     object_label: str = ""
+    mapping_date: datetime | None = None  # stamped by accredit ingest
+    record_id: str | None = None  # UUID4 stamped by accredit ingest
 
 
 # --- Provenance ---
@@ -124,17 +126,12 @@ class ValidationReport(BaseModel):
 # --- Accreditation ---
 
 
-class LedgerEntry(BaseModel):
-    source_uri: str
-    target_uri: str
-    status: Literal["pending", "accredited", "revoked"]
-    timestamp: datetime
-    actor: str
-    notes: str = ""
-
-
-class Ledger(BaseModel):
-    mappings: list[LedgerEntry] = []
+class StatusEntry(BaseModel):
+    subject_id: str
+    object_id: str
+    state: Literal["pending", "approved", "rejected"]
+    predicate_id: str
+    mapping_date: str | None
 
 
 # --- RML Generation ---

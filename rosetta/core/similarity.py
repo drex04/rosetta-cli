@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 
-from rosetta.core.models import Ledger, SSSOMRow
+from rosetta.core.models import SSSOMRow
 
 
 def cosine_matrix(A: np.ndarray, B: np.ndarray) -> np.ndarray:
@@ -94,39 +94,6 @@ def rank_suggestions(
         result[src_uri] = {
             "suggestions": suggestions,
         }
-
-    return result
-
-
-def apply_ledger_feedback(
-    source_uri: str,
-    candidates: list[dict[str, Any]],
-    ledger: Ledger,
-    boost: float = 0.1,
-) -> list[dict[str, Any]]:
-    """Adjust candidates based on accreditation ledger entries.
-
-    - status == "accredited" → add boost, cap at 1.0
-    - status == "revoked"    → remove candidate from list entirely
-    - status == "pending"    → no change (pass through)
-    Returns a new list (does not mutate input).
-    """
-    import copy
-
-    result = []
-    for cand in candidates:
-        obj_id = str(cand.get("uri", ""))
-        entry = next(
-            (e for e in ledger.mappings if e.source_uri == source_uri and e.target_uri == obj_id),
-            None,
-        )
-        if entry is None or entry.status == "pending":
-            result.append(copy.deepcopy(cand))
-        elif entry.status == "accredited":
-            c = copy.deepcopy(cand)
-            c["score"] = min(float(c["score"]) + boost, 1.0)
-            result.append(c)
-        # revoked → omit entirely
 
     return result
 

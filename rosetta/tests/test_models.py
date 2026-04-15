@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -158,6 +160,30 @@ def test_sssom_row_round_trip() -> None:
     assert data["subject_label"] == "FieldA"
     roundtrip = SSSOMRow.model_validate(data)
     assert roundtrip == row
+
+    # New fields: mapping_date and record_id
+    row_with_extras = SSSOMRow(
+        subject_id="ex:foo",
+        predicate_id="skos:exactMatch",
+        object_id="ex:bar",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.95,
+        mapping_date=datetime(2026, 1, 1, tzinfo=UTC),
+        record_id="abc-123",
+    )
+    assert row_with_extras.mapping_date == datetime(2026, 1, 1, tzinfo=UTC)
+    assert row_with_extras.record_id == "abc-123"
+
+    # Backward compat: row without new fields defaults to None
+    row_minimal = SSSOMRow(
+        subject_id="ex:foo",
+        predicate_id="skos:exactMatch",
+        object_id="ex:bar",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.5,
+    )
+    assert row_minimal.mapping_date is None
+    assert row_minimal.record_id is None
 
 
 # ---------------------------------------------------------------------------

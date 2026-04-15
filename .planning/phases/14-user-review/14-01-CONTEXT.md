@@ -69,6 +69,17 @@ Unit/datatype compatibility checks: **deferred** to a future plan (requires link
 - Old `accredit` CLI subcommands (`submit / approve / revoke` with `--ledger`) removed.
 - All existing ledger-based tests replaced by log-based tests.
 
+## Decisions (from plan-review 2026-04-15)
+
+- [review] `apply_ledger_feedback` in `similarity.py` is deleted (not kept or converted): its role is fully replaced by `apply_sssom_feedback` + log-reading in Task 3. [Why: keeping it would leave dead code with a broken `Ledger` import]
+- [review] Single 9-column SSSOM format everywhere (`_SSSOM_COLUMNS` expanded to include `mapping_date` + `record_id`). Non-audit rows (suggest output) emit empty strings for those columns. [Why: enables direct pipe from `rosetta-suggest` output into `rosetta-accredit ingest` without column mismatch]
+- [review] `ingest` pre-scans input file for in-file duplicate MMC pairs before calling `check_ingest_row`; all errors reported together, no partial write. [Why: `check_ingest_row` validates against persisted log only — in-file duplicates both pass without pre-scan]
+- [review] `dump` silently omits pairs where latest row is `ManualMappingCuration` (no HC decision yet). `dump` is exclusively HumanCuration output. [Why: dump documents accreditor decisions; pending analyst proposals belong in `review` not `dump`]
+- [review] `status` output uses `StatusEntry(BaseModel)` with `state: Literal["pending","approved","rejected"]` in `models.py`. [Why: Pydantic model makes output schema testable and consistent with other rosetta JSON outputs]
+- [review] Justification matching in `check_ingest_row` uses exact constants `"semapv:ManualMappingCuration"` / `"semapv:HumanCuration"` (not `endswith`). [Why: `endswith` would match hypothetical future `semapv:LexicalHumanCuration`]
+- [review] `tmp_rosetta_toml` pytest fixture in `conftest.py` required for all integration tests; writes temp config with `[accredit].log` to a temp path. [Why: without it, integration tests silently read missing log → vacuous pass]
+- [review] `review` subcommand writes valid SSSOM TSV (with `#` header block), not bare rows — output can pipe back into `ingest`. [Why: Unix composability]
+
 ## Deferred Ideas
 
 - **Unit/datatype compatibility checks in lint SSSOM mode**: requires resolving subject_id/object_id URIs to LinkML YAML schema slots. Deferred to Phase 15 or a lint-extension plan.

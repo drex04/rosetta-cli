@@ -4,12 +4,14 @@ import csv
 import io
 import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import click
 import numpy as np
 
+from rosetta.core.accredit import load_log
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import (
@@ -35,44 +37,9 @@ _SSSOM_COLUMNS = [
     "confidence",
     "subject_label",
     "object_label",
+    "mapping_date",
+    "record_id",
 ]
-
-
-def _parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
-    """Parse an SSSOM TSV file and return a list of SSSOMRow objects.
-
-    Skips comment lines (starting with '#') and rows with missing required fields.
-    """
-    rows: list[SSSOMRow] = []
-    with path.open(encoding="utf-8") as fh:
-        non_comment_lines: list[str] = []
-        for line in fh:
-            if not line.startswith("#"):
-                non_comment_lines.append(line)
-
-    if not non_comment_lines:
-        return rows
-
-    reader = csv.DictReader(non_comment_lines, delimiter="\t")
-    for row in reader:
-        subject_id = (row.get("subject_id") or "").strip()
-        predicate_id = (row.get("predicate_id") or "").strip()
-        object_id = (row.get("object_id") or "").strip()
-        mapping_justification = (row.get("mapping_justification") or "").strip()
-        if not (subject_id and predicate_id and object_id and mapping_justification):
-            continue
-        confidence_raw = (row.get("confidence") or "").strip()
-        confidence = float(confidence_raw) if confidence_raw else 0.0
-        rows.append(
-            SSSOMRow(
-                subject_id=subject_id,
-                predicate_id=predicate_id,
-                object_id=object_id,
-                mapping_justification=mapping_justification,
-                confidence=confidence,
-            )
-        )
-    return rows
 
 
 @click.command()
@@ -80,12 +47,6 @@ def _parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
 @click.argument("master", type=click.Path(exists=True))
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
-@click.option(
-    "--approved-mappings",
-    default=None,
-    type=click.Path(),
-    help="Path to an approved mappings .sssom.tsv file",
-)
 @click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
 @click.option("--config", default="rosetta.toml", show_default=True)
 def cli(
@@ -93,7 +54,6 @@ def cli(
     master: str,
     top_k: int | None,
     min_score: float | None,
-    approved_mappings: str | None,
     output: str | None,
     config: str,
 ) -> None:
@@ -104,13 +64,13 @@ def cli(
         get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
     )
 
-    # Validate --approved-mappings path up front (before heavy processing)
-    approved_path: Path | None = None
-    if approved_mappings is not None:
-        approved_path = Path(approved_mappings)
-        if not approved_path.exists():
-            click.echo(f"Approved mappings file not found: {approved_mappings}", err=True)
-            sys.exit(1)
+    # Load audit log if configured
+    log_path_str: str | None = get_config_value(cfg, "accredit", "log", cli_value=None)
+    log: list[SSSOMRow] = []
+    if log_path_str:
+        lp = Path(log_path_str)
+        if lp.exists():
+            log = load_log(lp)
 
     try:
         src_raw = json.loads(Path(source).read_text())
@@ -183,11 +143,6 @@ def cli(
             "semapv:CompositeMatching" if blending_active else "semapv:LexicalMatching"
         )
 
-        # Load approved mappings if provided
-        approved_rows: list[SSSOMRow] = []
-        if approved_path is not None:
-            approved_rows = _parse_sssom_tsv(approved_path)
-
         # Compute ranked suggestions
         result = rank_suggestions(
             src_uris,
@@ -201,14 +156,37 @@ def cli(
             structural_weight=resolved_structural_weight,
         )
 
+        # Apply per-field boost/derank from HumanCuration log rows
+        hc_rows = [r for r in log if r.mapping_justification == "semapv:HumanCuration"]
+        if hc_rows:
+            for src_uri, entry in result.items():
+                entry["suggestions"] = apply_sssom_feedback(src_uri, entry["suggestions"], hc_rows)
+
+        # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row
+        log_index: dict[tuple[str, str], SSSOMRow] = {}
+        for row in log:
+            if not (row.mapping_justification or "").endswith("CompositeMatching"):
+                key = (row.subject_id, row.object_id)
+                existing = log_index.get(key)
+                _sentinel = datetime(1, 1, 1, tzinfo=UTC)
+                if existing is None or (row.mapping_date or _sentinel) >= (
+                    existing.mapping_date or _sentinel
+                ):
+                    log_index[key] = row
+
+        # For each candidate in result: if pair is in log_index, refresh justification/predicate
+        for src_uri, entry in result.items():
+            for cand in entry["suggestions"]:
+                key = (src_uri, cand["uri"])
+                if key in log_index:
+                    log_row = log_index[key]
+                    cand["mapping_justification"] = log_row.mapping_justification
+                    cand["predicate_id"] = log_row.predicate_id
+
         # --- SSSOM TSV output ---
         sssom_rows: list[SSSOMRow] = []
         for src_uri, field_data in result.items():
             candidates_tsv: list[dict[str, Any]] = field_data["suggestions"]  # pyright: ignore[reportAny]
-
-            # Apply SSSOM feedback if approved mappings present
-            if approved_rows:
-                candidates_tsv = apply_sssom_feedback(src_uri, candidates_tsv, approved_rows)
 
             src_label = src_report.root[src_uri].label
 
@@ -222,12 +200,16 @@ def cli(
                 sssom_rows.append(
                     SSSOMRow(
                         subject_id=src_uri,
-                        predicate_id="skos:relatedMatch",
+                        predicate_id=cand.get("predicate_id") or "skos:relatedMatch",
                         object_id=obj_uri,
-                        mapping_justification=mapping_justification,
+                        mapping_justification=(
+                            cand.get("mapping_justification") or mapping_justification
+                        ),
                         confidence=score,
                         subject_label=src_label,
                         object_label=obj_label,
+                        mapping_date=cand.get("mapping_date") or None,  # pyright: ignore[reportAny]
+                        record_id=cand.get("record_id") or None,  # pyright: ignore[reportAny]
                     )
                 )
 
@@ -249,6 +231,8 @@ def cli(
                         row.confidence,
                         row.subject_label,
                         row.object_label,
+                        row.mapping_date.isoformat() if row.mapping_date else "",
+                        row.record_id or "",
                     ]
                 )
             fh.write(buf.getvalue())

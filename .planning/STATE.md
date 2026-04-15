@@ -6,9 +6,9 @@ status: in_progress
 last_updated: "2026-04-15T08:00:00.000Z"
 progress:
   total_phases: 14
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # State
@@ -16,8 +16,8 @@ progress:
 ## Current Position
 
 - **Phase:** 14 (User Review — approve/reject → approved SSSOM)
-- **Plan:** 1 (not started)
-- **Status:** Phase 13 complete — 177/177 tests passing
+- **Plan:** 1 (complete)
+- **Status:** Phase 14 complete — all 14 phases done
 
 ## Phase Progress
 
@@ -36,7 +36,7 @@ progress:
 | 11 | rosetta-ingest extensions (XSD + JSON sample) | Complete |
 | 12 | Schema Normalization (LinkML + schema-automator) | Complete |
 | 13 | Semantic Matching (embed + suggest → SSSOM) | Complete |
-| 14 | User Review (approve/reject → approved SSSOM) | In progress |
+| 14 | User Review (approve/reject → approved SSSOM) | Complete |
 
 ## Phase 1 Completion
 
@@ -118,12 +118,12 @@ progress:
 - **Completed:** 2026-04-15
 - **Key changes:** features.py (structural feature extraction), EmbeddingVectors.structural field, embed populates structural, rank_suggestions blends lexical+structural, suggest CLI wires structural_weight from rosetta.toml
 
-## Phase 14 Plan 01
+## Phase 14 Plan 01 Completion
 
 - **Plan:** `.planning/phases/14-user-review/14-01-PLAN.md`
-- **Status:** Ready to build
-- **Key changes:** Audit-log accreditation pipeline — append-only SSSOM log replaces ledger.json; new accredit CLI (ingest/review/status/dump); suggest reads log for boost/derank; lint --sssom mode
+- **Status:** Complete
+- **Key changes:** Audit-log accreditation pipeline — append-only SSSOM log replaces ledger.json; accredit CLI (ingest/review/status/dump); suggest auto-reads log for boost/derank; lint --sssom mode; SSSOMRow.mapping_date + record_id fields added
 
 ## Next Action
 
-Run `/fh:build` to execute Phase 14 Plan 01.
+Phase 14 Plan 01 is complete. All 14 phases of the v2.0 milestone are done.

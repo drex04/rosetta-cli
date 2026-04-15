@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import csv
 import json
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -454,3 +456,222 @@ def test_lint_cli_numeric_to_numeric_no_datatype_mismatch(tmp_path):
     data = json.loads(result.output)
     rules = [f["rule"] for f in data["findings"]]
     assert "datatype_mismatch" not in rules
+
+
+# ---------------------------------------------------------------------------
+# SSSOM proposals lint tests
+# ---------------------------------------------------------------------------
+
+_MMC = "semapv:ManualMappingCuration"
+_HC = "semapv:HumanCuration"
+_SSSOM_HEADER = "# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n"
+_SSSOM_COLS = [
+    "subject_id",
+    "predicate_id",
+    "object_id",
+    "mapping_justification",
+    "confidence",
+    "subject_label",
+    "object_label",
+    "mapping_date",
+    "record_id",
+]
+
+
+def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
+    with path.open("w") as f:
+        f.write(_SSSOM_HEADER)
+        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLS, delimiter="\t", extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
+
+
+def _no_accredit_toml(tmp_path: Path) -> Path:
+    config = tmp_path / "rosetta.toml"
+    config.write_text("[suggest]\ntop_k = 5\n")
+    return config
+
+
+def test_lint_sssom_passes_clean_file(tmp_path: Path) -> None:
+    sssom = tmp_path / "clean.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 0, result.output
+
+
+def test_lint_sssom_max_one_mmc_per_pair_fails(tmp_path: Path) -> None:
+    sssom = tmp_path / "dup.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:relatedMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.8",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 1
+
+
+def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
+
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="a",
+                object_id="b",
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="a",
+                object_id="b",
+                predicate_id="skos:exactMatch",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+
+    sssom = tmp_path / "reproposal.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
+    assert result.exit_code == 1
+
+
+def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
+
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="c",
+                object_id="d",
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="c",
+                object_id="d",
+                predicate_id="owl:differentFrom",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.0,
+            )
+        ],
+        log_path,
+    )
+
+    sssom = tmp_path / "reproposal_rejected.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "c",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "d",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(tmp_rosetta_toml)])
+    assert result.exit_code == 1
+
+
+def test_lint_sssom_invalid_predicate_fails(tmp_path: Path) -> None:
+    sssom = tmp_path / "bad_pred.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "bad:predicate",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 1
+
+
+def test_lint_sssom_no_log_configured_skips_reproposal_check(tmp_path: Path) -> None:
+    """Config without [accredit] section → reproposal check skipped."""
+    sssom = tmp_path / "no_log.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 0

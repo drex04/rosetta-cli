@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -297,12 +298,12 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     assert len(data_rows) <= len(SOURCE_EMB)
 
 
-def test_suggest_cli_approved_mappings(tmp_path) -> None:
-    """--approved-mappings boosts a matching candidate's confidence."""
-    from rosetta.cli.suggest import cli
+def test_suggest_cli_log_based_boost(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """HC approval in audit log boosts candidate confidence."""
+    from rosetta.cli.suggest import cli as suggest_cli
+    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
 
-    # Use non-collinear vectors: src=[0.9, 0, sqrt(1-0.81)], master=[1,0,0]
-    # cosine ~ 0.9; after boost of 0.1 → ~1.0 (capped)
     sin_val = math.sqrt(1.0 - 0.81)
     src_uri = "http://ex.org/FieldA"
     master_uri = "http://ex.org/Master1"
@@ -310,46 +311,63 @@ def test_suggest_cli_approved_mappings(tmp_path) -> None:
     src_emb = {src_uri: {"label": "FieldA", "lexical": [0.9, 0.0, sin_val]}}
     master_emb = {master_uri: {"label": "Master1", "lexical": [1.0, 0.0, 0.0]}}
 
-    src_file = tmp_path / "src.json"
-    src_file.write_text(json.dumps(src_emb))
-    mst_file = tmp_path / "master.json"
-    mst_file.write_text(json.dumps(master_emb))
-
-    approved_tsv = tmp_path / "approved.sssom.tsv"
-    approved_tsv.write_text(
-        "# curie_map:\n"
-        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-        "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\n"
-        f"{src_uri}\tskos:relatedMatch\t{master_uri}\tsemapv:LexicalMatching\t0.8\n"
-    )
+    src_f = tmp_path / "src.json"
+    src_f.write_text(json.dumps(src_emb))
+    mst_f = tmp_path / "master.json"
+    mst_f.write_text(json.dumps(master_emb))
 
     runner = CliRunner()
-    result = runner.invoke(
-        cli,
-        [str(src_file), str(mst_file), "--approved-mappings", str(approved_tsv)],
-    )
-    err_detail = result.output + (str(result.exception) if result.exception else "")
-    assert result.exit_code == 0, err_detail
-
-    # Parse confidence from TSV output
-    lines = result.output.splitlines()
-    data_rows = [
+    baseline = runner.invoke(suggest_cli, [str(src_f), str(mst_f)])
+    assert baseline.exit_code == 0, baseline.output
+    baseline_data = [
         ln
-        for ln in lines
+        for ln in baseline.output.splitlines()
         if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
     ]
-    assert len(data_rows) >= 1
-    cols = data_rows[0].split("\t")
-    # confidence is 5th column (index 4)
-    confidence = float(cols[4])
-    # baseline cosine ~0.9, boosted by 0.1 → ~1.0 (capped)
-    assert confidence == pytest.approx(1.0, abs=0.05)
+    baseline_score = float(baseline_data[0].split("\t")[4])
+
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri,
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri,
+                predicate_id="skos:exactMatch",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+
+    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
+    assert result.exit_code == 0, result.output + str(result.exception)
+    boosted_data = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    boosted_score = float(boosted_data[0].split("\t")[4])
+    assert boosted_score > baseline_score
 
 
-def test_suggest_cli_derank_revoked(tmp_path) -> None:
-    """owl:differentFrom in approved mappings decreases candidate confidence below baseline."""
-    from rosetta.cli.suggest import cli
+def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """HC owl:differentFrom in audit log deranks candidate confidence."""
+    from rosetta.cli.suggest import cli as suggest_cli
+    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FieldB"
     master_uri = "http://ex.org/Master2"
@@ -357,65 +375,128 @@ def test_suggest_cli_derank_revoked(tmp_path) -> None:
     src_emb = {src_uri: {"label": "FieldB", "lexical": [1.0, 0.0, 0.0]}}
     master_emb = {master_uri: {"label": "Master2", "lexical": [0.9, 0.1, 0.0]}}
 
-    src_file = tmp_path / "src.json"
-    src_file.write_text(json.dumps(src_emb))
-    mst_file = tmp_path / "master.json"
-    mst_file.write_text(json.dumps(master_emb))
+    src_f = tmp_path / "src.json"
+    src_f.write_text(json.dumps(src_emb))
+    mst_f = tmp_path / "master.json"
+    mst_f.write_text(json.dumps(master_emb))
 
     runner = CliRunner()
-
-    # Run without approved mappings to get baseline
-    baseline_result = runner.invoke(cli, [str(src_file), str(mst_file)])
-    assert baseline_result.exit_code == 0, baseline_result.output
-    baseline_lines = baseline_result.output.splitlines()
+    baseline = runner.invoke(suggest_cli, [str(src_f), str(mst_f)])
+    assert baseline.exit_code == 0, baseline.output
     baseline_data = [
         ln
-        for ln in baseline_lines
+        for ln in baseline.output.splitlines()
         if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
     ]
-    baseline_confidence = float(baseline_data[0].split("\t")[4])
+    baseline_score = float(baseline_data[0].split("\t")[4])
 
-    # Write owl:differentFrom approved mappings
-    approved_tsv = tmp_path / "approved.sssom.tsv"
-    approved_tsv.write_text(
-        "# curie_map:\n"
-        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-        "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\n"
-        f"{src_uri}\towl:differentFrom\t{master_uri}\tsemapv:LexicalMatching\t0.0\n"
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri,
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri,
+                predicate_id="owl:differentFrom",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.0,
+            )
+        ],
+        log_path,
     )
 
-    derank_result = runner.invoke(
-        cli,
-        [str(src_file), str(mst_file), "--approved-mappings", str(approved_tsv)],
-    )
-    assert derank_result.exit_code == 0, derank_result.output
-    derank_lines = derank_result.output.splitlines()
-    derank_data = [
+    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
+    assert result.exit_code == 0, result.output + str(result.exception)
+    deranked_data = [
         ln
-        for ln in derank_lines
+        for ln in result.output.splitlines()
         if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
     ]
-    deranked_confidence = float(derank_data[0].split("\t")[4])
+    deranked_score = float(deranked_data[0].split("\t")[4])
+    assert deranked_score < baseline_score
 
-    assert deranked_confidence < baseline_confidence
 
+def test_suggest_cli_no_log_configured_passthrough(tmp_path: Path) -> None:
+    """Config without [accredit] section → suggest runs normally."""
+    from rosetta.cli.suggest import cli as suggest_cli
 
-def test_suggest_cli_missing_approved_mappings(tmp_path, src_file, mst_file) -> None:
-    """--approved-mappings pointing to a non-existent file exits 1 with path in output."""
-    from rosetta.cli.suggest import cli
+    config = tmp_path / "rosetta.toml"
+    config.write_text("[suggest]\ntop_k = 5\n")
 
-    non_existent = str(tmp_path / "non_existent.sssom.tsv")
+    src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
+    master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
+    src_f = tmp_path / "src.json"
+    src_f.write_text(json.dumps(src_emb))
+    mst_f = tmp_path / "master.json"
+    mst_f.write_text(json.dumps(master_emb))
+
     runner = CliRunner()
-    result = runner.invoke(cli, [src_file, mst_file, "--approved-mappings", non_existent])
+    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(config)])
+    assert result.exit_code == 0, result.output + str(result.exception)
+    data_rows = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_rows) >= 1
+    # No log-based justification override — row has LexicalMatching
+    assert "LexicalMatching" in data_rows[0]
 
-    assert result.exit_code == 1
-    assert "non_existent.sssom.tsv" in result.output or "non_existent.sssom.tsv" in (
-        result.stderr or ""
+
+def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """MMC row in log → suggest TSV output has ManualMappingCuration for that pair."""
+    from rosetta.cli.suggest import cli as suggest_cli
+    from rosetta.core.accredit import MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
+
+    src_uri = "http://ex.org/FC"
+    master_uri = "http://ex.org/MC"
+
+    src_emb = {src_uri: {"label": "FC", "lexical": [1.0, 0.0]}}
+    master_emb = {master_uri: {"label": "MC", "lexical": [0.9, 0.1]}}
+    src_f = tmp_path / "src.json"
+    src_f.write_text(json.dumps(src_emb))
+    mst_f = tmp_path / "master.json"
+    mst_f.write_text(json.dumps(master_emb))
+
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri,
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
     )
 
+    runner = CliRunner()
+    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
+    assert result.exit_code == 0, result.output + str(result.exception)
+    data_rows = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_rows) >= 1
+    assert MMC_JUSTIFICATION in data_rows[0]
 
-def test_suggest_cli_output_file(tmp_path, src_file, mst_file) -> None:
+
+def test_suggest_cli_output_file(tmp_path: Path, src_file: str, mst_file: str) -> None:
     """--output writes SSSOM TSV to file; file contains subject_id header."""
     from rosetta.cli.suggest import cli
 

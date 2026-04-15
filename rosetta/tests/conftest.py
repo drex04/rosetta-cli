@@ -32,6 +32,15 @@ rose:SampleField a rose:Field ;
 
 
 @pytest.fixture()
+def tmp_rosetta_toml(tmp_path: Path) -> Path:
+    """Write a minimal rosetta.toml with [accredit].log pointing to a temp file."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    config = tmp_path / "rosetta.toml"
+    config.write_text(f'[accredit]\nlog = "{log_path}"\n')
+    return config
+
+
+@pytest.fixture()
 def config_dir(tmp_path: Path) -> Path:
     """Write a minimal rosetta.toml to tmp_path and return the directory."""
     toml_content = """\

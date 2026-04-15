@@ -2,6 +2,7 @@
 
 import json
 import sys
+from pathlib import Path
 from typing import Any
 
 import click
@@ -9,8 +10,10 @@ import rdflib
 from rdflib.namespace import XSD
 from rdflib.term import Node
 
+from rosetta.core.accredit import load_log, parse_sssom_tsv
+from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
-from rosetta.core.models import LintFinding, LintReport, LintSummary
+from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 from rosetta.core.units import (
     UNIT_STRING_TO_IRI,
     expand_unit_iri,
@@ -67,6 +70,63 @@ LIMIT 1
 """
 
 
+_VALID_PREDICATES = {
+    "skos:exactMatch",
+    "skos:closeMatch",
+    "skos:narrowMatch",
+    "skos:broadMatch",
+    "skos:relatedMatch",
+    "owl:differentFrom",
+}
+
+MMC = "semapv:ManualMappingCuration"
+HC = "semapv:HumanCuration"
+
+
+def check_sssom_proposals(
+    rows: list[SSSOMRow],
+    log: list[SSSOMRow],
+) -> list[str]:
+    """Return list of error strings. Empty list = no errors."""
+    errors: list[str] = []
+
+    # 1. MaxOneMmcPerPair
+    mmc_rows = [r for r in rows if r.mapping_justification == MMC]
+    pair_counts: dict[tuple[str, str], int] = {}
+    for r in mmc_rows:
+        pair = (r.subject_id, r.object_id)
+        pair_counts[pair] = pair_counts.get(pair, 0) + 1
+    for (subject_id, object_id), count in pair_counts.items():
+        if count > 1:
+            errors.append(
+                f"ERROR [MaxOneMmcPerPair] {subject_id} → {object_id}: "
+                f"{count} ManualMappingCuration rows (max 1)"
+            )
+
+    # 2. NoHumanCurationReproposal
+    if log:
+        hc_pairs: set[tuple[str, str]] = {
+            (r.subject_id, r.object_id) for r in log if r.mapping_justification == HC
+        }
+        for r in mmc_rows:
+            pair = (r.subject_id, r.object_id)
+            if pair in hc_pairs:
+                errors.append(
+                    f"ERROR [NoHumanCurationReproposal] {r.subject_id} → {r.object_id}: "
+                    f"pair already has a HumanCuration decision in the audit log"
+                )
+
+    # 3. ValidPredicate
+    for r in mmc_rows:
+        if r.predicate_id not in _VALID_PREDICATES:
+            errors.append(
+                f"ERROR [ValidPredicate] {r.subject_id} → {r.object_id}: "
+                f"invalid predicate '{r.predicate_id}'"
+            )
+
+    return errors
+
+
 def _sparql_one(
     graph: rdflib.Graph,
     query: str,
@@ -83,29 +143,68 @@ def _sparql_one(
 
 @click.command()
 @click.option(
-    "--source", required=True, type=click.Path(exists=True), help="National schema RDF (Turtle)."
+    "--source", default=None, type=click.Path(exists=True), help="National schema RDF (Turtle)."
 )
 @click.option(
-    "--master", required=True, type=click.Path(exists=True), help="Master ontology RDF (Turtle)."
+    "--master", default=None, type=click.Path(exists=True), help="Master ontology RDF (Turtle)."
 )
 @click.option(
     "--suggestions",
-    required=True,
+    default=None,
     type=click.Path(exists=True),
     help="Suggestions JSON from rosetta-suggest.",
 )
 @click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Treat WARNINGs as BLOCKs.")
 @click.option("--config", default="rosetta.toml", show_default=True, help="Path to rosetta.toml.")
+@click.option(
+    "--sssom",
+    default=None,
+    type=click.Path(exists=True),
+    help="Validate a SSSOM TSV file (proposals mode).",
+)
 def cli(  # noqa: E501
-    source: str,
-    master: str,
-    suggestions: str,
+    source: str | None,
+    master: str | None,
+    suggestions: str | None,
     output: str | None,
     strict: bool,
     config: str,
+    sssom: str | None,
 ) -> None:
     """Lint mapping files against SHACL shapes and policy rules."""
+    # ----------------------------------------------------------------
+    # SSSOM proposals mode
+    # ----------------------------------------------------------------
+    sssom_errors: list[str] = []
+    if sssom is not None:
+        rows = parse_sssom_tsv(Path(sssom))
+        cfg = load_config(Path(config)) if config else load_config()
+        log_path_str = get_config_value(cfg, "accredit", "log")
+        if log_path_str and Path(log_path_str).exists():
+            log = load_log(Path(log_path_str))
+        else:
+            log = []
+        sssom_errors = check_sssom_proposals(rows, log)
+        for err in sssom_errors:
+            click.echo(err, err=True)
+
+    # If --sssom was the only mode requested, exit now.
+    if sssom is not None and source is None and master is None and suggestions is None:
+        sys.exit(1 if sssom_errors else 0)
+
+    # If schema lint mode was requested, require all three options.
+    if source is None or master is None or suggestions is None:
+        if source is not None or master is not None or suggestions is not None:
+            click.echo(
+                "Error: --source, --master, and --suggestions are all required"
+                " for schema lint mode.",
+                err=True,
+            )
+            sys.exit(1)
+        # Nothing to do if no options provided at all.
+        sys.exit(1 if sssom_errors else 0)
+
     # initialised here so exit-code line after except can see it
     findings: list[LintFinding] = []
 
@@ -301,7 +400,7 @@ def cli(  # noqa: E501
 
     # 10. Exit code AFTER writing output
     has_block = any(f.severity == "BLOCK" for f in findings)
-    sys.exit(1 if has_block else 0)
+    sys.exit(1 if (has_block or sssom_errors) else 0)
 
 
 def _run_datatype_check(
