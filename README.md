@@ -89,21 +89,19 @@ Set `DEEPL_API_KEY` to your DeepL API key. For English-source schemas, use `--so
 ```bash
 uv run rosetta-ingest --input rosetta/tests/fixtures/nor_radar.csv --output nor_radar.linkml.yaml
 uv run rosetta-translate --input nor_radar.linkml.yaml --output nor_radar_en.linkml.yaml --source-lang auto
-// Norwegian-to-English embeddings
+// Norwegian embeddings
 uv run rosetta-embed --input nor_radar.linkml.yaml --output nor_radar_nb_embeddings.json
-// English-to-English embeddings
+// English embeddings
 uv run rosetta-embed --input nor_radar_en.linkml.yaml --output nor_radar_en_embeddings.json
 
-uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2.linkml.yaml
-uv run rosetta-translate --input usa_c2.linkml.yaml --output usa_c2_en.linkml.yaml --source-lang EN
-// translate with --source-lang EN should be a no-op
-uv run rosetta-embed --input usa_c2_en.linkml.yaml --output usa_c2_embeddings.json
+uv run rosetta-ingest --input rosetta/tests/fixtures/master_cop_ontology.ttl --output master_cop.linkml.yaml
+uv run rosetta-translate --input master_cop.linkml.yaml --output master_cop_en.linkml.yaml --source-lang EN # translate with --source-lang EN should be a no-op
+uv run rosetta-embed --input master_cop_en.linkml.yaml --output master_cop_embeddings.json
 
-// TODO: Change to master_embeddings later instead of usa_c2
-// NB-to-EN cosine distance
-uv run rosetta-suggest --source nor_radar_nb_embeddings.json --master usa_c2_embeddings.json --output suggestions_nb.json
-// Compare to EN-to-EN cosine distance
-uv run rosetta-suggest --source nor_radar_en_embeddings.json --master usa_c2_embeddings.json --output suggestions_en.json
+# NB-to-EN cosine distance
+uv run rosetta-suggest --output suggestions_nb.sssom.tsv nor_radar_nb_embeddings.json master_cop_embeddings.json
+# EN-to-EN cosine distance
+uv run rosetta-suggest --output suggestions_en.sssom.tsv nor_radar_en_embeddings.json master_cop_embeddings.json
 ```
 
 For English schemas, `--source-lang EN` keeps the pipeline uniform and is a no-op:
@@ -159,7 +157,7 @@ uv run rosetta-embed -i nor.linkml.yaml -o nor_emb_e5.json \
 
 ### rosetta-suggest
 
-Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs SSSOM TSV format. Optionally reads an approved SSSOM mappings file to boost confirmed mappings or derank rejected ones.
+Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs SSSOM TSV format. When an audit log is configured (see `rosetta-accredit`), automatically boosts previously approved mappings and deranks rejected ones.
 
 ```
 Usage: rosetta-suggest [OPTIONS] SOURCE MASTER
@@ -171,7 +169,6 @@ Arguments:
 Options:
   --top-k INT                Max suggestions per field  [default: 5]
   --min-score FLOAT          Minimum cosine score  [default: 0.0]
-  --approved-mappings PATH   Path to approved mappings .sssom.tsv (boost/derank)
   --output PATH              Output file  (default: stdout)
   --config PATH              Path to rosetta.toml
 ```
@@ -179,12 +176,7 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-suggest nor_emb.json usa_emb.json --output suggestions.sssom.tsv
-
-# With approved mappings feedback (boost confirmed, derank rejected)
-uv run rosetta-suggest nor_emb.json usa_emb.json \
-  --approved-mappings store/approved.sssom.tsv \
-  --output suggestions.sssom.tsv
+uv run rosetta-suggest nor_emb.json usa_emb.json --output candidates.sssom.tsv
 ```
 
 **Output format** — SSSOM TSV with 7 columns and a YAML comment header:
@@ -204,9 +196,12 @@ Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `co
 
 **Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
-**Deranking:** Rows with `predicate_id = owl:differentFrom` in the approved mappings file decrease the candidate's confidence score (the candidate is NOT removed from output). Use `skos:relatedMatch` or any other predicate to boost a candidate's score.
+**Audit log integration:** When `[accredit].log` is set in `rosetta.toml` and the log file exists, `rosetta-suggest` automatically:
+- **Boosts** candidates whose (subject, object) pair has an approved `HumanCuration` row in the log
+- **Deranks** candidates whose pair has a rejected `HumanCuration` row (`predicate_id = owl:differentFrom`)
+- **Preserves log row justification and predicate** for already-tracked pairs: if a source–target pair already appears in the audit log with a `ManualMappingCuration` or `HumanCuration` row, that row is included in `candidates.sssom.tsv` with its existing justification and predicate, but with a freshly computed confidence score. All other pairs appear as new `CompositeMatching` (or `LexicalMatching`) candidates.
 
-> **Note:** `object_id` values in approved mapping files must be full URIs matching the embedding JSON keys exactly.
+This means `candidates.sssom.tsv` provides a complete picture: newly computed candidates alongside the current state of all previously decided pairs.
 
 **Exit codes:** 0 on success, 1 on error.
 
@@ -214,7 +209,9 @@ Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `co
 
 ### rosetta-lint
 
-Validates mapping suggestions against QUDT unit compatibility and XSD datatype rules. Emits a structured JSON report.
+Validates mapping artifacts. Supports two modes: **schema mode** (unit/datatype checks on RDF suggestions) and **SSSOM mode** (structural checks on analyst-proposed SSSOM TSV files).
+
+#### Schema mode
 
 ```
 Usage: rosetta-lint [OPTIONS]
@@ -256,6 +253,34 @@ uv run rosetta-lint --strict \
 ```
 
 **Exit codes:** 0 if no BLOCKs, 1 if any BLOCKs found.
+
+#### SSSOM mode
+
+Validates analyst-proposed `candidates.sssom.tsv` files before they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].log`) to check for conflicts with existing decisions.
+
+```
+Usage: rosetta-lint --sssom FILE [--config PATH]
+```
+
+**Findings (all reported to stderr; errors cause exit 1):**
+
+| Code | Meaning |
+| ---- | ------- |
+| `MaxOneMmcPerPair` | More than one `ManualMappingCuration` row for the same (subject_id, object_id) pair |
+| `NoHumanCurationReproposal` | `ManualMappingCuration` proposed for a pair that already has a `HumanCuration` decision in the audit log (approved or rejected — final) |
+| `ValidPredicate` | `predicate_id` is not a recognised SKOS or OWL mapping predicate |
+
+**Example:**
+
+```bash
+# Validate analyst proposals
+uv run rosetta-lint --sssom candidates.sssom.tsv
+
+# Then stage for accreditor review if clean
+uv run rosetta-accredit ingest candidates.sssom.tsv
+```
+
+**Exit codes:** 0 if no errors, 1 if any errors found.
 
 ---
 
@@ -403,79 +428,192 @@ The artifact URI is derived from the input filename stem: `mapping.rml.ttl` → 
 
 ### rosetta-accredit
 
-Manages the mapping accreditation state machine. Mappings move through `pending` → `accredited` or `pending` → `revoked`. Accredited mappings are boosted in `rosetta-suggest`; revoked ones are excluded. The ledger is created automatically on first use.
+Manages the mapping accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta-suggest` (boost/derank) and `rosetta-lint` (conflict checking).
+
+#### User flow
+
+The pipeline involves two roles — **Analyst** and **Accreditor** — coordinated through file editing and CLI commands.
+
+```
+rosetta-suggest → candidates.sssom.tsv
+                        │
+              Analyst edits file:
+              change ManualMappingCuration rows,
+              set predicate_id
+                        │
+              rosetta-lint --sssom candidates.sssom.tsv
+              (fix errors if exit 1, re-run lint)
+                        │
+              rosetta-accredit ingest candidates.sssom.tsv
+              (ManualMappingCuration rows → audit log)
+                        │
+              rosetta-accredit review -o review.sssom.tsv
+                        │
+              Accreditor edits review.sssom.tsv:
+              change HumanCuration + update predicate_id
+              (owl:differentFrom = reject)
+                        │
+              rosetta-accredit ingest review.sssom.tsv
+              (HumanCuration rows → audit log)
+                        │
+              Next rosetta-suggest run reads updated log
+```
+
+**Step-by-step:**
+
+1. **Generate candidates** — `rosetta-suggest` produces `candidates.sssom.tsv`. For pairs already in the audit log, the existing row (justification + predicate) is preserved with a freshly computed confidence score.
+
+2. **Analyst proposes** — The analyst edits `candidates.sssom.tsv`: for each mapping they want to propose, change `mapping_justification` to `semapv:ManualMappingCuration` and set `predicate_id` to the appropriate SKOS predicate.
+
+3. **Lint validates** — `rosetta-lint --sssom candidates.sssom.tsv` checks for structural errors (duplicate proposals, conflicts with existing decisions, invalid predicates). Errors are printed to stderr; analyst fixes and re-runs.
+
+4. **Stage proposals** — `rosetta-accredit ingest candidates.sssom.tsv` reads `ManualMappingCuration` rows, validates them against the state machine, and appends them to the audit log with a `mapping_date` timestamp and `record_id`.
+
+5. **Accreditor reviews** — `rosetta-accredit review -o review.sssom.tsv` generates a work list of all pending proposals (ManualMappingCuration rows with no decision yet). The accreditor edits `review.sssom.tsv`:
+   - **Approve**: change `mapping_justification` → `semapv:HumanCuration` (keep or refine `predicate_id`)
+   - **Reject**: change `mapping_justification` → `semapv:HumanCuration`, set `predicate_id` → `owl:differentFrom`
+
+6. **Ingest decisions** — `rosetta-accredit ingest review.sssom.tsv` validates each `HumanCuration` row has a `ManualMappingCuration` predecessor, then appends to the audit log.
+
+7. **Correct a decision** — To override a prior decision, the accreditor manually creates a file with a new `HumanCuration` row and runs `rosetta-accredit ingest` again. The latest entry wins.
+
+#### Business rules
+
+| Rule | Enforced by |
+| ---- | ----------- |
+| Max 1 `ManualMappingCuration` per (subject_id, object_id) | `rosetta-lint --sssom` |
+| Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected) | `rosetta-accredit ingest` + `rosetta-lint --sssom` |
+| `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists | `rosetta-accredit ingest` |
+| Once rejected, only the Accreditor can un-reject (by ingesting a corrected `HumanCuration` row) | Workflow convention |
+| Approved mappings boost future `rosetta-suggest` results | `rosetta-suggest` (log integration) |
+| Rejected mappings (`owl:differentFrom`) derank future `rosetta-suggest` results | `rosetta-suggest` (log integration) |
+
+#### Predicate guide
+
+| Situation | `predicate_id` |
+| --------- | -------------- |
+| Same concept, same units | `skos:exactMatch` |
+| Same concept, different units (conversion needed) | `skos:exactMatch` — lint flags unit mismatch |
+| Close but not exact semantic match | `skos:closeMatch` |
+| Source is narrower than target | `skos:narrowMatch` |
+| Source is broader than target | `skos:broadMatch` |
+| Related, neither narrows nor broadens | `skos:relatedMatch` |
+| Reject — different concept | `owl:differentFrom` |
+
+#### Commands
 
 ```
 Usage: rosetta-accredit [OPTIONS] COMMAND
 
 Global options:
-  --ledger PATH   Path to ledger.json  [default: store/ledger.json]
+  --log PATH       Path to audit log .sssom.tsv  [default: store/audit-log.sssom.tsv]
   -c, --config PATH
 
 Commands:
-  submit    Submit a mapping for review  (→ pending)
-  approve   Approve a pending mapping   (pending → accredited)
-  revoke    Revoke a pending or accredited mapping  (→ revoked)
-  status    Show accreditation status for matching entries
+  ingest   Append ManualMappingCuration or HumanCuration rows to the audit log
+  review   Output pending proposals (ManualMappingCuration with no decision yet)
+  status   Show current accreditation state per pair
+  dump     Export current HumanCuration rows for pipeline use
 ```
 
-**submit:**
+**ingest:**
 
 ```
+Usage: rosetta-accredit ingest FILE
+
+Arguments:
+  FILE    SSSOM TSV file containing ManualMappingCuration or HumanCuration rows
+```
+
+Validates each row against the state machine before writing. If any row violates a rule, all errors are printed to stderr and nothing is written (no partial writes).
+
+**review:**
+
+```
+Usage: rosetta-accredit review [OPTIONS]
+
 Options:
-  --source TEXT   Source field URI   [required]
-  --target TEXT   Target field URI   [required]
-  --actor TEXT    Submitter identity  [default: anonymous]
-  --notes TEXT    Free-text notes
-```
-
-**approve / revoke:**
-
-```
-Options:
-  --source TEXT   Source field URI   [required]
-  --target TEXT   Target field URI   [required]
+  -o, --output PATH    Output file (default: stdout)
 ```
 
 **status:**
 
 ```
+Usage: rosetta-accredit status [OPTIONS]
+
 Options:
-  --source TEXT   Filter by source URI
-  --target TEXT   Filter by target URI
+  --source TEXT    Filter by subject_id (substring match)
+  --target TEXT    Filter by object_id (substring match)
 ```
 
-All subcommands print a JSON response to stdout.
+Prints a JSON array with current state per pair to stdout.
 
-**State-machine rules:**
+**dump:**
 
-- `approve` only valid from `pending`
-- `revoke` valid from `pending` or `accredited`
-- Re-submitting an existing `(source, target)` pair is an error
+```
+Usage: rosetta-accredit dump [OPTIONS]
 
-**Example:**
+Options:
+  -o, --output PATH    Output file (default: stdout)
+```
+
+Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for external pipeline consumption.
+
+#### Audit log format
+
+`audit-log.sssom.tsv` is an append-only SSSOM TSV file. Two additional columns are stamped at ingest time:
+
+| Column | Description |
+| ------ | ----------- |
+| `mapping_date` | ISO 8601 UTC timestamp — when this row was ingested |
+| `record_id` | UUID4 — unique identifier for this log entry |
+
+A complete history for an approved mapping:
+
+```
+subject_id   predicate_id      object_id    mapping_justification         confidence  mapping_date          record_id
+nor:speed    skos:relatedMatch  mst:speed   semapv:ManualMappingCuration  0.87        2026-04-15T09:00:00Z  <uuid>
+nor:speed    skos:exactMatch    mst:speed   semapv:HumanCuration          0.87        2026-04-16T14:00:00Z  <uuid>
+```
+
+A rejected mapping (feeds derank into next suggest run):
+
+```
+nor:bearing  skos:relatedMatch  mst:heading  semapv:ManualMappingCuration  0.72   2026-04-15T09:00:00Z  <uuid>
+nor:bearing  owl:differentFrom  mst:heading  semapv:HumanCuration          0.72   2026-04-16T14:00:00Z  <uuid>
+```
+
+#### Example session
 
 ```bash
-SRC="http://rosetta.interop/ns/NOR/nor_radar/altitude_m"
-TGT="http://rosetta.interop/ns/master/altitude"
+# 1. Generate candidates (log is read automatically from rosetta.toml)
+uv run rosetta-suggest nor_emb.json master_emb.json -o candidates.sssom.tsv
 
-# --ledger is a GLOBAL option — it must come before the subcommand name
-uv run rosetta-accredit --ledger my/ledger.json submit \
-  --source "$SRC" --target "$TGT" \
-  --actor alice --notes "Validated against NOR field manual"
-uv run rosetta-accredit --ledger my/ledger.json approve \
-  --source "$SRC" --target "$TGT"
-uv run rosetta-accredit --ledger my/ledger.json status
+# 2. Analyst edits candidates.sssom.tsv, marking ManualMappingCuration rows
 
-# Later: withdraw or deny
-uv run rosetta-accredit --ledger my/ledger.json revoke \
-  --source "$SRC" --target "$TGT"
+# 3. Lint check
+uv run rosetta-lint --sssom candidates.sssom.tsv
 
-# Omit --ledger to use the default (store/ledger.json)
-uv run rosetta-accredit submit --source "$SRC" --target "$TGT" --actor alice
+# 4. Stage analyst proposals
+uv run rosetta-accredit ingest candidates.sssom.tsv
+
+# 5. Generate accreditor work list
+uv run rosetta-accredit review -o review.sssom.tsv
+
+# 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows
+
+# 7. Ingest decisions
+uv run rosetta-accredit ingest review.sssom.tsv
+
+# 8. Check current state
+uv run rosetta-accredit status
+
+# 9. Correct a previous decision
+# (edit update.sssom.tsv with corrected HumanCuration row)
+uv run rosetta-accredit ingest update.sssom.tsv
 ```
 
-**Exit codes:** 0 on success, 1 on state-machine violations.
+**Exit codes:** 0 on success, 1 on state-machine violation or I/O error.
 
 ---
 
@@ -498,9 +636,13 @@ mode  = "lexical-only"
 top_k             = 5
 min_score         = 0.0
 anomaly_threshold = 0.3
+structural_weight = 0.2
 
 [lint]
 strict = false
+
+[accredit]
+log = "store/audit-log.sssom.tsv"
 ```
 
 ---

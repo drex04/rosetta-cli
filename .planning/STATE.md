@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-14T14:45:00.000Z"
+last_updated: "2026-04-15T08:00:00.000Z"
 progress:
   total_phases: 14
-  completed_phases: 12
-  total_plans: 13
-  completed_plans: 12
+  completed_phases: 13
+  total_plans: 15
+  completed_plans: 14
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 13 (Semantic Matching — embed + suggest → SSSOM)
+- **Phase:** 14 (User Review — approve/reject → approved SSSOM)
 - **Plan:** 1 (not started)
-- **Status:** Phase 12 complete — 166/166 tests passing
+- **Status:** Phase 13 complete — 177/177 tests passing
 
 ## Phase Progress
 
@@ -35,8 +35,8 @@ progress:
 | 10 | rosetta-translate | Complete |
 | 11 | rosetta-ingest extensions (XSD + JSON sample) | Complete |
 | 12 | Schema Normalization (LinkML + schema-automator) | Complete |
-| 13 | Semantic Matching (embed + suggest → SSSOM) | Not started |
-| 14 | User Review (approve/reject → approved SSSOM) | Not started |
+| 13 | Semantic Matching (embed + suggest → SSSOM) | Complete |
+| 14 | User Review (approve/reject → approved SSSOM) | In progress |
 
 ## Phase 1 Completion
 
@@ -104,6 +104,26 @@ progress:
 - **Completed:** 2026-04-14
 - **Key changes:** LinkML-based ingest pipeline, normalize.py (7 formats), translate/embed rewritten for YAML I/O
 
+## Phase 13 Plan 01 Completion
+
+- **Commit:** 9d63eb8
+- **Tests:** 166/166 passing
+- **Completed:** 2026-04-14
+- **Key changes:** linkml 1.10.0 upgrade, monkey-patch removed, SSSOM TSV output for rosetta-suggest, apply_sssom_feedback, SSSOMRow model, --approved-mappings flag
+
+## Phase 13 Plan 02 Completion
+
+- **Commit:** cbdd2dd
+- **Tests:** 177/177 passing (+11 new)
+- **Completed:** 2026-04-15
+- **Key changes:** features.py (structural feature extraction), EmbeddingVectors.structural field, embed populates structural, rank_suggestions blends lexical+structural, suggest CLI wires structural_weight from rosetta.toml
+
+## Phase 14 Plan 01
+
+- **Plan:** `.planning/phases/14-user-review/14-01-PLAN.md`
+- **Status:** Ready to build
+- **Key changes:** Audit-log accreditation pipeline — append-only SSSOM log replaces ledger.json; new accredit CLI (ingest/review/status/dump); suggest reads log for boost/derank; lint --sssom mode
+
 ## Next Action
 
-Run `/fh:plan-work` to plan Phase 13 (Semantic Matching — SSSOM suggest).
+Run `/fh:build` to execute Phase 14 Plan 01.
