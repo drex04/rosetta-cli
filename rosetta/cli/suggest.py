@@ -4,14 +4,13 @@ import csv
 import io
 import json
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import click
 import numpy as np
 
-from rosetta.core.accredit import load_log
+from rosetta.core.accredit import _DATETIME_MIN, load_log
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import (
@@ -168,9 +167,8 @@ def cli(
             if not (row.mapping_justification or "").endswith("CompositeMatching"):
                 key = (row.subject_id, row.object_id)
                 existing = log_index.get(key)
-                _sentinel = datetime(1, 1, 1, tzinfo=UTC)
-                if existing is None or (row.mapping_date or _sentinel) >= (
-                    existing.mapping_date or _sentinel
+                if existing is None or (row.mapping_date or _DATETIME_MIN) >= (
+                    existing.mapping_date or _DATETIME_MIN
                 ):
                     log_index[key] = row
 

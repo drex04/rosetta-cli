@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from rosetta.core.accredit import (
     check_ingest_row,
     current_state_for_pair,
     load_log,
+    parse_sssom_tsv,
     query_pending,
 )
 from rosetta.core.models import SSSOMRow
@@ -555,3 +557,118 @@ def test_accredit_status_cli_empty_when_log_absent(tmp_path: Path) -> None:
     result = runner.invoke(cli, ["--config", str(config), "status"])
     assert result.exit_code == 0
     assert result.output.strip() == "[]"
+
+
+# ---------------------------------------------------------------------------
+# parse_sssom_tsv — edge cases and correctness
+# ---------------------------------------------------------------------------
+
+
+def test_parse_sssom_tsv_returns_empty_for_empty_file(tmp_path: Path) -> None:
+    """parse_sssom_tsv returns [] for a zero-byte file."""
+    path = tmp_path / "empty.sssom.tsv"
+    path.write_text("")
+    assert parse_sssom_tsv(path) == []
+
+
+def test_parse_sssom_tsv_returns_empty_for_header_only_file(tmp_path: Path) -> None:
+    """parse_sssom_tsv returns [] for a file with only SSSOM comment header (no data rows)."""
+    path = tmp_path / "header-only.sssom.tsv"
+    path.write_text("# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n")
+    assert parse_sssom_tsv(path) == []
+
+
+def test_parse_sssom_tsv_coerces_tz_naive_date_to_utc(tmp_path: Path) -> None:
+    """parse_sssom_tsv coerces tz-naive ISO date strings to UTC-aware datetimes.
+
+    A hand-crafted SSSOM file without '+00:00' suffix must not cause a TypeError
+    when compared against tz-aware datetimes written by append_log.
+    """
+    path = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+                "mapping_date": "2026-04-15T12:00:00",  # tz-naive — no +00:00
+            }
+        ],
+    )
+    rows = parse_sssom_tsv(path)
+    assert len(rows) == 1
+    assert rows[0].mapping_date is not None
+    # Must be tz-aware — comparison with tz-aware sentinel must not raise TypeError
+    sentinel = datetime(1, 1, 1, tzinfo=UTC)
+    assert rows[0].mapping_date.tzinfo is not None
+    _ = rows[0].mapping_date > sentinel  # must not raise TypeError
+
+
+def test_append_log_tab_in_label_does_not_corrupt_log(tmp_path: Path) -> None:
+    """append_log uses csv.writer so tab characters in labels don't corrupt the TSV."""
+    path = tmp_path / "log.sssom.tsv"
+    row = SSSOMRow(
+        subject_id="src:A",
+        predicate_id="skos:exactMatch",
+        object_id="mst:B",
+        mapping_justification=MMC_JUSTIFICATION,
+        confidence=0.9,
+        subject_label="label with\ttab",
+    )
+    append_log([row], path)
+    rows = load_log(path)
+    assert len(rows) == 1
+    assert rows[0].subject_label == "label with\ttab"
+
+
+# ---------------------------------------------------------------------------
+# dump — with HC correction
+# ---------------------------------------------------------------------------
+
+
+def test_accredit_dump_cli_outputs_latest_hc_after_correction(
+    tmp_path: Path, tmp_rosetta_toml: Path
+) -> None:
+    """dump outputs exactly one row per pair — the latest HC — after an accreditor correction."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
+    append_log([_row("src:A", "mst:B", HC_JUSTIFICATION, predicate="skos:closeMatch")], log_path)
+    # Accreditor corrects the decision
+    append_log([_row("src:A", "mst:B", HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "dump"])
+    assert result.exit_code == 0
+
+    data_lines = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+    ]
+    assert len(data_lines) == 1
+    assert "skos:exactMatch" in data_lines[0]
+    assert "skos:closeMatch" not in data_lines[0]
+
+
+# ---------------------------------------------------------------------------
+# review → ingest round-trip
+# ---------------------------------------------------------------------------
+
+
+def test_review_ingest_round_trip(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """review output is valid SSSOM TSV that parse_sssom_tsv can re-read."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["--config", str(tmp_rosetta_toml), "review"])
+    assert result.exit_code == 0
+
+    review_output = tmp_path / "review-output.sssom.tsv"
+    review_output.write_text(result.output)
+    rows = parse_sssom_tsv(review_output)
+    assert len(rows) == 1
+    assert rows[0].subject_id == "src:A"
+    assert rows[0].mapping_justification == MMC_JUSTIFICATION

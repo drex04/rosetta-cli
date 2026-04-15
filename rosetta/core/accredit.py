@@ -14,7 +14,10 @@ from rosetta.core.models import SSSOMRow
 MMC_JUSTIFICATION = "semapv:ManualMappingCuration"
 HC_JUSTIFICATION = "semapv:HumanCuration"
 
-_AUDIT_LOG_COLUMNS = [
+# Sentinel for datetime comparisons — tz-aware, sorts before any real audit date.
+_DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
+
+AUDIT_LOG_COLUMNS = [
     "subject_id",
     "predicate_id",
     "object_id",
@@ -26,7 +29,7 @@ _AUDIT_LOG_COLUMNS = [
     "record_id",
 ]
 
-_SSSOM_HEADER = """\
+SSSOM_HEADER = """\
 # sssom_version: https://w3id.org/sssom/spec/0.15
 # mapping_set_id: http://rosetta.interop/audit-log
 # curie_map:
@@ -59,7 +62,8 @@ def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
                 mapping_date: datetime | None = None
                 raw_date = raw.get("mapping_date") or ""
                 if raw_date.strip():
-                    mapping_date = datetime.fromisoformat(raw_date.strip())
+                    dt = datetime.fromisoformat(raw_date.strip())
+                    mapping_date = dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
                 row = SSSOMRow(
                     subject_id=raw.get("subject_id", ""),
@@ -94,7 +98,7 @@ def append_log(rows: list[SSSOMRow], path: Path) -> None:
 
     Stamps mapping_date (utcnow ISO 8601) and record_id (uuid4) on each row.
     Calls path.parent.mkdir(parents=True, exist_ok=True) before opening.
-    Writes all 9 _AUDIT_LOG_COLUMNS.
+    Uses csv.writer so field values containing tabs are safely quoted.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(UTC).isoformat()
@@ -102,34 +106,34 @@ def append_log(rows: list[SSSOMRow], path: Path) -> None:
 
     with path.open("a", encoding="utf-8", newline="") as fh:
         if write_header:
-            fh.write(_SSSOM_HEADER)
-            fh.write("\t".join(_AUDIT_LOG_COLUMNS) + "\n")
+            fh.write(SSSOM_HEADER)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        if write_header:
+            writer.writerow(AUDIT_LOG_COLUMNS)
 
         for row in rows:
             # Stamp date and UUID if not already set
             mapping_date = row.mapping_date.isoformat() if row.mapping_date else now
             record_id = row.record_id or str(uuid.uuid4())
-
-            values = [
-                row.subject_id,
-                row.predicate_id,
-                row.object_id,
-                row.mapping_justification,
-                str(row.confidence),
-                row.subject_label,
-                row.object_label,
-                mapping_date,
-                record_id,
-            ]
-            fh.write("\t".join(values) + "\n")
+            writer.writerow(
+                [
+                    row.subject_id,
+                    row.predicate_id,
+                    row.object_id,
+                    row.mapping_justification,
+                    str(row.confidence),
+                    row.subject_label,
+                    row.object_label,
+                    mapping_date,
+                    record_id,
+                ]
+            )
 
 
 def current_state_for_pair(log: list[SSSOMRow], subject_id: str, object_id: str) -> SSSOMRow | None:
     """Return the most recent row for (subject_id, object_id), ordered by
     mapping_date (None dates sort first). Returns None if pair absent.
     """
-    _DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
-
     matching = [r for r in log if r.subject_id == subject_id and r.object_id == object_id]
     if not matching:
         return None
@@ -140,37 +144,28 @@ def current_state_for_pair(log: list[SSSOMRow], subject_id: str, object_id: str)
 def query_pending(log: list[SSSOMRow]) -> list[SSSOMRow]:
     """Return ManualMappingCuration rows that have no subsequent HumanCuration
     for the same (subject_id, object_id) pair.
-    """
-    _DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
 
-    # Build set of (subject_id, object_id) pairs that have a HumanCuration row
-    hc_pairs: set[tuple[str, str]] = set()
+    O(n) — pre-groups rows by pair to avoid the O(n²) inner scan.
+    """
+    # Pre-group HC rows by pair for O(1) lookup
+    hc_by_pair: dict[tuple[str, str], list[SSSOMRow]] = {}
     for row in log:
         if row.mapping_justification == HC_JUSTIFICATION:
-            hc_pairs.add((row.subject_id, row.object_id))
+            key = (row.subject_id, row.object_id)
+            hc_by_pair.setdefault(key, []).append(row)
 
-    # For MMC rows: keep only those whose pair has no HC row,
-    # OR where the MMC row is more recent than all HC rows for that pair.
     result: list[SSSOMRow] = []
     for row in log:
         if row.mapping_justification != MMC_JUSTIFICATION:
             continue
         pair = (row.subject_id, row.object_id)
-        if pair not in hc_pairs:
+        hc_rows = hc_by_pair.get(pair)
+        if not hc_rows:
             result.append(row)
         else:
-            # Check if this MMC row is newer than all HC rows for this pair
-            hc_rows_for_pair = [
-                r
-                for r in log
-                if r.subject_id == row.subject_id
-                and r.object_id == row.object_id
-                and r.mapping_justification == HC_JUSTIFICATION
-            ]
-            latest_hc = max(hc_rows_for_pair, key=lambda r: r.mapping_date or _DATETIME_MIN)
-            row_date = row.mapping_date or _DATETIME_MIN
-            hc_date = latest_hc.mapping_date or _DATETIME_MIN
-            if row_date > hc_date:
+            # MMC is pending only if it is newer than the latest HC for this pair
+            latest_hc = max(hc_rows, key=lambda r: r.mapping_date or _DATETIME_MIN)
+            if (row.mapping_date or _DATETIME_MIN) > (latest_hc.mapping_date or _DATETIME_MIN):
                 result.append(row)
 
     return result

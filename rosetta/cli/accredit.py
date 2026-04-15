@@ -11,10 +11,10 @@ from typing import IO
 import click
 
 from rosetta.core.accredit import (
-    _AUDIT_LOG_COLUMNS,
-    _SSSOM_HEADER,
+    AUDIT_LOG_COLUMNS,
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
+    SSSOM_HEADER,
     append_log,
     check_ingest_row,
     current_state_for_pair,
@@ -41,12 +41,11 @@ def cli(ctx: click.Context, log: str | None, config: str | None) -> None:
 
 def _write_sssom_tsv(rows: list[dict[str, str]], out: IO[str]) -> None:
     """Write SSSOM header block + column header + rows to out."""
-    out.write(_SSSOM_HEADER)
-    out.write("\t".join(_AUDIT_LOG_COLUMNS) + "\n")
-    if rows:
-        writer = csv.writer(out, delimiter="\t", lineterminator="\n")
-        for row in rows:
-            writer.writerow([row.get(col, "") for col in _AUDIT_LOG_COLUMNS])
+    out.write(SSSOM_HEADER)
+    writer = csv.writer(out, delimiter="\t", lineterminator="\n")
+    writer.writerow(AUDIT_LOG_COLUMNS)
+    for row in rows:
+        writer.writerow([row.get(col, "") for col in AUDIT_LOG_COLUMNS])
 
 
 @cli.command("ingest")
