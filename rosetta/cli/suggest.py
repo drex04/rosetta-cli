@@ -141,13 +141,61 @@ def cli(
         A = np.array([src_report.root[u].lexical for u in src_uris], dtype=np.float32)
         B = np.array([master_report.root[u].lexical for u in master_uris], dtype=np.float32)
 
+        resolved_structural_weight = float(
+            get_config_value(cfg, "suggest", "structural_weight", cli_value=None) or 0.2
+        )
+
+        # Build structural numpy arrays (empty structural → zero-row matrix → fallback triggers)
+        src_structs = [src_report.root[u].structural for u in src_uris]
+        master_structs = [master_report.root[u].structural for u in master_uris]
+
+        struct_dim = max((len(v) for v in src_structs + master_structs), default=0)
+        A_struct: np.ndarray | None = None
+        B_struct: np.ndarray | None = None
+        if struct_dim > 0:
+            A_struct = np.array(
+                [v if v else [0.0] * struct_dim for v in src_structs], dtype=np.float32
+            )
+            B_struct = np.array(
+                [v if v else [0.0] * struct_dim for v in master_structs], dtype=np.float32
+            )
+
+        src_has_struct = any(len(v) > 0 for v in src_structs)
+        master_has_struct = any(len(v) > 0 for v in master_structs)
+        if src_has_struct != master_has_struct:
+            click.echo(
+                "Warning: structural arrays present in one embed file but not the other"
+                " — falling back to lexical-only",
+                err=True,
+            )
+
+        blending_active = (
+            A_struct is not None
+            and B_struct is not None
+            and np.any(A_struct != 0)
+            and np.any(B_struct != 0)  # pyright: ignore[reportOperatorIssue]
+        )
+        mapping_justification = (
+            "semapv:CompositeMatching" if blending_active else "semapv:LexicalMatching"
+        )
+
         # Load approved mappings if provided
         approved_rows: list[SSSOMRow] = []
         if approved_path is not None:
             approved_rows = _parse_sssom_tsv(approved_path)
 
         # Compute ranked suggestions
-        result = rank_suggestions(src_uris, A, master_uris, B, resolved_top_k, resolved_min_score)
+        result = rank_suggestions(
+            src_uris,
+            A,
+            master_uris,
+            B,
+            resolved_top_k,
+            resolved_min_score,
+            A_struct=A_struct,
+            B_struct=B_struct,
+            structural_weight=resolved_structural_weight,
+        )
 
         # --- SSSOM TSV output ---
         sssom_rows: list[SSSOMRow] = []
@@ -172,7 +220,7 @@ def cli(
                         subject_id=src_uri,
                         predicate_id="skos:relatedMatch",
                         object_id=obj_uri,
-                        mapping_justification="semapv:LexicalMatching",
+                        mapping_justification=mapping_justification,
                         confidence=score,
                         subject_label=src_label,
                         object_label=obj_label,

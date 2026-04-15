@@ -34,6 +34,10 @@ def rank_suggestions(
     B: np.ndarray,  # shape (n_master, dim)
     top_k: int = 5,
     min_score: float = 0.0,
+    *,
+    A_struct: np.ndarray | None = None,
+    B_struct: np.ndarray | None = None,
+    structural_weight: float = 0.2,
 ) -> dict[str, Any]:
     """Compute ranked suggestions for each source URI against all master URIs.
 
@@ -45,19 +49,38 @@ def rank_suggestions(
         }
     Scores rounded to 6 decimal places. Rank is 1-based.
     If top_k > len(master), returns all master entries sorted by score.
+
+    Optional structural blending:
+        If A_struct and B_struct are both provided and neither is all-zero,
+        the final score is a weighted blend:
+            final = (1 - structural_weight) * lex_sim + structural_weight * struct_sim
+        Otherwise falls back to lexical-only (silent, no warning here).
     """
-    sim = cosine_matrix(A, B)
+    lex_sim = cosine_matrix(A, B)
+
+    final: np.ndarray
+    if (
+        A_struct is not None
+        and B_struct is not None
+        and np.any(A_struct != 0)
+        and np.any(B_struct != 0)
+    ):
+        struct_sim = cosine_matrix(A_struct, B_struct)
+        final = (1.0 - structural_weight) * lex_sim + structural_weight * struct_sim
+    else:
+        final = lex_sim
+
     n_take = min(top_k, len(master_uris))
     result = {}
 
     for i, src_uri in enumerate(src_uris):
-        sim_row = sim[i]
+        final_row = final[i]
 
-        sorted_indices = np.argsort(sim_row)[::-1]
+        sorted_indices = np.argsort(final_row)[::-1]
 
         suggestions = []
         for idx in sorted_indices:
-            score = round(float(sim_row[idx]), 6)
+            score = round(float(final_row[idx]), 6)
             if score < min_score:
                 continue
             suggestions.append({"uri": master_uris[idx], "score": score, "rank": len(suggestions)})

@@ -12,6 +12,7 @@ from rosetta.core.embedding import (
     EmbeddingModel,
     extract_text_inputs_linkml,
 )
+from rosetta.core.features import extract_structural_features_linkml
 from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 
 
@@ -92,13 +93,19 @@ def cli(
             click.echo("Error: No embeddable nodes found in schema.", err=True)
             sys.exit(1)
 
+        struct_map = extract_structural_features_linkml(schema)
+
         em = EmbeddingModel(model_name)
         texts = [text for _, _, text in pairs]
         vectors = em.encode(texts)
 
         report = EmbeddingReport(
             root={
-                node_id: EmbeddingVectors(label=label, lexical=vec)
+                node_id: EmbeddingVectors(
+                    label=label,
+                    lexical=vec,
+                    structural=struct_map.get(node_id, []),
+                )
                 for (node_id, label, _), vec in zip(pairs, vectors, strict=True)
             }
         )

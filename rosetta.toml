@@ -18,6 +18,7 @@ source_lang = "auto"
 top_k = 5
 min_score = 0.0
 anomaly_threshold = 0.3
+structural_weight = 0.2
 
 [lint]
 strict = false

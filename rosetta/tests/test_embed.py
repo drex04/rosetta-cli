@@ -285,3 +285,6 @@ def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.Fixt
     assert "label" in first_val
     # The schema has one class "Speed" — label should reflect the class name
     assert first_val["label"] == "Speed"
+    # Assert structural field is present and has length 5
+    assert "structural" in first_val
+    assert len(first_val["structural"]) == 5

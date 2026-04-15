@@ -118,7 +118,7 @@ rosetta-translate eng_schema.linkml.yaml -o eng_schema_en.linkml.yaml --source-l
 
 Reads a `.linkml.yaml` file and computes embeddings for every schema slot. Outputs a JSON map of slot URI → embedding vector.
 
-> **Output format note:** Each entry in the output JSON now includes a `"label"` field (derived from the schema class or slot name) in addition to the `"lexical"` vector. The `"label"` field is used by `rosetta-suggest` to populate the `subject_label` and `object_label` columns in SSSOM TSV output.
+> **Output format note:** Each entry in the output JSON now includes a `"label"` field (derived from the schema class or slot name) in addition to the `"lexical"` vector. The `"label"` field is used by `rosetta-suggest` to populate the `subject_label` and `object_label` columns in SSSOM TSV output. Each entry also includes a `"structural"` array of 5 floats encoding schema-structural features (is_class, hierarchy_depth, is_required, is_multivalued, slot_usage_count — all normalized to [0.0, 1.0]). Old embed files without this field still load correctly and fall back to lexical-only scoring.
 
 > **Note:** The first run downloads the model (~1.2 GB) from HuggingFace. Subsequent runs use the local cache.
 
@@ -201,6 +201,8 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 ```
 
 Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`.
+
+**Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
 **Deranking:** Rows with `predicate_id = owl:differentFrom` in the approved mappings file decrease the candidate's confidence score (the candidate is NOT removed from output). Use `skos:relatedMatch` or any other predicate to boost a candidate's score.
 

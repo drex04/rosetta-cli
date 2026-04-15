@@ -469,3 +469,181 @@ def test_rank_suggestions_top_k_with_min_score_returns_all_qualifying():
     assert suggestions[0]["rank"] == 1
     assert suggestions[1]["rank"] == 2
     assert suggestions[2]["rank"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Structural blending tests
+# ---------------------------------------------------------------------------
+
+
+def test_rank_suggestions_structural_blend() -> None:
+    """Non-collinear structural vectors → blended score differs from lexical-only."""
+    from rosetta.core.similarity import rank_suggestions
+
+    src_uris = ["http://src/a"]
+    master_uris = ["http://master/b"]
+
+    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
+    B = np.array([[0.9, 0.1, 0.0]], dtype=np.float32)
+
+    # Non-collinear structural vectors
+    A_struct = np.array([[1.0, 0.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    B_struct = np.array([[0.0, 1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+
+    lex_result = rank_suggestions(src_uris, A, master_uris, B)
+    blend_result = rank_suggestions(
+        src_uris,
+        A,
+        master_uris,
+        B,
+        A_struct=A_struct,
+        B_struct=B_struct,
+        structural_weight=0.5,
+    )
+
+    lex_score = lex_result["http://src/a"]["suggestions"][0]["score"]
+    blend_score = blend_result["http://src/a"]["suggestions"][0]["score"]
+
+    assert lex_score != blend_score, (
+        f"Expected blended score ({blend_score}) to differ from lexical-only ({lex_score})"
+    )
+
+
+def test_rank_suggestions_structural_fallback() -> None:
+    """A_struct/B_struct=None → identical to lexical-only result."""
+    from rosetta.core.similarity import rank_suggestions
+
+    src_uris = ["http://src/a"]
+    master_uris = ["http://master/b"]
+
+    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
+    B = np.array([[0.9, 0.1, 0.0]], dtype=np.float32)
+
+    lex_result = rank_suggestions(src_uris, A, master_uris, B)
+    fallback_result = rank_suggestions(src_uris, A, master_uris, B, A_struct=None, B_struct=None)
+
+    lex_score = lex_result["http://src/a"]["suggestions"][0]["score"]
+    fallback_score = fallback_result["http://src/a"]["suggestions"][0]["score"]
+
+    assert lex_score == fallback_score, (
+        f"Fallback (no struct) should match lexical-only: {lex_score} vs {fallback_score}"
+    )
+
+
+def test_rank_suggestions_structural_weight_zero() -> None:
+    """structural_weight=0.0 → pure lexical scores."""
+    from rosetta.core.similarity import rank_suggestions
+
+    src_uris = ["http://src/a"]
+    master_uris = ["http://master/b"]
+
+    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
+    B = np.array([[0.9, 0.1, 0.0]], dtype=np.float32)
+
+    A_struct = np.array([[1.0, 0.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    B_struct = np.array([[0.0, 1.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+
+    lex_result = rank_suggestions(src_uris, A, master_uris, B)
+    zero_w_result = rank_suggestions(
+        src_uris,
+        A,
+        master_uris,
+        B,
+        A_struct=A_struct,
+        B_struct=B_struct,
+        structural_weight=0.0,
+    )
+
+    lex_score = lex_result["http://src/a"]["suggestions"][0]["score"]
+    zero_w_score = zero_w_result["http://src/a"]["suggestions"][0]["score"]
+
+    assert lex_score == zero_w_score, (
+        f"structural_weight=0 should equal lexical-only: {lex_score} vs {zero_w_score}"
+    )
+
+
+def test_rank_suggestions_structural_partial_zeros() -> None:
+    """src has non-zero structural, master has all-zero rows → fallback to lexical-only."""
+    from rosetta.core.similarity import rank_suggestions
+
+    src_uris = ["http://src/a"]
+    master_uris = ["http://master/b"]
+
+    A = np.array([[1.0, 0.0, 0.0]], dtype=np.float32)
+    B = np.array([[0.9, 0.1, 0.0]], dtype=np.float32)
+
+    A_struct = np.array([[1.0, 0.0, 0.0, 0.0, 0.0]], dtype=np.float32)
+    B_struct = np.array([[0.0, 0.0, 0.0, 0.0, 0.0]], dtype=np.float32)  # all-zero
+
+    lex_result = rank_suggestions(src_uris, A, master_uris, B)
+    partial_result = rank_suggestions(
+        src_uris,
+        A,
+        master_uris,
+        B,
+        A_struct=A_struct,
+        B_struct=B_struct,
+        structural_weight=0.5,
+    )
+
+    lex_score = lex_result["http://src/a"]["suggestions"][0]["score"]
+    partial_score = partial_result["http://src/a"]["suggestions"][0]["score"]
+
+    assert lex_score == partial_score, (
+        f"All-zero master struct should fall back to lexical: {lex_score} vs {partial_score}"
+    )
+
+
+def test_suggest_cli_structural_weight_config(tmp_path) -> None:
+    """CLI with non-default structural_weight produces different confidence than default."""
+    import json as _json
+
+    from rosetta.cli.suggest import cli
+
+    runner = CliRunner()
+
+    src_emb = {
+        "schema/A": {
+            "label": "A",
+            "lexical": [1.0, 0.0, 0.0],
+            "structural": [1.0, 0.0, 0.0, 0.0, 0.0],
+        }
+    }
+    master_emb = {
+        "schema/B": {
+            "label": "B",
+            "lexical": [0.9, 0.1, 0.0],
+            "structural": [0.0, 1.0, 0.0, 0.0, 0.0],  # non-collinear
+        }
+    }
+
+    src_file = tmp_path / "src.json"
+    mst_file = tmp_path / "mst.json"
+    src_file.write_text(_json.dumps(src_emb))
+    mst_file.write_text(_json.dumps(master_emb))
+
+    def _run_with_weight(weight: float) -> float:
+        toml_file = tmp_path / f"rosetta_{weight}.toml"
+        toml_file.write_text(f"[suggest]\nstructural_weight = {weight}\n")
+        result = runner.invoke(
+            cli,
+            [str(src_file), str(mst_file), "--config", str(toml_file)],
+        )
+        assert result.exit_code == 0, f"CLI failed (weight={weight}): {result.output}"
+        lines = result.output.splitlines()
+        data_rows = [
+            ln
+            for ln in lines
+            if ln.strip() and not ln.startswith("#") and not ln.startswith("subject_id")
+        ]
+        assert len(data_rows) >= 1, "Expected at least one data row"
+        fields = data_rows[0].split("\t")
+        return float(fields[4])  # confidence column index 4
+
+    score_a = _run_with_weight(0.5)
+    score_b = _run_with_weight(0.1)
+
+    assert score_a != score_b, (
+        f"Different structural_weight values should produce different confidence: "
+        f"0.5→{score_a}, 0.1→{score_b}"
+    )

@@ -47,6 +47,7 @@ class LintReport(BaseModel):
 class EmbeddingVectors(BaseModel):
     label: str = ""
     lexical: list[float]
+    structural: list[float] = []
 
 
 class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
