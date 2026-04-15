@@ -20,15 +20,15 @@ Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input form
 
 #### Supported formats
 
-| Extension / `--input-format` | Format              | Notes                                                                 |
-| ---------------------------- | ------------------- | --------------------------------------------------------------------- |
-| `.csv` / `csv`               | CSV                 | Auto-detected                                                         |
-| `.tsv` / `tsv`               | TSV                 | Auto-detected                                                         |
-| `.json` / `json-schema`      | JSON Schema         | Auto-detected from `.json`                                            |
-| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x         | Auto-detected                                                         |
-| `.xsd` / `xsd`               | XML Schema          | Auto-detected                                                         |
-| `json-sample`                | JSON sample data    | **Must pass `--input-format json-sample`** — no extension auto-detect |
-| `rdfs`                       | RDFS/OWL vocabulary | **Must pass `--input-format rdfs`**                                   |
+| Extension / `--format` | Format              | Notes                                                              |
+| ---------------------- | ------------------- | ------------------------------------------------------------------ |
+| `.csv` / `csv`         | CSV                 | Auto-detected                                                      |
+| `.tsv` / `tsv`         | TSV                 | Auto-detected                                                      |
+| `.json` / `json-schema`| JSON Schema         | Auto-detected from `.json`                                         |
+| `.yaml` / `.yml` / `openapi` | OpenAPI 3.x   | Auto-detected                                                      |
+| `.xsd` / `xsd`         | XML Schema          | Auto-detected                                                      |
+| `json-sample`          | JSON sample data    | **Must pass `--format json-sample`** — no extension auto-detect    |
+| `rdfs`                 | RDFS/OWL vocabulary | **Must pass `--format rdfs`** (e.g. `.ttl`, `.owl` files)         |
 
 **json-sample** accepts three input shapes:
 
@@ -73,12 +73,12 @@ rosetta-translate [OPTIONS]
 
 **Options**
 
-| Option                     | Default        | Description                                                                                                                                    |
-| -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--input FILE`, `-i FILE`  | `-` (stdin)    | LinkML YAML input file                                                                                                                         |
-| `--output FILE`, `-o FILE` | `-` (stdout)   | LinkML YAML output (English-normalised)                                                                                                        |
-| `--source-lang LANG`       | `auto`         | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
-| `--config FILE`, `-c FILE` | `rosetta.toml` | Config file path                                                                                                                               |
+| Option               | Default | Description                                                                                                                                    |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--input PATH`       | —       | LinkML YAML input file **[required]**                                                                                                          |
+| `--output PATH`      | —       | Output path for translated `.linkml.yaml` **[required]**                                                                                       |
+| `--source-lang LANG` | `auto`  | Source language code (`DE`, `NO`, etc.) or `auto` for server-side detection. Any `EN`/`EN-US`/`en` variant triggers passthrough — no API call. |
+| `--deepl-key TEXT`   | —       | DeepL API key (overrides `DEEPL_API_KEY` env var)                                                                                              |
 
 **Requirements**
 
@@ -94,7 +94,7 @@ uv run rosetta-embed --input nor_radar.linkml.yaml --output nor_radar_nb_embeddi
 // English embeddings
 uv run rosetta-embed --input nor_radar_en.linkml.yaml --output nor_radar_en_embeddings.json
 
-uv run rosetta-ingest --input rosetta/tests/fixtures/master_cop_ontology.ttl --output master_cop.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/master_cop_ontology.ttl --format rdfs --output master_cop.linkml.yaml
 uv run rosetta-translate --input master_cop.linkml.yaml --output master_cop_en.linkml.yaml --source-lang EN # translate with --source-lang EN should be a no-op
 uv run rosetta-embed --input master_cop_en.linkml.yaml --output master_cop_embeddings.json
 
@@ -124,14 +124,13 @@ Reads a `.linkml.yaml` file and computes embeddings for every schema slot. Outpu
 Usage: rosetta-embed [OPTIONS]
 
 Options:
-  -i, --input PATH            LinkML YAML input file  (default: stdin)
-  -o, --output PATH           JSON output file         (default: stdout)
-  --include-definitions       Include slot definitions in the embedding text
-  --include-parents           Include immediate parent class context
-  --include-ancestors         Include full ancestor chain context (supersedes --include-parents)
-  --include-children          Include direct child slot names in the embedding text
-  --model TEXT                Sentence-transformer model  [default: intfloat/e5-large-v2]
-  -c, --config PATH           Path to rosetta.toml
+  --input PATH            LinkML YAML input file  [required]
+  --output PATH           JSON output file         (default: stdout)
+  --include-definitions   Include slot definitions in the embedding text
+  --include-parents       Include immediate parent class context
+  --include-ancestors     Include full ancestor chain context (supersedes --include-parents)
+  --include-children      Include direct child slot names in the embedding text
+  --model TEXT            Sentence-transformer model  [default: intfloat/e5-large-v2]
 ```
 
 > **E5 models** (`intfloat/multilingual-e5-*`) receive the `"passage: "` prefix automatically on indexed texts. No extra flags needed.
@@ -139,15 +138,15 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-embed -i nor.linkml.yaml -o nor_emb.json
-uv run rosetta-embed -i usa.linkml.yaml -o usa_emb.json
+uv run rosetta-embed --input nor.linkml.yaml --output nor_emb.json
+uv run rosetta-embed --input usa.linkml.yaml --output usa_emb.json
 
 # Richer context — include full ancestor chain and slot definitions
-uv run rosetta-embed -i nor.linkml.yaml -o nor_emb.json \
+uv run rosetta-embed --input nor.linkml.yaml --output nor_emb.json \
   --include-ancestors --include-definitions
 
 # Cross-verify with multilingual E5 (stronger on non-English schemas)
-uv run rosetta-embed -i nor.linkml.yaml -o nor_emb_e5.json \
+uv run rosetta-embed --input nor.linkml.yaml --output nor_emb_e5.json \
   --model intfloat/multilingual-e5-base
 ```
 
@@ -188,11 +187,13 @@ uv run rosetta-suggest nor_emb.json usa_emb.json --output candidates.sssom.tsv
 # curie_map:
 #   skos: http://www.w3.org/2004/02/skos/core#
 #   semapv: https://w3id.org/semapv/vocab/
-subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label
-http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude
+subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label	mapping_date	record_id
+http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude		
 ```
 
-Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`.
+Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`, `mapping_date`, `record_id`.
+
+`mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates.
 
 **Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
@@ -649,17 +650,16 @@ log = "store/audit-log.sssom.tsv"
 
 ## End-to-end scripts
 
-Two runnable scripts use the fixture files in `rosetta/tests/fixtures/` and write output to a local directory.
-
-| Script                     | Covers                                                          |
-| -------------------------- | --------------------------------------------------------------- |
-| `scripts/quickstart.sh`    | Core pipeline: ingest → embed → suggest                         |
-| `scripts/full-pipeline.sh` | All 8 tools: adds lint, rml-gen, provenance, validate, accredit |
+| Script                       | Covers                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
+| `scripts/pipeline-demo.sh`   | Full accreditation walkthrough: ingest → translate → embed → suggest → lint → accredit, with interactive pauses for analyst and accreditor edits |
 
 ```bash
-bash scripts/quickstart.sh
-bash scripts/full-pipeline.sh
+bash scripts/pipeline-demo.sh          # writes output to demo_out/
+bash scripts/pipeline-demo.sh my_run   # custom output directory
 ```
+
+The script uses the bundled fixture files in `rosetta/tests/fixtures/` and pauses at each human-in-the-loop step so you can edit the generated SSSOM files before proceeding.
 
 ---
 

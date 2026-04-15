@@ -21,6 +21,34 @@ repos:
         pass_filenames: false
         types: [python]
 
+      - id: radon
+        name: radon complexity
+        language: system
+        entry: bash -c 'uv run radon cc rosetta/core/ -n C -s | tee /dev/stderr | grep -q . && exit 1 || exit 0'
+        pass_filenames: false
+        types: [python]
+
+      - id: vulture
+        name: vulture dead code
+        language: system
+        entry: uv run vulture rosetta/ --min-confidence 80 --exclude rosetta/tests
+        pass_filenames: false
+        types: [python]
+
+      - id: refurb
+        name: refurb modernize
+        language: system
+        entry: uv run refurb rosetta/
+        pass_filenames: false
+        types: [python]
+
+      - id: bandit
+        name: bandit security
+        language: system
+        entry: uv run bandit -r rosetta/ -x rosetta/tests -ll
+        pass_filenames: false
+        types: [python]
+
       - id: pytest
         name: pytest (not slow)
         language: system
