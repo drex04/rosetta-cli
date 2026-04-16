@@ -57,7 +57,16 @@ uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2
 uv run rosetta-ingest --input rosetta/tests/fixtures/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
 ```
 
-**Exit codes:** 0 on success, 1 on parse or I/O error.
+**Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta-rml-gen`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
+
+**Source-format and path annotations:** Every generated `.linkml.yaml` is stamped with:
+
+- `annotations.rosetta_source_format` — the detected or forced input format (e.g., `csv`, `json-schema`, `xsd`).
+- Per-slot path annotations — `rosetta_csv_column` (CSV/TSV), `rosetta_jsonpath` (JSON Schema / JSON sample), or `rosetta_xpath` (XSD) — recording the original field path in the source schema.
+
+These annotations are consumed by the upcoming `rosetta-yarrrml-gen` command (Plan 16-01) to generate source-format-aware RML/YARRRML mapping templates automatically.
+
+**Exit codes:** 0 on success, 1 on parse, I/O, or prefix-collision error.
 
 ---
 
@@ -178,7 +187,7 @@ Options:
 uv run rosetta-suggest nor_emb.json usa_emb.json --output candidates.sssom.tsv
 ```
 
-**Output format** — SSSOM TSV with 7 columns and a YAML comment header:
+**Output format** — SSSOM TSV with 15 columns and a YAML comment header:
 
 ```
 # mapping_set_id: https://rosetta-cli/mappings
@@ -187,13 +196,29 @@ uv run rosetta-suggest nor_emb.json usa_emb.json --output candidates.sssom.tsv
 # curie_map:
 #   skos: http://www.w3.org/2004/02/skos/core#
 #   semapv: https://w3id.org/semapv/vocab/
-subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label	mapping_date	record_id
-http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude
+subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label	mapping_date	record_id	subject_datatype	object_datatype	subject_type	object_type	mapping_group_id	composition_expr
+http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rosetta.interop/ns/master/altitude	semapv:LexicalMatching	0.94	Altitude M	Altitude	2026-04-16T00:00:00Z	<uuid>	xsd:float	xsd:float
 ```
 
-Columns: `subject_id`, `predicate_id`, `object_id`, `mapping_justification`, `confidence`, `subject_label`, `object_label`, `mapping_date`, `record_id`.
+| Column | Description |
+| ------ | ----------- |
+| `subject_id` | Source field URI |
+| `predicate_id` | SKOS/OWL mapping predicate |
+| `object_id` | Master ontology field URI |
+| `mapping_justification` | SEMAPV justification CURIE |
+| `confidence` | Cosine similarity score (0.0–1.0) |
+| `subject_label` | Human-readable source field name |
+| `object_label` | Human-readable target field name |
+| `mapping_date` | ISO 8601 UTC timestamp (populated for audit-log rows; empty for fresh candidates) |
+| `record_id` | UUID4 (populated for audit-log rows; empty for fresh candidates) |
+| `subject_datatype` | XSD datatype of the source field, re-derived from the source LinkML schema |
+| `object_datatype` | XSD datatype of the target field, re-derived from the master LinkML schema |
+| `subject_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
+| `object_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
+| `mapping_group_id` | Optional identifier shared across rows that compose one logical mapping |
+| `composition_expr` | Python/GREL expression that composes fields for 1:N decomposition or N:1 aggregation; consumed by `rosetta-rml-gen` (Phase 16-01+) |
 
-`mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates.
+`mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates. `subject_datatype` and `object_datatype` are re-derived at suggest time from the source and master LinkML schemas; they are not stored in the audit log (see [Audit log format](#audit-log-format)).
 
 **Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
@@ -395,27 +420,58 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for exter
 
 #### Audit log format
 
-`audit-log.sssom.tsv` is an append-only SSSOM TSV file. Two additional columns are stamped at ingest time:
+`audit-log.sssom.tsv` is an append-only SSSOM TSV file with 13 columns. Two columns are stamped at ingest time; the remaining 11 come from the ingested SSSOM row.
 
-| Column         | Description                                         |
-| -------------- | --------------------------------------------------- |
+| Column | Description |
+| ------ | ----------- |
+| `subject_id` | Source field URI |
+| `predicate_id` | SKOS/OWL mapping predicate |
+| `object_id` | Master ontology field URI |
+| `mapping_justification` | SEMAPV justification CURIE |
+| `confidence` | Score at time of proposal |
+| `subject_label` | Human-readable source field name |
+| `object_label` | Human-readable target field name |
 | `mapping_date` | ISO 8601 UTC timestamp — when this row was ingested |
-| `record_id`    | UUID4 — unique identifier for this log entry        |
+| `record_id` | UUID4 — unique identifier for this log entry |
+| `subject_type` | SSSOM entity type (e.g., `"composed entity expression"` for composite mappings) |
+| `object_type` | SSSOM entity type (e.g., `"composed entity expression"` for composite mappings) |
+| `mapping_group_id` | Optional group identifier shared across rows that compose one logical mapping |
+| `composition_expr` | Python/GREL composition expression for 1:N or N:1 mappings |
+
+> The audit log persists reviewer-asserted fields only. Schema-derived fields (`subject_datatype`, `object_datatype`) appear in `rosetta-suggest` output but are not stored in the audit log; they are re-derived by downstream tools from the source/master LinkML schemas.
+
+> **Migration:** Pre-16-00 audit logs with 9 columns are automatically upgraded to the 13-column format on the first `rosetta-accredit ingest` call. No manual migration is required.
 
 A complete history for an approved mapping:
 
 ```
-subject_id   predicate_id      object_id    mapping_justification         confidence  mapping_date          record_id
-nor:speed    skos:relatedMatch  mst:speed   semapv:ManualMappingCuration  0.87        2026-04-15T09:00:00Z  <uuid>
-nor:speed    skos:exactMatch    mst:speed   semapv:HumanCuration          0.87        2026-04-16T14:00:00Z  <uuid>
+subject_id   predicate_id      object_id   mapping_justification         confidence  mapping_date          record_id  subject_type  object_type  mapping_group_id  composition_expr  subject_label  object_label
+nor:speed    skos:relatedMatch  mst:speed  semapv:ManualMappingCuration  0.87        2026-04-15T09:00:00Z  <uuid>
+nor:speed    skos:exactMatch    mst:speed  semapv:HumanCuration          0.87        2026-04-16T14:00:00Z  <uuid>
 ```
 
 A rejected mapping (feeds derank into next suggest run):
 
 ```
-nor:bearing  skos:relatedMatch  mst:heading  semapv:ManualMappingCuration  0.72   2026-04-15T09:00:00Z  <uuid>
-nor:bearing  owl:differentFrom  mst:heading  semapv:HumanCuration          0.72   2026-04-16T14:00:00Z  <uuid>
+nor:bearing  skos:relatedMatch  mst:heading  semapv:ManualMappingCuration  0.72  2026-04-15T09:00:00Z  <uuid>
+nor:bearing  owl:differentFrom  mst:heading  semapv:HumanCuration          0.72  2026-04-16T14:00:00Z  <uuid>
 ```
+
+#### Composite mappings
+
+When a single source field maps to a combination of master fields (or vice versa), rosetta-cli uses the SSSOM composite-entity pattern. The analyst sets `subject_type` and/or `object_type` to `"composed entity expression"` and provides a `composition_expr` describing the transformation. Rows that belong to the same logical mapping share a `mapping_group_id`.
+
+Example — a single NOR `position` field decomposes into separate master `latitude` and `longitude` slots:
+
+```
+subject_id       predicate_id    object_id          mapping_justification  confidence  subject_type                  object_type  mapping_group_id  composition_expr
+nor:position     skos:closeMatch mst:latitude       semapv:HumanCuration   0.81        composed entity expression                grp-position-001  record["position"].split(",")[0]
+nor:position     skos:closeMatch mst:longitude      semapv:HumanCuration   0.81        composed entity expression                grp-position-001  record["position"].split(",")[1]
+```
+
+See the [SSSOM composite-entity pattern documentation](https://mapping-commons.github.io/sssom/spec-model/#composite-entity) for the full specification.
+
+> Note: rosetta-cli stores `subject_type` / `object_type` as the prose string `"composed entity expression"`, matching the canonical SSSOM example. The SSSOM Python package also accepts the CURIE `sssom:CompositeEntity`; rosetta-cli may migrate to the CURIE form in a future phase without changing behaviour.
 
 #### Example session
 

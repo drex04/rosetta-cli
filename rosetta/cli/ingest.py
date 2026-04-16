@@ -7,7 +7,13 @@ from pathlib import Path
 
 import click
 
-from rosetta.core.normalize import normalize_schema
+from rosetta.core.normalize import (
+    _detect_format,
+    _stamp_slot_paths,
+    _stamp_source_format,
+    check_prefix_collision,
+    normalize_schema,
+)
 
 
 @click.command()
@@ -45,9 +51,19 @@ def cli(
     try:
         from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
 
-        schema_def = normalize_schema(input_path, fmt=fmt, schema_name=schema_name)
+        resolved_fmt = fmt if fmt is not None else _detect_format(input_path)
+        schema_def = normalize_schema(input_path, fmt=resolved_fmt, schema_name=schema_name)
+        _stamp_source_format(schema_def, resolved_fmt)
+        _stamp_slot_paths(schema_def, resolved_fmt)
         output.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            check_prefix_collision(output, schema_def)
+        except ValueError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
         output.write_text(yaml_dumper.dumps(schema_def))
+    except SystemExit:
+        raise
     except Exception as exc:  # noqa: BLE001
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)

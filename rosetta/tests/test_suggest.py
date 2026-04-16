@@ -501,8 +501,8 @@ def test_suggest_cli_output_file(tmp_path: Path, src_file: str, mst_file: str) -
     assert "subject_id" in content
 
 
-def test_suggest_cli_header_has_11_columns(src_file: str, mst_file: str) -> None:
-    """TSV header must have 11 columns including subject_datatype and object_datatype."""
+def test_suggest_cli_header_has_15_columns(src_file: str, mst_file: str) -> None:
+    """TSV header must have 15 columns including the four new composite-entity columns."""
     from rosetta.cli.suggest import cli
 
     result = CliRunner().invoke(cli, [src_file, mst_file])
@@ -512,9 +512,14 @@ def test_suggest_cli_header_has_11_columns(src_file: str, mst_file: str) -> None
     columns = next(
         ln for ln in result.output.splitlines() if ln.strip() and not ln.startswith("#")
     ).split("\t")
-    assert len(columns) == 11, f"Expected 11 columns, got {len(columns)}: {columns}"
+    assert len(columns) == 15, f"Expected 15 columns, got {len(columns)}: {columns}"
     assert "subject_datatype" in columns
     assert "object_datatype" in columns
+    assert "subject_type" in columns
+    assert "object_type" in columns
+    assert "mapping_group_id" in columns
+    assert "composition_expr" in columns
+    assert columns[11:] == ["subject_type", "object_type", "mapping_group_id", "composition_expr"]
 
 
 # ---------------------------------------------------------------------------

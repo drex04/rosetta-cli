@@ -15,6 +15,7 @@ from rosetta.cli.accredit import cli
 from rosetta.core.accredit import (
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
+    SSSOM_HEADER,
     append_log,
     check_ingest_row,
     current_state_for_pair,
@@ -685,3 +686,173 @@ def test_review_ingest_round_trip(tmp_path: Path, tmp_rosetta_toml: Path) -> Non
     assert len(rows) == 1
     assert rows[0].subject_id == "src:A"
     assert rows[0].mapping_justification == MMC_JUSTIFICATION
+
+
+# ---------------------------------------------------------------------------
+# Task 4a — Composite round-trip (mapping_group_id / composition_expr)
+# ---------------------------------------------------------------------------
+
+
+def test_accredit_audit_log_composite_round_trip(tmp_path: Path) -> None:
+    """Two rows sharing a mapping_group_id round-trip through append_log/load_log."""
+    log_path = tmp_path / "audit.sssom.tsv"
+    rows = [
+        SSSOMRow(
+            subject_id="src:lat",
+            predicate_id="skos:exactMatch",
+            object_id="ex:geoPoint-from-lat-lon",
+            mapping_justification="semapv:HumanCuration",
+            confidence=1.0,
+            subject_label="latitude",
+            object_label="geoPoint",
+            object_type="composed entity expression",
+            mapping_group_id="grp-geo-1",
+            composition_expr='{lat} + "," + {lon}',
+        ),
+        SSSOMRow(
+            subject_id="src:lon",
+            predicate_id="skos:exactMatch",
+            object_id="ex:geoPoint-from-lat-lon",
+            mapping_justification="semapv:HumanCuration",
+            confidence=1.0,
+            subject_label="longitude",
+            object_label="geoPoint",
+            object_type="composed entity expression",
+            mapping_group_id="grp-geo-1",
+            composition_expr='{lat} + "," + {lon}',
+        ),
+    ]
+    append_log(rows, log_path)
+
+    loaded = load_log(log_path)
+    assert len(loaded) == 2
+    assert {r.subject_id for r in loaded} == {"src:lat", "src:lon"}
+    for r in loaded:
+        assert r.object_id == "ex:geoPoint-from-lat-lon"
+        assert r.object_type == "composed entity expression"
+        assert r.mapping_group_id == "grp-geo-1"
+        assert r.composition_expr == '{lat} + "," + {lon}'
+
+
+# ---------------------------------------------------------------------------
+# Task 4b — Backward-compat parse (9-col and 11-col audit log shapes)
+# ---------------------------------------------------------------------------
+
+
+def test_accredit_audit_log_backward_compat(tmp_path: Path) -> None:
+    """Pre-16-00 audit log shapes (9-col and 11-col) parse cleanly with composite fields = None."""
+    # 9-column (pre-Phase-15 audit log shape)
+    log_9 = tmp_path / "old_9col.sssom.tsv"
+    log_9.write_text(
+        SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
+        "confidence\tsubject_label\tobject_label\tmapping_date\trecord_id\n"
+        "src:a\tskos:exactMatch\tmst:b\tsemapv:HumanCuration\t1.0\ta\tb\t"
+        "2026-04-01T00:00:00+00:00\trec-1\n",
+        encoding="utf-8",
+    )
+    loaded_9 = load_log(log_9)
+    assert len(loaded_9) == 1
+    assert loaded_9[0].subject_type is None
+    assert loaded_9[0].object_type is None
+    assert loaded_9[0].mapping_group_id is None
+    assert loaded_9[0].composition_expr is None
+    assert loaded_9[0].subject_datatype is None
+
+    # 11-column (post-Phase-15 suggest output shape, fed into parse_sssom_tsv)
+    log_11 = tmp_path / "old_11col.sssom.tsv"
+    log_11.write_text(
+        SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
+        "confidence\tsubject_label\tobject_label\tmapping_date\trecord_id\t"
+        "subject_datatype\tobject_datatype\n"
+        "src:a\tskos:exactMatch\tmst:b\tsemapv:HumanCuration\t1.0\ta\tb\t"
+        "2026-04-01T00:00:00+00:00\trec-1\tinteger\tdouble\n",
+        encoding="utf-8",
+    )
+    loaded_11 = load_log(log_11)
+    assert len(loaded_11) == 1
+    assert loaded_11[0].subject_datatype == "integer"
+    assert loaded_11[0].object_datatype == "double"
+    assert loaded_11[0].mapping_group_id is None
+    assert loaded_11[0].composition_expr is None
+
+
+# ---------------------------------------------------------------------------
+# Task 4e — Migration tests (Task 3b coverage)
+# ---------------------------------------------------------------------------
+
+
+def test_accredit_append_log_migrates_9col_file(tmp_path: Path) -> None:
+    """Appending to an existing 9-col audit log rewrites it to 13 columns atomically."""
+    log = tmp_path / "audit.sssom.tsv"
+    log.write_text(
+        SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
+        "confidence\tsubject_label\tobject_label\tmapping_date\trecord_id\n"
+        "src:a\tskos:exactMatch\tmst:b\tsemapv:HumanCuration\t1.0\ta\tb\t"
+        "2026-04-01T00:00:00+00:00\trec-1\n",
+        encoding="utf-8",
+    )
+    new_row = SSSOMRow(
+        subject_id="src:c",
+        predicate_id="skos:exactMatch",
+        object_id="mst:d",
+        mapping_justification="semapv:HumanCuration",
+        confidence=1.0,
+        mapping_group_id="grp-1",
+        composition_expr='{a} + "," + {b}',
+        object_type="composed entity expression",
+    )
+    append_log([new_row], log)
+
+    # File header now has 13 columns.
+    data_lines = [ln for ln in log.read_text().splitlines() if not ln.startswith("#")]
+    header = data_lines[0].split("\t")
+    assert len(header) == 13
+    assert header[-4:] == ["subject_type", "object_type", "mapping_group_id", "composition_expr"]
+
+    # Legacy row preserved; composite fields None.
+    loaded = load_log(log)
+    assert len(loaded) == 2
+    legacy = next(r for r in loaded if r.subject_id == "src:a")
+    new = next(r for r in loaded if r.subject_id == "src:c")
+    assert legacy.mapping_group_id is None
+    assert legacy.composition_expr is None
+    assert new.mapping_group_id == "grp-1"
+    assert new.composition_expr == '{a} + "," + {b}'
+    assert new.object_type == "composed entity expression"
+
+
+def test_accredit_append_log_no_migration_on_current_shape(tmp_path: Path) -> None:
+    """Appending to an already-13-col file performs no rewrite."""
+    log = tmp_path / "audit.sssom.tsv"
+    # Seed with a fresh (current-shape) file.
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="src:a",
+                predicate_id="skos:exactMatch",
+                object_id="mst:b",
+                mapping_justification="semapv:HumanCuration",
+                confidence=1.0,
+            )
+        ],
+        log,
+    )
+    mtime_before = log.stat().st_mtime_ns
+    # Second append — no migration should occur, just a standard append.
+    append_log(
+        [
+            SSSOMRow(
+                subject_id="src:c",
+                predicate_id="skos:exactMatch",
+                object_id="mst:d",
+                mapping_justification="semapv:HumanCuration",
+                confidence=1.0,
+            )
+        ],
+        log,
+    )
+    # Two data rows, same 13-col header, no .tmp sibling left behind.
+    assert not (log.with_suffix(log.suffix + ".tmp")).exists()
+    loaded = load_log(log)
+    assert len(loaded) == 2
+    _ = mtime_before  # referenced to satisfy linters

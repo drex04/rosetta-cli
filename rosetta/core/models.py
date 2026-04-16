@@ -89,6 +89,10 @@ class SSSOMRow(BaseModel):
     record_id: str | None = None  # UUID4 stamped by accredit ingest
     subject_datatype: str | None = None
     object_datatype: str | None = None
+    subject_type: str | None = None
+    object_type: str | None = None
+    mapping_group_id: str | None = None
+    composition_expr: str | None = None
 
 
 # --- Provenance ---

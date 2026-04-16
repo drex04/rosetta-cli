@@ -220,6 +220,47 @@ def test_embedding_vectors_datatype_optional() -> None:
     assert ev2.datatype == "integer"
 
 
+def test_sssom_row_composite_fields_round_trip() -> None:
+    """All four new composite-entity fields serialise and round-trip via model_validate."""
+    row = SSSOMRow(
+        subject_id="src:lat",
+        predicate_id="skos:exactMatch",
+        object_id="ex:geoPoint",
+        mapping_justification="semapv:HumanCuration",
+        confidence=1.0,
+        subject_type="composed entity expression",
+        object_type="owl:Class",
+        mapping_group_id="grp-geo-1",
+        composition_expr='{lat} + "," + {lon}',
+    )
+    data = row.model_dump(mode="json")
+
+    assert data["subject_type"] == "composed entity expression"
+    assert data["object_type"] == "owl:Class"
+    assert data["mapping_group_id"] == "grp-geo-1"
+    assert data["composition_expr"] == '{lat} + "," + {lon}'
+
+    roundtrip = SSSOMRow.model_validate(data)
+    assert roundtrip.subject_type == "composed entity expression"
+    assert roundtrip.object_type == "owl:Class"
+    assert roundtrip.mapping_group_id == "grp-geo-1"
+    assert roundtrip.composition_expr == '{lat} + "," + {lon}'
+    assert roundtrip == row
+
+    # Minimal row: all four fields default to None
+    minimal = SSSOMRow(
+        subject_id="a",
+        predicate_id="b",
+        object_id="c",
+        mapping_justification="j",
+        confidence=0.5,
+    )
+    assert minimal.subject_type is None
+    assert minimal.object_type is None
+    assert minimal.mapping_group_id is None
+    assert minimal.composition_expr is None
+
+
 def test_sssom_row_datatype_fields_optional() -> None:
     """SSSOMRow.subject_datatype and object_datatype are optional and default to None."""
     row = SSSOMRow(

@@ -40,6 +40,10 @@ _SSSOM_COLUMNS = [
     "record_id",
     "subject_datatype",
     "object_datatype",
+    "subject_type",
+    "object_type",
+    "mapping_group_id",
+    "composition_expr",
 ]
 
 
@@ -237,6 +241,10 @@ def cli(
                         row.record_id or "",
                         row.subject_datatype or "",
                         row.object_datatype or "",
+                        row.subject_type or "",
+                        row.object_type or "",
+                        row.mapping_group_id or "",
+                        row.composition_expr or "",
                     ]
                 )
             fh.write(buf.getvalue())

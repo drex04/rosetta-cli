@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import pyparsing as _pp  # type: ignore[import-untyped]
+import yaml as _yaml
 from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
 
 
@@ -164,6 +166,91 @@ def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
         case _:
             _supported = "json-schema, openapi, xsd, csv, tsv, json-sample, rdfs"
             raise ValueError(f"Unsupported format {fmt!r}. Supported: {_supported}.")
+
+
+def check_prefix_collision(output_path: Path, schema_def: SchemaDefinition) -> None:
+    """Error if any sibling *.linkml.yaml in output_path.parent has the same
+    default_prefix or id as schema_def.
+
+    Raises ValueError (caught at CLI layer, exits 1).
+    """
+    parent = output_path.parent
+    if not parent.is_dir():
+        return
+    new_prefix = schema_def.default_prefix
+    new_id = str(schema_def.id)
+    for sibling in parent.glob("*.linkml.yaml"):
+        if sibling.resolve() == output_path.resolve():
+            continue
+        try:
+            data = _yaml.safe_load(sibling.read_text(encoding="utf-8"))
+        except (OSError, _yaml.YAMLError) as exc:
+            print(
+                f"WARNING: prefix-collision check could not read {sibling}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+        if not isinstance(data, dict):
+            continue
+        if new_prefix and data.get("default_prefix") == new_prefix:
+            raise ValueError(
+                f"default_prefix {new_prefix!r} already used by {sibling}. "
+                "Choose a unique --schema-name."
+            )
+        if new_id and str(data.get("id", "")) == new_id:
+            raise ValueError(
+                f"id {new_id!r} already used by {sibling}. Choose a unique --schema-name."
+            )
+
+
+def _stamp_source_format(schema_def: SchemaDefinition, fmt: str) -> None:
+    """Set ``annotations.rosetta_source_format`` on the LinkML schema.
+
+    ``fmt`` is the normalised CLI ``--format`` value mapped to the downstream
+    domain: json|csv|xml. Unknown formats (rdfs) are not stamped.
+    """
+    domain_fmt: str | None = {
+        "json": "json",
+        "json-sample": "json",
+        "json-schema": "json",
+        "openapi": "json",
+        "csv": "csv",
+        "tsv": "csv",
+        "xml": "xml",
+        "xsd": "xml",
+        "rdfs": None,
+    }.get(fmt)
+    if domain_fmt is None:
+        return
+    existing: dict[str, Any] = getattr(schema_def, "annotations", None) or {}
+    existing["rosetta_source_format"] = domain_fmt
+    schema_def.annotations = existing  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def _stamp_slot_paths(schema_def: SchemaDefinition, fmt: str) -> None:
+    """For every slot, attach the format-specific path hint annotation consumed by 16-02."""
+    annotation_key: str | None = {
+        "json": "rosetta_jsonpath",
+        "json-sample": "rosetta_jsonpath",
+        "json-schema": "rosetta_jsonpath",
+        "openapi": "rosetta_jsonpath",
+        "csv": "rosetta_csv_column",
+        "tsv": "rosetta_csv_column",
+        "xml": "rosetta_xpath",
+        "xsd": "rosetta_xpath",
+    }.get(fmt)
+    if annotation_key is None:
+        return
+    slots: dict[str, Any] = getattr(schema_def, "slots", None) or {}
+    for slot_name, slot in slots.items():
+        annotations: dict[str, Any] = getattr(slot, "annotations", None) or {}
+        if annotation_key == "rosetta_csv_column":
+            annotations[annotation_key] = slot_name
+        elif annotation_key == "rosetta_jsonpath":
+            annotations[annotation_key] = f"$.{slot_name}"
+        elif annotation_key == "rosetta_xpath":
+            annotations[annotation_key] = f"./{slot_name}"
+        slot.annotations = annotations  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def normalize_schema(
