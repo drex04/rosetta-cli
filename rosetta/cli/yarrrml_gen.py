@@ -108,12 +108,13 @@ def cli(
     # 4. Resolve source format (CLI flag OR schema annotation; exit 1 on neither)
     effective_source_format = _resolve_source_format(source_format, source_def)
 
-    # 5. Empty-filter guard: before running build_spec, check whether filtering leaves any rows
+    # 5. Empty-filter guard: before running build_spec, check whether filtering leaves any rows.
+    #    We store the result to pass as prefiltered= into build_spec — single filter pass.
     src_prefix = str(getattr(source_def, "default_prefix", "") or "")
     if not src_prefix:
         click.echo(f"Error: source schema {source_schema} lacks default_prefix", err=True)
         sys.exit(1)
-    remaining, _excluded = filter_rows(rows, src_prefix, include_manual)
+    remaining, excluded = filter_rows(rows, src_prefix, include_manual)
     if not remaining and not allow_empty:
         mmc = "+MMC" if include_manual else ""
         msg = (
@@ -124,10 +125,15 @@ def cli(
         click.echo(msg, err=True)
         sys.exit(1)
 
-    # 6. Build spec
+    # 6. Build spec (prefiltered= avoids a second O(n) filter_rows pass)
     try:
         spec, coverage = build_spec(
-            rows, source_def, master_def, include_manual=include_manual, force=force
+            rows,
+            source_def,
+            master_def,
+            include_manual=include_manual,
+            force=force,
+            prefiltered=(remaining, excluded),
         )
     except ValueError as exc:
         click.echo(f"Error: {exc}", err=True)

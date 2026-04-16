@@ -254,6 +254,12 @@ def build_composite_slot_derivation(group_id: str, members: list[SSSOMRow]) -> S
     (Wave 7 _resolve_composite_groups) resolves it to a schema slot name.
     """
     exprs = {r.composition_expr for r in members if r.composition_expr}
+    if not exprs:
+        row_ids = [r.record_id for r in members]
+        raise ValueError(
+            f"mapping_group_id={group_id!r} has no composition_expr on any member. "
+            f"Composite mappings require composition_expr. Row IDs: {row_ids}"
+        )
     if len(exprs) != 1:
         raise ValueError(
             f"mapping_group_id={group_id!r} has inconsistent composition_expr "
@@ -264,7 +270,7 @@ def build_composite_slot_derivation(group_id: str, members: list[SSSOMRow]) -> S
         raise ValueError(
             f"mapping_group_id={group_id!r} spans multiple target slots: {sorted(target_slots)!r}"
         )
-    expr = members[0].composition_expr
+    expr = next(iter(exprs))
     target = next(iter(target_slots))
     return SlotDerivation(name=target, expr=expr)
 
@@ -576,19 +582,28 @@ def build_spec(
     *,
     include_manual: bool = False,
     force: bool = False,
+    prefiltered: tuple[list[SSSOMRow], dict[str, list[SSSOMRow]]] | None = None,
 ) -> tuple[TransformationSpecification, CoverageReport]:
     """Top-level orchestrator. Pure-function style; all I/O is caller's job.
 
     --force bypasses unresolvable-CURIE errors only. Mixed-kind mappings,
     missing class-level mappings, and inconsistent composite expressions are
     ALWAYS fatal — data-integrity errors, not coverage issues.
+
+    prefiltered: optional pre-computed result of filter_rows(sssom_rows, src_prefix,
+    include_manual). When supplied, the internal filter_rows call is skipped and the
+    provided (remaining, excluded) tuple is used directly. Library callers that do
+    not pass prefiltered continue to work without change (defaults to None).
     """
     src_prefix = str(source.default_prefix or "")
     if not src_prefix:
         raise ValueError("source schema lacks default_prefix")
     mst_prefix = str(master.default_prefix or "")
 
-    remaining, excluded = filter_rows(sssom_rows, src_prefix, include_manual)
+    if prefiltered is not None:
+        remaining, excluded = prefiltered
+    else:
+        remaining, excluded = filter_rows(sssom_rows, src_prefix, include_manual)
 
     src_view = SchemaView(source)
     master_view = SchemaView(master)

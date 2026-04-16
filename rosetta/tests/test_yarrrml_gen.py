@@ -259,6 +259,20 @@ def test_build_composite_slot_derivation_rejects_inconsistent_expr() -> None:
         build_composite_slot_derivation("g", [r1, r2])
 
 
+def test_build_composite_slot_derivation_rejects_all_none_expr() -> None:
+    r1 = _mkrow(record_id="r1", mapping_group_id="g", object_id="mc:X", composition_expr=None)
+    r2 = _mkrow(record_id="r2", mapping_group_id="g", object_id="mc:X", composition_expr=None)
+    with pytest.raises(ValueError, match="no composition_expr"):
+        build_composite_slot_derivation("g", [r1, r2])
+
+
+def test_build_composite_slot_derivation_rejects_empty_string_expr() -> None:
+    r1 = _mkrow(record_id="r1", mapping_group_id="g", object_id="mc:X", composition_expr="")
+    r2 = _mkrow(record_id="r2", mapping_group_id="g", object_id="mc:X", composition_expr="")
+    with pytest.raises(ValueError, match="no composition_expr"):
+        build_composite_slot_derivation("g", [r1, r2])
+
+
 def test_build_composite_slot_derivation_rejects_multi_target() -> None:
     r1 = _mkrow(record_id="r1", mapping_group_id="g", object_id="mc:X", composition_expr="[{a}]")
     r2 = _mkrow(record_id="r2", mapping_group_id="g", object_id="mc:Y", composition_expr="[{a}]")
@@ -805,3 +819,39 @@ def test_cli_comments_carry_effective_source_format(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
     spec_text = out_yaml.read_text()
     assert "rosetta:source_format=csv" in spec_text
+
+
+def test_build_spec_accepts_prefiltered_tuple() -> None:
+    """build_spec honours prefiltered= kwarg and skips internal filter_rows.
+
+    Verifies that coverage filter-stage counts are consistent whether
+    prefiltered is supplied or omitted.
+    """
+    src = _mkschema("nor_radar", {"Observation": ["frequency"]}, {"frequency": "string"})
+    mst = _mkschema("cop", {"Track": ["frequency"]}, {"frequency": "string"})
+
+    rows = [
+        _mkrow(subject_id="nor_radar:Observation", object_id="cop:Track"),
+        _mkrow(subject_id="nor_radar:frequency", object_id="cop:frequency"),
+        # Row from a different schema prefix — excluded at prefix stage
+        _mkrow(subject_id="other:Foo", object_id="cop:Track"),
+    ]
+
+    # Call filter_rows once (as CLI would), then pass prefiltered= to build_spec
+    remaining, excluded = filter_rows(rows, "nor_radar", include_manual=False)
+    assert len(excluded["prefix"]) == 1  # the "other:Foo" row
+
+    _, coverage_pre = build_spec(rows, src, mst, force=True, prefiltered=(remaining, excluded))
+
+    # Also call without prefiltered to confirm counts match
+    _, coverage_plain = build_spec(rows, src, mst, force=True)
+
+    assert coverage_pre.rows_after_prefix_filter == coverage_plain.rows_after_prefix_filter
+    assert coverage_pre.rows_after_predicate_filter == coverage_plain.rows_after_predicate_filter
+    assert (
+        coverage_pre.rows_after_justification_filter
+        == coverage_plain.rows_after_justification_filter
+    )
+    # Sanity: 3 total rows, 1 excluded by prefix → 2 pass
+    assert coverage_pre.rows_after_prefix_filter == 2
+    assert coverage_pre.rows_after_justification_filter == 2
