@@ -1,60 +1,108 @@
-# Coding Conventions
+# Code Conventions
 
-**Analysis Date:** 2026-04-14
+**Updated:** 2026-04-16 (phases 14–15)
 
 ## Naming Patterns
-**Files:** `snake_case.py`; CLI files named after tool (`rml_gen.py` → `rosetta-rml-gen`)
-**Functions:** `snake_case` verbs — `load_ledger`, `approve_mapping`, `bind_namespaces`; private helpers prefixed `_`
-**Variables:** `snake_case`; short locals (`g` for Graph, `led` for Ledger); UPPER_SNAKE constants (`UNIT_STRING_TO_IRI`, `ROSE_NS`)
-**Classes:** `PascalCase` Pydantic models — `LintFinding`, `ValidationReport`, `MappingDecision`
-**Test URIs:** Module-level uppercase aliases — `SOURCE_EMB = {...}`, `MASTER_EMB = {...}`
-**Module-level constants:** Private module-level lists/dicts use `_UPPER_SNAKE` with leading underscore (e.g., `_SSSOM_HEADER_LINES`, `_SSSOM_COLUMNS` in `rosetta/cli/suggest.py`)
 
-## Code Style
-**Formatting:** `uv run ruff format .` — line length 100, target py311
-**Linting:** `uv run ruff check .` — rules E, W, F, I, UP
-**Type Checking:** `uv run basedpyright` — strict for `rosetta/core/` and `rosetta/cli/`; basic for `rosetta/tests/`
+- **Files:** `snake_case.py`; CLI files named after tool (`rml_gen.py` → `rosetta-rml-gen`)
+- **Functions:** `snake_case` verbs — `load_graph()`, `append_log()`, `check_sssom_proposals()`; private helpers prefixed `_`
+- **Variables:** `snake_case`; short locals (`g` for Graph); UPPER_SNAKE constants (`UNIT_STRING_TO_IRI`, `ROSE_NS`)
+- **Classes:** `PascalCase` Pydantic models — `LintFinding`, `ValidationReport`, `SSSOMRow`
+- **Module-level constants:** Private prefix `_` (e.g., `_NUMERIC_LINKML`, `_SSSOM_HEADER_LINES`, `_QUDT`)
 
-## Import Organization
-**Always first:** `from __future__ import annotations`
-**Order:**
-1. Standard library (`csv`, `io`, `json`, `sys`, `pathlib`)
-2. Third-party (`click`, `rdflib`, `pydantic`, `numpy`)
-3. Internal (`from rosetta.core.X import Y`) — always absolute, never relative
+## Code Style & Quality Gates
+
+**8 mandatory checks before commit:**
+```bash
+uv run ruff format .                    # line-length 100, target py311
+uv run ruff check .                     # rules: E, W, F, I, UP
+uv run basedpyright                     # strict: rosetta/core+cli; basic: tests
+uv run pytest -m "not slow"             # regression guard
+uv run radon cc rosetta/core/ -n C -s   # complexity (fails grade C+, core only)
+uv run vulture rosetta/ --exclude rosetta/tests --min-confidence 80
+uv run bandit -r rosetta/ -x rosetta/tests -ll
+uv run refurb rosetta/ rosetta/tests/
+```
+
+**Gotchas:**
+- `rosetta/cli/` **excluded from radon** — Click handlers inherently high CC (45–56).
+- `vulture --min-confidence 80` required — Pydantic fields and Click decorators are false positives.
+
+## Imports
+
+```python
+from __future__ import annotations      # always first
+
+import sys                              # stdlib
+from datetime import UTC, datetime
+from pathlib import Path
+
+import click                             # third-party
+import rdflib
+from pydantic import BaseModel
+
+from rosetta.core.rdf_utils import ...  # internal (always absolute)
+```
 
 ## Type Annotations
-**Policy:** All functions in `rosetta/core/` and `rosetta/cli/` require explicit parameter and return type annotations.
-**Broad rdflib types:** Use `rdflib.term.Node | None`, `rdflib.Graph` — do not narrow to `URIRef`/`Literal` at function boundaries.
-**SPARQL rows:** Add `# pyright: ignore[reportAttributeAccessIssue]` at every `row.attribute` access.
-**Untyped dict access:** `# pyright: ignore[reportAny]` when indexing externally-typed dicts (e.g., `cand["uri"]  # pyright: ignore[reportAny]`).
-**Test suppression:** Use `# pyright: ignore[reportArgumentType]` — NOT `# type: ignore[arg-type]` (basedpyright ignores the latter in test files).
+
+- **All functions in `rosetta/core/` and `rosetta/cli/`:** explicit parameter and return types.
+- **rdflib types:** broad — `rdflib.term.Node | None`, `rdflib.Graph`; never `URIRef`/`Literal` at boundaries.
+- **SPARQL row access:** `# pyright: ignore[reportAttributeAccessIssue]` at every `.attribute`.
+- **Tests (basic mode):** annotate fixture returns and non-obvious variables; use `# pyright: ignore[reportArgumentType]` (NOT `# type: ignore[arg-type]`).
+
+Example:
+```python
+def load_graph(path: Path | TextIO, fmt: str = "turtle") -> Graph:
+    """Load RDF from path or file-like object."""
+```
 
 ## Error Handling
-**Core functions:** Raise `ValueError` with descriptive messages matching what callers can `match` on.
-**CLI commands:** Catch `ValueError`, emit `click.echo(f"Error: {e}")`, then `sys.exit(1)`. Use `err=True` for path-not-found errors emitted before heavy processing.
-**Exit codes:** 0 = success/conformant, 1 = errors/violations — enforced for shell composability.
+
+- **Core:** raise `ValueError` with human-readable message.
+- **CLI:** catch `Exception`, emit `click.echo(f"Error: {exc}", err=True)`, `sys.exit(1)`.
+- **Exit codes:** 0 = success/conformant, 1 = error/violation (Unix-composable).
+
+```python
+try:
+    result = check_sssom_proposals(rows, log)
+except Exception as exc:
+    click.echo(f"Error: {exc}", err=True)
+    sys.exit(1)
+```
 
 ## Module Design
-**Separation:** `rosetta/cli/` = Click entrypoints only, no business logic. All logic in `rosetta/core/`.
-**CLI group pattern:** `@click.group()` + `@click.pass_context`; share state via `ctx.obj` dict.
-**Exports:** No `__all__` — import explicitly by name.
-**SPARQL strings:** Store as module-level string constants (e.g., `_SRC_UNIT_QUERY` in `lint.py`).
 
-## Pydantic Models
-**Location:** `rosetta/core/models.py` — all models in one file, grouped by tool.
-**When to use:** All structured user-facing JSON outputs. Internal transient structures use `list[dict[str, Any]]`.
-**Serialization:** `model.model_dump(mode="json")` before `json.dumps()` — never pass model instances directly.
-**RootModel pattern:** Use `RootModel[dict[str, FieldType]]` for dict-shaped reports (`SuggestionReport`, `EmbeddingReport`).
-**Current models:** `LintReport`, `SuggestionReport`, `EmbeddingReport`, `SSSOMRow`, `ValidationReport`, `ProvenanceRecord`, `Ledger`, `MappingDecision`.
-**Timing:** Define models after function return shape is finalized — or write a failing test first.
+- **`rosetta/cli/*.py`:** Click only, no business logic. Use `@click.group()`, `@click.pass_context`, `ctx.obj` dict.
+- **`rosetta/core/*.py`:** pure logic, raise on errors, no I/O except function params.
 
-## LinkML/SSSOM Patterns (v2)
-**Primary data model:** `SchemaDefinition` from `linkml_runtime.linkml_model` — `FieldRecord` is deleted.
-**Slot/class access:** `schema.classes["name"]`, `schema.slots["name"]` — dict-style keyed access.
-**SSSOM rows:** Construct `SSSOMRow(...)` from `rosetta/core/models.py`; write via `csv.writer(delimiter="\t")`.
-**SSSOM header:** Always emit `_SSSOM_HEADER_LINES` block (mapping_set_id, tool, license, curie_map) before column header row.
-**Output extensions:** `.sssom.tsv` for SSSOM output; `.linkml.yaml` for schema output.
-**Revocation:** `owl:differentFrom` predicate in approved mappings triggers derank (confidence penalty), not deletion.
+## Pydantic v2 Models
 
----
-*Convention analysis: 2026-04-14*
+- **Location:** `rosetta/core/models.py`, grouped by tool.
+- **User-facing outputs:** define model, construct in CLI, serialise with `model.model_dump(mode="json")` before `json.dumps()`.
+- **RootModel:** for dict-shaped reports (`EmbeddingReport`, `SuggestionReport`).
+
+Current models (see `rosetta/core/models.py`):
+- `LintReport`, `LintFinding`, `LintSummary`, `FnmlSuggestion`
+- `EmbeddingReport`, `EmbeddingVectors`
+- `SuggestionReport`, `FieldSuggestions`, `Suggestion`
+- `SSSOMRow` (11 columns: subject_id, predicate_id, object_id, mapping_justification, confidence, subject_label, object_label, mapping_date, record_id, **subject_datatype**, **object_datatype**)
+- `ProvenanceRecord`
+- `ValidationFinding`, `ValidationSummary`, `ValidationReport`
+
+## LinkML & SSSOM
+
+- **LinkML:** `SchemaDefinition` from `linkml_runtime`; dict-style class/slot access.
+- **SSSOM TSV:** **11 columns** (phase 15+): subject_id, predicate_id, object_id, mapping_justification, confidence, subject_label, object_label, mapping_date, record_id, subject_datatype, object_datatype.
+- **SSSOM header:** emit `_SSSOM_HEADER_LINES` block (mapping_set_id, tool, license, curie_map) before column header.
+- **OWL derank:** `owl:differentFrom` + `HC` justification marks rejection (confidence penalty, not deletion).
+
+## Conventional Commits
+
+`feat:`, `fix:`, `test:`, `docs:`, `chore:`, `perf:`
+
+Example: `fix: five correctness issues found in phase 15 review`
+
+## README Convention
+
+**Public API surface changes require README update before done:** CLI commands, option names, placement, output formats, exit codes.

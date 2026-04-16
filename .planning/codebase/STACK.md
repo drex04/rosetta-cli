@@ -1,46 +1,78 @@
 # Technology Stack
 
-**Analysis Date:** 2026-04-14
+**Last Updated:** 2026-04-16 (Phases 14-15)
 
-## Languages
-**Primary:** Python 3.11+ — all application code, CLI tools, and tests
+## Languages & Runtime
 
-## Runtime
-**Environment:** Python 3.11+ (specified in `pyproject.toml` requires-python)
-**Package Manager:** uv — lockfile present at `uv.lock`; use `uv sync` to install, `uv add <pkg>` to add deps
+- **Python:** 3.11+ (enforced in `pyproject.toml` requires-python)
+- **Package Manager:** uv with lockfile (`uv.lock`); install via `uv sync`, add deps with `uv add <pkg>`
+- **Build System:** hatchling (wheel backend, packages `rosetta/`)
 
-## Frameworks
-**CLI:** Click >=8.1 — all 9 entrypoints in `rosetta/cli/` use `@click.command()`
-**RDF:** rdflib >=6.3 — semantic graph representation, SPARQL querying, Turtle/N-Triples serialization
-**Validation:** pySHACL >=0.20 — SHACL shape validation; shapes in `rosetta/policies/`
-**Testing:** pytest >=9.0 — tests in `rosetta/tests/`; run with `uv run pytest`
-**Build:** hatchling — wheel backend, packages `rosetta/` only
+## Frameworks & Core Dependencies
 
-## Key Dependencies
-**rdflib >=6.3** — RDF graph parsing, SPARQL execution; core to all semantic operations in `rosetta/core/rdf_utils.py`
-**click >=8.1** — CLI argument parsing, file I/O orchestration, exit code handling
-**linkml >=1.10.0** — LinkML YAML schema parsing, OWL emission; `.linkml.yaml` is the primary schema format consumed by `rosetta-embed` and `rosetta-suggest`
-**sentence-transformers >=3.0** — embedding generation; default model `intfloat/e5-large-v2` (set in `rosetta.toml [embed]`)
-**schema-automator >=0.5.5** — auto-generates LinkML schemas from JSON/RDF/OpenAPI in `rosetta-ingest`
-**sssom >=0.4.15** — SSSOM mapping set I/O; `rosetta-suggest` outputs `.sssom.tsv`
-**pySHACL >=0.20** — SHACL validation engine for `rosetta-lint` and `rosetta-validate`
-**numpy >=1.26** — cosine similarity computation in `rosetta/core/similarity.py`
-**pydantic >=2.13** — typed user-facing JSON output; all models in `rosetta/core/models.py`
-**deepl >=1.18,<2** — translation via DeepL API in `rosetta-translate`
-**genson >=1.2** — JSON schema inference in `rosetta-ingest` (json-sample path)
+| Package                | Purpose                                      | Version      |
+|------------------------|----------------------------------------------|--------------|
+| **click**              | CLI command/option routing                   | >=8.1        |
+| **rdflib**             | RDF graph model (Turtle, N-Triples, SPARQL) | >=6.3        |
+| **pySHACL**            | SHACL shape validation (shapes in `rosetta/policies/`) | >=0.20 |
+| **sentence-transformers** | Semantic similarity (LaBSE/e5-large-v2 HF model) | >=3.0 |
+| **pydantic**           | JSON schema + Pydantic v2 models (`rosetta/core/models.py`) | >=2.13.0 |
+| **linkml**             | Schema definition (`.linkml.yaml` format)   | >=1.10.0     |
+| **schema-automator**   | JSON Schema↔OpenAPI↔RDF inference           | >=0.5.5      |
+| **sssom**              | SSSOM TSV I/O (11 columns with datatypes, Phase 15) | >=0.4.15 |
+| **deepl**              | Machine translation API client               | >=1.18,<2    |
+| **pyyaml**             | Config/schema parsing                        | >=6.0        |
+| **numpy**              | Vector similarity math                       | >=1.26       |
+| **genson**             | JSON Schema generation                       | >=1.2        |
+
+## CLI Tools
+
+Nine entrypoints (all in `pyproject.toml`):
+
+- `rosetta-ingest` → `rosetta/cli/ingest.py` — import schemas + mappings
+- `rosetta-embed` → `rosetta/cli/embed.py` — compute embedding vectors
+- `rosetta-suggest` → `rosetta/cli/suggest.py` — generate mapping suggestions via similarity
+- `rosetta-translate` → `rosetta/cli/translate.py` — machine translate labels (DeepL API)
+- `rosetta-lint` → `rosetta/cli/lint.py` — validate SSSOM unit + datatype compatibility (RDF mode removed Phase 15)
+- `rosetta-validate` → `rosetta/cli/validate.py` — SHACL shape checking
+- `rosetta-rml-gen` → `rosetta/cli/rml_gen.py` — generate RML transform specs
+- `rosetta-provenance` → `rosetta/cli/provenance.py` — document mapping origin
+- `rosetta-accredit` → `rosetta/cli/accredit.py` — manage audit-log (ingest/review/status/dump, Phase 14)
 
 ## Configuration
-**Primary config:** `rosetta.toml` at repo root — store path, RDF namespaces, embed model (`intfloat/e5-large-v2`), suggest thresholds, translate source lang, lint strictness
-**Override:** all `rosetta.toml` settings overridable via CLI flags at runtime
 
-## Linting & Type Checking
-**Formatter:** `uv run ruff format .` (line-length 100, target py311)
-**Linter:** `uv run ruff check .` — rules E, W, F, I, UP
-**Type checker:** `uv run basedpyright` — strict on `rosetta/core/` and `rosetta/cli/`; basic on tests
+- **Primary config file:** `rosetta.toml` — store path, namespaces, embed model, translate lang, suggest thresholds, lint strictness, accredit log path
+- **Overridable via CLI:** All settings have corresponding flags (e.g., `--model`, `--deepl-key`, `--log`)
+- **Format:** TOML with sections: `[general]`, `[embed]`, `[translate]`, `[suggest]`, `[lint]`, `[accredit]`
 
-## Platform Requirements
-**Development:** Linux/macOS; uv installed; Python 3.11+; pre-commit hooks via `pre-commit >=4.5.1`
-**Production:** Python 3.11+ only; no containerization config present; tools are Unix-composable CLI utilities (stdin/stdout, exit codes 0/1)
+## Quality Assurance (CI + Pre-commit)
 
----
-*Stack analysis: 2026-04-14*
+All eight checks run via `uv run`:
+
+| Check | Command | Target | Notes |
+|-------|---------|--------|-------|
+| Format | `ruff format .` | All | 100 char line length, Python 3.11 target |
+| Lint | `ruff check .` | All | Rules E, W, F, I, UP |
+| Type | `basedpyright` | Strict: core + cli; Basic: tests | Mypy follow_imports=skip (skip dependencies) |
+| Regression | `pytest -m "not slow"` | `rosetta/tests/` | Excludes slow marks |
+| Complexity | `radon cc rosetta/core/ -n C -s` | Core only | CLI excluded (inherently high CC via Click) |
+| Dead Code | `vulture rosetta/ --exclude rosetta/tests --min-confidence 80` | All except tests | Confidence 80 to skip Pydantic/Click decorators |
+| Security | `bandit -r rosetta/ -x rosetta/tests -ll` | All except tests | Low-severity filter (-ll) |
+| Modernization | `refurb rosetta/ rosetta/tests/` | All | Python idiom upgrades |
+
+**CI:** `.github/workflows/ci.yml` enforces all eight on every push/PR; dedicated `analysis` job for radon/vulture/bandit.
+
+## Type Annotations
+
+- **Mandatory in `rosetta/core/` and `rosetta/cli/`:** explicit parameter and return types
+- **Broad RDF types:** Use `rdflib.term.Node | None`, `rdflib.Graph` (never narrow to URIRef/Literal at function boundaries)
+- **User-facing JSON:** Pydantic models only in `rosetta/core/models.py` (v2, serialized with `model_dump(mode="json")`)
+- **Tests:** Basic mode — annotate fixture returns and non-obvious vars; use `# pyright: ignore[reportArgumentType]` for stub suppression
+
+## Data Formats
+
+- **Turtle (.ttl)** — human RDF artifacts
+- **N-Triples (.nt)** — machine RDF interchange
+- **LinkML YAML (.linkml.yaml)** — schema definitions
+- **SSSOM TSV (.sssom.tsv)** — 11 columns (Phase 15): subject_id, predicate_id, object_id, mapping_justification, confidence, subject_label, object_label, subject_datatype, object_datatype, mapping_date, record_id
+- **JSON** — structured output via Pydantic models (no bare dicts to stdout)
