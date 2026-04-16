@@ -207,3 +207,86 @@ ready for formal accreditation.
   mappings feed back into suggestion boost (Phase 13 loop)
 
 **Requirements:** REQ-V2-REVIEW-01
+
+---
+
+## Phase 15: rosetta-lint SSSOM enrichment
+**Goal:** Remove the legacy RDF lint path entirely. Enrich the SSSOM lint path with
+unit-compatibility and datatype-compatibility checks drawn from QUDT and the LinkML schema.
+Produce a machine-readable JSON `LintReport` from the SSSOM path (matching the old RDF
+path's output contract).
+
+**Delivers:**
+- `rosetta/core/models.py` — `EmbeddingVectors.datatype` field; `SSSOMRow.subject_datatype` + `object_datatype`
+- `rosetta/cli/embed.py` — populate `datatype` from `slot.range` in embedding report
+- `rosetta/cli/suggest.py` — propagate `subject_datatype`/`object_datatype` into SSSOM TSV (2 new columns)
+- `rosetta/core/accredit.py` — `_parse_sssom_row` reads new optional columns
+- `rosetta/cli/lint.py` — RDF path deleted; SSSOM path outputs JSON `LintReport`; unit + datatype checks added
+- `rosetta/tests/test_lint.py` — RDF tests removed; SSSOM unit/datatype tests added
+- `README.md` — rosetta-lint section updated
+
+**Requirements:** REQ-V2-LINT-01
+
+---
+
+## Phase 16: rosetta-rml-gen v2 (SSSOM → linkml-map TransformSpec → YARRRML → JSON-LD)
+**Goal:** Replace the legacy decisions-JSON-driven RML Turtle generator with a pipeline
+built on linkml-map's `TransformationSpecification` as the canonical IR, compiled to YARRRML
+via a new `YarrrmlCompiler` contributed to a fork of linkml-map. Read approved SSSOM mappings,
+build a TransformSpec, compile to YARRRML, execute via morph-kgc, and frame the output as
+JSON-LD conforming to the master ontology.
+
+Design doc: `.planning/designs/2026-04-16-phase16-rml-gen-v2.md`
+
+**Delivers (split across 4 plans):**
+
+### 16-00: SSSOM audit-log schema extension (prerequisite)
+- Extend `SSSOMRow` with `subject_type`, `object_type`, `mapping_group_id`, `composition_expr`
+- Audit log: 9 → 13 columns; suggest TSV: 11 → 15 columns
+- Supports the SSSOM composite-entity pattern for 1:N and N:1 mappings
+
+### 16-01: SSSOM → linkml-map TransformSpec (rosetta-cli)
+- New `rosetta/core/transform_builder.py`
+- Reads SSSOM + source LinkML + master LinkML; emits `mapping.transform.yaml`
+- Groups rows by `mapping_group_id` for composite mappings; flows `composition_expr` to `SlotDerivation.expr`
+- Schema coverage check; CURIE resolution via `curies.Converter`
+- `rosetta-yarrrml-gen` CLI entrypoint (no YARRRML yet — TransformSpec only)
+
+### 16-02: YarrrmlCompiler (forked linkml-map)
+- Fork `linkml/linkml-map`; add `compiler/yarrrml_compiler.py` + Jinja2 template
+- Handles `class_derivations`, `slot_derivations`, `unit_conversion` → FnML GREL, source-format references (JSON/CSV/XML)
+- Registered as `linkml-tr compile yarrrml`
+- `rosetta-cli` pins the fork via git SHA in `pyproject.toml`
+
+### 16-03: morph-kgc runner + JSON-LD framing + E2E
+- `rosetta/core/rml_runner.py` wraps `morph_kgc.materialize()`
+- JSON-LD output via `linkml gen-jsonld-context` + rdflib framing
+- `rosetta-yarrrml-gen --run` one-shot mode
+- README rewrite; E2E test: NOR CSV → SSSOM → TransformSpec → YARRRML → JSON-LD
+
+**Requirements:** REQ-V2-RMLGEN-01
+
+---
+
+## Phase 17: QUDT-native multi-library unit detection
+**Goal:** Make `detect_unit()` return QUDT IRIs directly, eliminating the `UNIT_STRING_TO_IRI`
+lookup table and the sync-mismatch gotcha it created. Add two new detection layers: expanded regex
+(name + description) and quantulum3 NLP extraction validated by pint. Expand from 7 to ~25
+NATO-relevant units. False positives gated by pint — unmappable results return `None`.
+
+**Delivers:**
+- `rosetta/core/unit_detect.py` — expanded regex patterns + quantulum3+pint cascade; returns QUDT IRIs;
+  `_PINT_TO_QUDT_IRI` internal mapping table; lazy imports
+- `rosetta/core/units.py` — `UNIT_STRING_TO_IRI` deleted; all other helpers unchanged
+- `rosetta/cli/lint.py` — uses `detect_unit()` output as IRI directly; no lookup table
+- `rosetta/policies/qudt_units.ttl` — new unit triples: HZ, KiloHZ, MegaHZ, GigaHZ, MilliRAD,
+  HectoPa, DEG_F, MI-PER-HR
+- `rosetta/tests/test_unit_detect.py` — IRI-based assertions; quantulum3-path tests
+- `rosetta/tests/test_lint.py` — UNIT_STRING_TO_IRI tests replaced with detect_unit() equivalents
+- `pyproject.toml` / `uv.lock` — quantulum3 and pint declared
+
+**Note:** Phase 17 is independent of Phase 16 (rml-gen v2). Can be built in any order.
+
+**Requirements:** REQ-UNIT-DETECT-01
+
+

@@ -177,7 +177,7 @@ at this stage. Both can be made configurable in a future phase if needed.
 **Decision:** `mapping.shacl.ttl` constrains `rose:Field` and `rose:Mapping` classes, which
 are produced by rosetta-ingest (Phase 2) — the earliest, most stable artifact type.
 
-**Rationale:** rosetta-rml-gen (Phase 6) and rosetta-provenance (Phase 7) outputs may not
+**Rationale:** rosetta-yarrrml-gen (Phase 16) and rosetta-provenance (Phase 7) outputs may not
 yet exist when validate is first used. Testing against ingest output ensures the shapes file
 is immediately useful without requiring the full pipeline to be run.
 

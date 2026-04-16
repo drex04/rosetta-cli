@@ -1,0 +1,146 @@
+name: nor_radar
+annotations:
+  rosetta_source_format: csv
+description: nor_radar
+id: https://w3id.org/nor_radar
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  nor_radar:
+    prefix_prefix: nor_radar
+    prefix_reference: https://w3id.org/nor_radar
+default_prefix: nor_radar
+slots:
+  sporings_id:
+    name: sporings_id
+    annotations:
+      rosetta_csv_column: sporings_id
+    examples:
+    - value: NOR-007
+    identifier: true
+    range: string
+  breddegrad:
+    name: breddegrad
+    annotations:
+      rosetta_csv_column: breddegrad
+    examples:
+    - value: '60.1892'
+    range: float
+  lengdegrad:
+    name: lengdegrad
+    annotations:
+      rosetta_csv_column: lengdegrad
+    examples:
+    - value: '11.1045'
+    range: float
+  hoyde_m:
+    name: hoyde_m
+    annotations:
+      rosetta_csv_column: hoyde_m
+    examples:
+    - value: '4100.0'
+    range: float
+  kurs_grader:
+    name: kurs_grader
+    annotations:
+      rosetta_csv_column: kurs_grader
+    examples:
+    - value: '135'
+    range: integer
+  hastighet_kmh:
+    name: hastighet_kmh
+    annotations:
+      rosetta_csv_column: hastighet_kmh
+    examples:
+    - value: '390'
+    range: integer
+  avstand_km:
+    name: avstand_km
+    annotations:
+      rosetta_csv_column: avstand_km
+    examples:
+    - value: '87'
+    range: integer
+  peiling_grader:
+    name: peiling_grader
+    annotations:
+      rosetta_csv_column: peiling_grader
+    examples:
+    - value: '128'
+    range: integer
+  tidsstempel:
+    name: tidsstempel
+    annotations:
+      rosetta_csv_column: tidsstempel
+    examples:
+    - value: '2026-04-12T06:19:40Z'
+    range: datetime
+  klassifisering:
+    name: klassifisering
+    annotations:
+      rosetta_csv_column: klassifisering
+    examples:
+    - value: UKJENT
+    range: string
+  signalstyrke_dbm:
+    name: signalstyrke_dbm
+    annotations:
+      rosetta_csv_column: signalstyrke_dbm
+    examples:
+    - value: '-77'
+    range: integer
+classes:
+  Observation:
+    name: Observation
+    slots:
+    - sporings_id
+    - breddegrad
+    - lengdegrad
+    - hoyde_m
+    - kurs_grader
+    - hastighet_kmh
+    - avstand_km
+    - peiling_grader
+    - tidsstempel
+    - klassifisering
+    - signalstyrke_dbm
+    unique_keys:
+      breddegrad_key:
+        unique_key_name: breddegrad_key
+        unique_key_slots:
+        - breddegrad
+      lengdegrad_key:
+        unique_key_name: lengdegrad_key
+        unique_key_slots:
+        - lengdegrad
+      hoyde_m_key:
+        unique_key_name: hoyde_m_key
+        unique_key_slots:
+        - hoyde_m
+      kurs_grader_key:
+        unique_key_name: kurs_grader_key
+        unique_key_slots:
+        - kurs_grader
+      hastighet_kmh_key:
+        unique_key_name: hastighet_kmh_key
+        unique_key_slots:
+        - hastighet_kmh
+      avstand_km_key:
+        unique_key_name: avstand_km_key
+        unique_key_slots:
+        - avstand_km
+      peiling_grader_key:
+        unique_key_name: peiling_grader_key
+        unique_key_slots:
+        - peiling_grader
+      tidsstempel_key:
+        unique_key_name: tidsstempel_key
+        unique_key_slots:
+        - tidsstempel
+      signalstyrke_dbm_key:
+        unique_key_name: signalstyrke_dbm_key
+        unique_key_slots:
+        - signalstyrke_dbm

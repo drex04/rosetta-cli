@@ -57,7 +57,7 @@ uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2
 uv run rosetta-ingest --input rosetta/tests/fixtures/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
 ```
 
-**Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta-rml-gen`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
+**Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta-yarrrml-gen`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
 
 **Source-format and path annotations:** Every generated `.linkml.yaml` is stamped with:
 
@@ -216,7 +216,7 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 | `subject_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
 | `object_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
 | `mapping_group_id` | Optional identifier shared across rows that compose one logical mapping |
-| `composition_expr` | Python/GREL expression that composes fields for 1:N decomposition or N:1 aggregation; consumed by `rosetta-rml-gen` (Phase 16-01+) |
+| `composition_expr` | Python/GREL expression that composes fields for 1:N decomposition or N:1 aggregation; consumed by `rosetta-yarrrml-gen` (Phase 16-01+) |
 
 `mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates. `subject_datatype` and `object_datatype` are re-derived at suggest time from the source and master LinkML schemas; they are not stored in the audit log (see [Audit log format](#audit-log-format)).
 
@@ -543,50 +543,71 @@ uv run rosetta-validate \
 
 ---
 
-### rosetta-rml-gen
+### rosetta-yarrrml-gen
 
-Generates valid RML/FnML Turtle from an approved decisions file. The output is executable by RMLMapper.
+Generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas. This is the data-format-agnostic first half of the SSSOM → YARRRML pipeline; the compiled YARRRML + JSON-LD output arrive in Phase 16-02 (`YarrrmlCompiler`) and 16-03 (`morph-kgc` execution).
 
 ```
-Usage: rosetta-rml-gen [OPTIONS]
+Usage: rosetta-yarrrml-gen [OPTIONS]
 
 Options:
-  --decisions PATH      Approved decisions JSON  [required]
-  --source-file TEXT    Data file path to embed in rml:logicalSource (referenced, not read)  [required]
-  --source-format [json|csv]  Reference formulation: json, csv  [default: json]
-  --base-uri TEXT       Subject template base URI  [default: http://rosetta.interop/record]
-  --output PATH         Output file  (default: stdout)
+  --sssom PATH           Approved SSSOM audit log (13+ column TSV). [required]
+  --source-schema PATH   Source LinkML schema (from rosetta-ingest). [required]
+  --master-schema PATH   Master ontology LinkML schema. [required]
+  --source-format [json|csv|xml]
+                         Source data format. If omitted, read from source
+                         schema's annotations.rosetta_source_format; exit 1
+                         if neither is present.
+  --output PATH          Output TransformSpec YAML path. Default: stdout.
+  --coverage-report PATH Emit a CoverageReport JSON alongside the TransformSpec.
+  --include-manual       Additionally accept semapv:ManualMappingCuration rows
+                         (default: only semapv:HumanCuration).
+  --allow-empty          Exit 0 on empty filtered SSSOM (default: exit 1).
+  --force                Downgrade unresolvable-CURIE errors to warnings and
+                         continue. Does NOT bypass mixed-kind mappings,
+                         missing class-level mappings, or inconsistent
+                         composite expressions — those are always fatal.
 ```
 
-**Decisions format:**
-
-```json
-{
-	"http://rosetta.interop/ns/NOR/nor_radar/altitude_m": {
-		"target_uri": "http://rosetta.interop/ns/master/altitude"
-	},
-	"http://rosetta.interop/ns/NOR/nor_radar/speed_kn": {
-		"target_uri": "http://rosetta.interop/ns/master/speed",
-		"field_ref": "speed_kn"
-	}
-}
-```
-
-`field_ref` is optional — defaults to the last path segment of the source URI. FnML unit-conversion support (`fnml_function`) is added in a later phase.
-
-**Subject field convention:** The generated `rr:subjectMap` uses `{base-uri}/{id}` as the subject template. Your source data must contain an `id` field (JSON key or CSV column) for RMLMapper to construct subject IRIs.
-
-**Example:**
+**Example**
 
 ```bash
-uv run rosetta-rml-gen \
-  --decisions decisions.json \
-  --source-file data/nor_radar.csv \
-  --source-format csv \
-  --output mapping.rml.ttl
+uv run rosetta-yarrrml-gen \
+  --sssom store/audit-log.sssom.tsv \
+  --source-schema demo_out/nor_radar.linkml.yaml \
+  --master-schema demo_out/master_cop.linkml.yaml \
+  --output demo_out/nor_to_mc.transform.yaml \
+  --coverage-report demo_out/nor_to_mc.coverage.json
 ```
 
-**Exit codes:** 0 on success, 1 on invalid or empty decisions.
+Output (excerpt):
+
+```yaml
+comments:
+- rosetta:source_format=csv
+id: https://rosetta.interop/transform/nor_radar-to-mc
+title: Transform nor_radar → mc
+class_derivations:
+- name: Track
+  populated_from: Observation
+  slot_derivations:
+    hasLatitude:
+      name: hasLatitude
+      populated_from: breddegrad
+```
+
+**Exit codes**
+
+- `0` — success (TransformSpec written).
+- `1` — any of: malformed input file; unresolvable CURIEs (without `--force`); mixed-kind mapping; missing class-level mapping for a mapped slot; inconsistent `composition_expr` within a group; empty filtered SSSOM (without `--allow-empty`); source schema has no `default_prefix`; `--source-format` not provided and source schema lacks `annotations.rosetta_source_format`.
+
+**Coverage report**
+
+When `--coverage-report` is provided, a JSON file with the `CoverageReport` model is written. Fields: row-stage counts, resolved/unresolved class + slot mappings, datatype mismatches, composite-group resolution status, and required master slots that remain unmapped.
+
+**Source format resolution (GA4 hybrid)**
+
+`--source-format` is OPTIONAL. If omitted, the builder reads `annotations.rosetta_source_format` from the source schema (stamped by `rosetta-ingest` on every generated schema since 16-00). Either must be present — otherwise exit 1.
 
 ---
 

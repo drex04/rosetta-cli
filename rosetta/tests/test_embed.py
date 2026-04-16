@@ -118,12 +118,12 @@ def _make_schema(
         cls = ClassDefinition(cls_name)
         for k, v in attrs.items():
             setattr(cls, k, v)
-        schema.classes[cls_name] = cls
+        schema.classes[cls_name] = cls  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
     for slot_name, attrs in (slots or {}).items():
         slot = SlotDefinition(slot_name)
         for k, v in attrs.items():
             setattr(slot, k, v)
-        schema.slots[slot_name] = slot
+        schema.slots[slot_name] = slot  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
     return schema
 
 

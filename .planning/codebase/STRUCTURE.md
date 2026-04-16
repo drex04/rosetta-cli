@@ -21,7 +21,7 @@ rosetta-cli/
 
 **`rosetta/cli/` (9 Click entrypoints):**
 - Purpose: One Click `@command` per tool; I/O orchestration, exit codes.
-- Current files: `ingest.py`, `embed.py`, `suggest.py`, `lint.py`, `validate.py`, `rml_gen.py`, `provenance.py`, `accredit.py`, `translate.py`.
+- Current files: `ingest.py`, `embed.py`, `suggest.py`, `lint.py`, `validate.py`, `yarrrml_gen.py`, `provenance.py`, `accredit.py`, `translate.py`.
 - Pattern: Load config (3-tier precedence) → call core function → construct Pydantic model → serialize via `model.model_dump(mode="json")` → exit code.
 
 **`rosetta/core/` (Pure domain logic):**
@@ -32,7 +32,7 @@ rosetta-cli/
   - `features.py` — `extract_structural_features_linkml()` returns 5-element vectors [depth, child_count, slot_usage, cardinality, parent_depth] per node (normalized to [0,1]).
   - `similarity.py` — `cosine_matrix()`, `rank_suggestions()` (lexical + structural blend, weight=0.2), `apply_sssom_feedback()` (audit-log boost/derank).
   - `accredit.py` — state-machine functions: `load_log()`, `append_log()`, `parse_sssom_tsv()`, `current_state_for_pair()`, `query_pending()`, `check_ingest_row()`.
-  - `models.py` — Pydantic v2 output types: `SSSOMRow` (with mapping_date, record_id, subject_datatype, object_datatype), `LintReport`, `EmbeddingReport` (RootModel), `SuggestionReport` (RootModel), `ValidationReport`, `ProvenanceRecord`, `MappingDecision`.
+  - `models.py` — Pydantic v2 output types: `SSSOMRow` (with mapping_date, record_id, subject_datatype, object_datatype), `LintReport`, `EmbeddingReport` (RootModel), `SuggestionReport` (RootModel), `ValidationReport`, `ProvenanceRecord`, `CoverageReport`.
   - `units.py` — QUDT graph loading via importlib.resources; unit compatibility checks; FNML suggestions via `suggest_fnml()`.
   - `unit_detect.py` — regex-based unit detection from field labels; returns detected unit string or None.
   - `rdf_utils.py` — graph load/save, SPARQL query helpers, namespace binding.
@@ -40,7 +40,7 @@ rosetta-cli/
   - `config.py` — 3-tier config loader (CLI flag > env var > rosetta.toml > default).
   - `io.py` — `open_input()` / `open_output()` context managers for stdin/stdout.
   - `provenance.py` — provenance record stamping and querying.
-  - `rml_builder.py` — RML mapping document construction.
+  - `transform_builder.py` — linkml-map `TransformationSpecification` construction.
 - Deleted: `parsers/` subdirectory (Phase 12); all format dispatch now in `normalize.py`.
 
 **`rosetta/policies/` (Static knowledge graphs):**
@@ -50,7 +50,7 @@ rosetta-cli/
 
 **`rosetta/tests/` (pytest suite):**
 - Purpose: Unit and integration tests; one test file per core/cli module.
-- Current test files: `conftest.py` (shared fixtures), `test_accredit.py`, `test_accredit_integration.py`, `test_embed.py`, `test_features.py`, `test_ingest.py`, `test_lint.py`, `test_models.py`, `test_normalize.py`, `test_provenance.py`, `test_rdf_utils.py`, `test_rml_gen.py`, `test_suggest.py`, `test_translate.py`, `test_validate.py`, `test_unit_detect.py`, `test_config.py`, `test_io.py`.
+- Current test files: `conftest.py` (shared fixtures), `test_accredit.py`, `test_accredit_integration.py`, `test_embed.py`, `test_features.py`, `test_ingest.py`, `test_lint.py`, `test_models.py`, `test_normalize.py`, `test_provenance.py`, `test_rdf_utils.py`, `test_yarrrml_gen.py`, `test_suggest.py`, `test_translate.py`, `test_validate.py`, `test_unit_detect.py`, `test_config.py`, `test_io.py`.
 - Fixtures: `nor_radar.csv`, `deu_patriot.json`, `deu_radar_sample.json`, `usa_c2.yaml`, `master_cop_ontology.ttl`.
 - Convention: Stub tests belong in the tool's own test file (not elsewhere); `test_<tool>_stub_exits_1` stays in `test_<tool>.py` until real implementation lands.
 
@@ -91,7 +91,7 @@ rosetta-cli/
 
 **Files:** `snake_case.py` — one concept per file.
 
-**CLI tools:** `rosetta/cli/{name}.py` → command `rosetta-{name}` (e.g., `rml_gen.py` → `rosetta-rml-gen`).
+**CLI tools:** `rosetta/cli/{name}.py` → command `rosetta-{name}` (e.g., `yarrrml_gen.py` → `rosetta-yarrrml-gen`).
 
 **Output formats:** 
 - `.linkml.yaml` — ingested schemas (LinkML YAML).

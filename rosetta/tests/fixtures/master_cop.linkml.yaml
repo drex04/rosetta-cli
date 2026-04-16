@@ -1,0 +1,460 @@
+name: mc
+id: https://ontology.nato.int/core/MasterCOP#
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  mc:
+    prefix_prefix: mc
+    prefix_reference: https://ontology.nato.int/core/MasterCOP#
+default_prefix: mc
+default_range: string
+slots:
+  hasVerticalRate:
+    name: hasVerticalRate
+    description: Rate of climb or descent in feet per minute. Positive = climbing,
+      negative = descending.
+    slot_uri: mc:hasVerticalRate
+    range: double
+  hasMode2Code:
+    name: hasMode2Code
+    description: IFF Mode 2 (unit identification) code, four-digit octal string.
+    slot_uri: mc:hasMode2Code
+    range: string
+  operatedBy:
+    name: operatedBy
+    description: The unit that operates this platform.
+    slot_uri: mc:operatedBy
+    range: Unit
+  withinZone:
+    name: withinZone
+    description: The airspace zone(s) the track currently occupies.
+    slot_uri: mc:withinZone
+    range: Zone
+  hasEngagementStatus:
+    name: hasEngagementStatus
+    description: Current engagement status of the track.
+    slot_uri: mc:hasEngagementStatus
+    range: EngagementStatus
+  hasMode5:
+    name: hasMode5
+    description: Whether a valid Mode 5 cryptographic IFF reply has been received
+      for this track.
+    slot_uri: mc:hasMode5
+    range: boolean
+  hasIdentity:
+    name: hasIdentity
+    description: 'The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL,
+      UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT.'
+    slot_uri: mc:hasIdentity
+    range: IdentityCode
+  hasMode3Code:
+    name: hasMode3Code
+    description: IFF Mode 3/A (civil/military squawk) code, four-digit octal string.
+    slot_uri: mc:hasMode3Code
+    range: string
+  hasBearing:
+    name: hasBearing
+    description: Bearing from the reporting sensor to the track in degrees true.
+    slot_uri: mc:hasBearing
+    range: double
+  assignedWeapon:
+    name: assignedWeapon
+    description: The weapon round assigned to intercept this track.
+    slot_uri: mc:assignedWeapon
+    range: Weapon
+  hasThreatLevel:
+    name: hasThreatLevel
+    description: 'Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL.'
+    slot_uri: mc:hasThreatLevel
+    range: ThreatLevel
+  hasMode1Code:
+    name: hasMode1Code
+    description: IFF Mode 1 (mission type) code, two-digit octal string.
+    slot_uri: mc:hasMode1Code
+    range: string
+  reportedBy:
+    name: reportedBy
+    description: The raw sensor reports fused to produce or update this track.
+    slot_uri: mc:reportedBy
+    range: SensorReport
+  managedBy:
+    name: managedBy
+    description: The C2 unit currently responsible for managing this track in the
+      COP.
+    slot_uri: mc:managedBy
+    range: Unit
+  correlatedWith:
+    name: correlatedWith
+    description: Another track that the fusion engine has associated as the same physical
+      object.
+    slot_uri: mc:correlatedWith
+    range: Track
+  responsibleFor:
+    name: responsibleFor
+    description: The airspace zone(s) for which this unit has air defense responsibility.
+    slot_uri: mc:responsibleFor
+    range: Zone
+  hasHeading:
+    name: hasHeading
+    description: Track heading in degrees true (0–360).
+    slot_uri: mc:hasHeading
+    range: double
+  hasLongitude:
+    name: hasLongitude
+    description: WGS-84 geodetic longitude in decimal degrees. Positive = east.
+    slot_uri: mc:hasLongitude
+    range: double
+  hasAltitude:
+    name: hasAltitude
+    description: Altitude above mean sea level in meters.
+    slot_uri: mc:hasAltitude
+    range: double
+  hasCallsign:
+    name: hasCallsign
+    description: The tactical callsign assigned to a unit or aircraft.
+    slot_uri: mc:hasCallsign
+    range: string
+  detectedBy:
+    name: detectedBy
+    description: The sensor platform(s) that have contributed reports to this track.
+    slot_uri: mc:detectedBy
+    range: Platform
+  hasLatitude:
+    name: hasLatitude
+    description: WGS-84 geodetic latitude in decimal degrees. Positive = north.
+    slot_uri: mc:hasLatitude
+    range: double
+  engagedBy:
+    name: engagedBy
+    description: The fire unit currently assigned to engage this track.
+    slot_uri: mc:engagedBy
+    range: Unit
+  hasSource:
+    name: hasSource
+    description: The originating system or data link that produced this entity (e.g.,
+      LINK16, LINK11, MIDS, JREAP-C).
+    slot_uri: mc:hasSource
+    range: string
+  hasConfidence:
+    name: hasConfidence
+    description: Fusion engine confidence score for this track (0.0–1.0).
+    slot_uri: mc:hasConfidence
+    range: double
+  hasTrackNumber:
+    name: hasTrackNumber
+    description: Tactical track number assigned by the originating C2 system (e.g.,
+      H001, A042).
+    slot_uri: mc:hasTrackNumber
+    range: string
+  hasPlatformType:
+    name: hasPlatformType
+    description: Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER,
+      MISSILE, UAS).
+    slot_uri: mc:hasPlatformType
+    range: string
+  hasTrackQuality:
+    name: hasTrackQuality
+    description: Track quality score (0–15) indicating sensor fusion confidence in
+      the track solution.
+    slot_uri: mc:hasTrackQuality
+    range: integer
+  hasRange:
+    name: hasRange
+    description: Slant range from the reporting sensor to the track in nautical miles.
+    slot_uri: mc:hasRange
+    range: double
+  hasTimestamp:
+    name: hasTimestamp
+    description: UTC timestamp of the last update to this entity.
+    slot_uri: mc:hasTimestamp
+    range: dateTime
+  hasNATOStockNumber:
+    name: hasNATOStockNumber
+    description: NATO Stock Number (NSN) identifying the weapon type in the NATO supply
+      catalogue.
+    slot_uri: mc:hasNATOStockNumber
+    range: string
+  hasSpeed:
+    name: hasSpeed
+    description: Track speed over ground in knots.
+    slot_uri: mc:hasSpeed
+    range: double
+classes:
+  BallisticTrack:
+    name: BallisticTrack
+    description: A track following a ballistic trajectory — typically a ballistic
+      missile or large-calibre artillery round.
+    is_a: AirTrack
+    class_uri: mc:BallisticTrack
+  FireUnit:
+    name: FireUnit
+    description: An air defense unit equipped with interceptors or surface-to-air
+      missiles with organic engagement authority.
+    is_a: AirDefenseUnit
+    class_uri: mc:FireUnit
+  IdentityCode:
+    name: IdentityCode
+    description: Closed set of tactical identity values per APP-6 / MIL-STD-2525.
+    class_uri: mc:IdentityCode
+  Track:
+    name: Track
+    description: An observed or reported contact maintained by a C2 system. May be
+      correlated from one or more sensor reports.
+    is_a: Entity
+    slots:
+    - hasMode2Code
+    - withinZone
+    - hasEngagementStatus
+    - hasMode5
+    - hasIdentity
+    - hasMode3Code
+    - hasBearing
+    - assignedWeapon
+    - hasThreatLevel
+    - hasMode1Code
+    - reportedBy
+    - managedBy
+    - correlatedWith
+    - hasHeading
+    - detectedBy
+    - engagedBy
+    - hasConfidence
+    - hasTrackNumber
+    - hasPlatformType
+    - hasTrackQuality
+    - hasRange
+    - hasSpeed
+    class_uri: mc:Track
+  IFFReport:
+    name: IFFReport
+    description: An Identification Friend or Foe transponder reply containing mode/code
+      data.
+    is_a: SensorReport
+    class_uri: mc:IFFReport
+  EWReport:
+    name: EWReport
+    description: An electronic warfare emission report contributing to platform type
+      identification.
+    is_a: SensorReport
+    class_uri: mc:EWReport
+  SurfaceTrack:
+    name: SurfaceTrack
+    description: A track on the surface — land vehicle or surface vessel.
+    is_a: Track
+    class_uri: mc:SurfaceTrack
+  SubsurfaceTrack:
+    name: SubsurfaceTrack
+    description: A submerged track, typically a submarine.
+    is_a: Track
+    class_uri: mc:SubsurfaceTrack
+  ThreatLevel:
+    name: ThreatLevel
+    description: Assessed threat level of a track to defended assets.
+    class_uri: mc:ThreatLevel
+  UAVTrack:
+    name: UAVTrack
+    description: An unmanned aerial vehicle track, including MALE, HALE, and Group
+      1-5 UAS.
+    is_a: AirTrack
+    class_uri: mc:UAVTrack
+  RadarReturn:
+    name: RadarReturn
+    description: A primary or secondary radar detection contributing to a track.
+    is_a: SensorReport
+    class_uri: mc:RadarReturn
+  EngagementZone:
+    name: EngagementZone
+    description: The volume of airspace within which a weapon system has both authority
+      and capability to engage a threat.
+    is_a: Zone
+    class_uri: mc:EngagementZone
+  SensorUnit:
+    name: SensorUnit
+    description: A unit operating one or more sensors for surveillance, tracking,
+      or targeting.
+    is_a: Unit
+    class_uri: mc:SensorUnit
+  AISReport:
+    name: AISReport
+    description: An Automatic Identification System broadcast from a maritime vessel.
+    is_a: SensorReport
+    class_uri: mc:AISReport
+  GunSystem:
+    name: GunSystem
+    description: An anti-aircraft gun or close-in weapon system (CIWS).
+    is_a: Weapon
+    class_uri: mc:GunSystem
+  RotaryWingAircraft:
+    name: RotaryWingAircraft
+    description: A helicopter or other rotary-wing platform.
+    is_a: Aircraft
+    class_uri: mc:RotaryWingAircraft
+  Weapon:
+    name: Weapon
+    description: A munition or weapon system employed against a target.
+    is_a: Entity
+    slots:
+    - hasNATOStockNumber
+    class_uri: mc:Weapon
+  EWSystem:
+    name: EWSystem
+    description: An electronic warfare system providing emissions intelligence and
+      jamming capability.
+    is_a: Platform
+    class_uri: mc:EWSystem
+  AEWUnit:
+    name: AEWUnit
+    description: An airborne early warning unit providing extended radar coverage
+      and airborne C2.
+    is_a: SensorUnit
+    class_uri: mc:AEWUnit
+  KillBox:
+    name: KillBox
+    description: Three-dimensional area reference used to facilitate the rapid attack
+      of targets within a defined area of space.
+    is_a: Zone
+    class_uri: mc:KillBox
+  Platform:
+    name: Platform
+    description: A physical asset capable of carrying sensors, weapons, or personnel.
+    is_a: Entity
+    slots:
+    - operatedBy
+    class_uri: mc:Platform
+  Corridor:
+    name: Corridor
+    description: A defined airspace lane reserved for the transit of specific friendly
+      aircraft, providing deconfliction from engagement zones.
+    is_a: Zone
+    class_uri: mc:Corridor
+  AirTrack:
+    name: AirTrack
+    description: An airborne track — fixed-wing aircraft, rotary-wing aircraft, UAV,
+      or missile in flight.
+    is_a: Track
+    slots:
+    - hasVerticalRate
+    class_uri: mc:AirTrack
+  AirToAirMissile:
+    name: AirToAirMissile
+    description: A missile fired from an airborne platform at an airborne target.
+    is_a: Weapon
+    class_uri: mc:AirToAirMissile
+  ADIZ:
+    name: ADIZ
+    description: Designated airspace in which identification, location, and control
+      of civil and military aircraft is required in the interest of national security.
+    is_a: Zone
+    class_uri: mc:ADIZ
+  Aircraft:
+    name: Aircraft
+    description: An airborne platform — fighter, bomber, AWACS, tanker, transport,
+      helicopter, or UAV.
+    is_a: Platform
+    class_uri: mc:Aircraft
+  FixedWingAircraft:
+    name: FixedWingAircraft
+    description: A conventional fixed-wing aircraft.
+    is_a: Aircraft
+    class_uri: mc:FixedWingAircraft
+  ADSBReport:
+    name: ADSBReport
+    description: An Automatic Dependent Surveillance-Broadcast message from a civil
+      or military aircraft.
+    is_a: SensorReport
+    class_uri: mc:ADSBReport
+  Unit:
+    name: Unit
+    description: A military organizational unit with a defined mission, commander,
+      and assigned assets.
+    is_a: Entity
+    slots:
+    - responsibleFor
+    class_uri: mc:Unit
+  AEWPlatform:
+    name: AEWPlatform
+    description: Airborne Early Warning platform (e.g., E-3 Sentry, E-2 Hawkeye) providing
+      airborne surveillance and C2 relay.
+    is_a: FixedWingAircraft
+    class_uri: mc:AEWPlatform
+  SurfaceToAirMissile:
+    name: SurfaceToAirMissile
+    description: A missile fired from a ground or sea-based launcher to intercept
+      airborne targets.
+    is_a: Weapon
+    class_uri: mc:SurfaceToAirMissile
+  MissileSystem:
+    name: MissileSystem
+    description: A surface-to-air missile launcher and associated fire control radar.
+    is_a: Platform
+    class_uri: mc:MissileSystem
+  Zone:
+    name: Zone
+    description: A defined airspace volume with a specific operational function.
+    is_a: Entity
+    class_uri: mc:Zone
+  EngagementStatus:
+    name: EngagementStatus
+    description: The current engagement state of a track within the air battle.
+    class_uri: mc:EngagementStatus
+  AirDefenseUnit:
+    name: AirDefenseUnit
+    description: A unit whose primary mission is defense against air threats including
+      missiles, aircraft, and UAS.
+    is_a: Unit
+    class_uri: mc:AirDefenseUnit
+  GroundBasedRadar:
+    name: GroundBasedRadar
+    description: A fixed or mobile ground-based radar system used for air surveillance
+      or fire control.
+    is_a: Platform
+    class_uri: mc:GroundBasedRadar
+  Entity:
+    name: Entity
+    description: Top-level class for any distinct object tracked or managed in the
+      COP.
+    slots:
+    - hasLongitude
+    - hasAltitude
+    - hasCallsign
+    - hasLatitude
+    - hasSource
+    - hasTimestamp
+    class_uri: mc:Entity
+  DirectedEnergyWeapon:
+    name: DirectedEnergyWeapon
+    description: A laser or high-power microwave weapon used against airborne threats.
+    is_a: Weapon
+    class_uri: mc:DirectedEnergyWeapon
+  RestrictedOperationsZone:
+    name: RestrictedOperationsZone
+    description: Airspace of defined dimensions imposed by the coordinating authority
+      within which the operation of one or more airspace users is restricted.
+    is_a: Zone
+    class_uri: mc:RestrictedOperationsZone
+  SensorReport:
+    name: SensorReport
+    description: A single sensor detection or update from a radar, EW system, or other
+      sensor contributing to track formation or update.
+    class_uri: mc:SensorReport
+  NoFlyZone:
+    name: NoFlyZone
+    description: Airspace in which all flight is prohibited unless specifically authorized
+      by the controlling authority.
+    is_a: Zone
+    class_uri: mc:NoFlyZone
+  CommandPost:
+    name: CommandPost
+    description: A unit serving as a C2 node coordinating subordinate units and managing
+      the COP.
+    is_a: Unit
+    class_uri: mc:CommandPost
+  CruiseMissileTrack:
+    name: CruiseMissileTrack
+    description: A track exhibiting terrain-following or low-altitude sustained powered
+      flight consistent with a cruise missile.
+    is_a: AirTrack
+    class_uri: mc:CruiseMissileTrack

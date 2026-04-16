@@ -26,7 +26,7 @@
   - `accredit.py` — state-machine: load/append/parse SSSOM log; validate ingest rules; state queries.
   - `units.py` — QUDT graph loading; unit compatibility; FNML suggestions.
   - `unit_detect.py` — regex-based unit detection from field labels.
-  - `models.py` — Pydantic v2 output types: SSSOMRow, LintReport, EmbeddingReport, SuggestionReport, ValidationReport, ProvenanceRecord, MappingDecision.
+  - `models.py` — Pydantic v2 output types: SSSOMRow, LintReport, EmbeddingReport, SuggestionReport, ValidationReport, ProvenanceRecord, CoverageReport.
   - `rdf_utils.py`, `translation.py`, `provenance.py` — utilities.
 
 **Policies Layer** (`rosetta/policies/`):
@@ -68,9 +68,9 @@
 3. `status` — query `current_state_for_pair()` (latest record per pair).
 4. `dump` — output all non-deleted audit records.
 
-**rosetta-rml-gen:**
-1. Reads SSSOM + master ontology RDF.
-2. Outputs RML YAML (SPARQL Mapping Language rules).
+**rosetta-yarrrml-gen:**
+1. Reads approved SSSOM audit log + source and master LinkML schemas.
+2. Outputs a linkml-map `TransformationSpecification` YAML (first half of the SSSOM → YARRRML pipeline).
 
 **rosetta-translate:**
 1. Translates LinkML YAML field labels via DeepL (source_lang: "auto" or "EN").
@@ -116,7 +116,7 @@
 - Stamped by accredit ingest; serialized to JSON via `model_dump(mode="json")`.
 
 **Pydantic output models (models.py):**
-- All user-facing structured output typed — LintReport, EmbeddingReport (RootModel), SuggestionReport (RootModel), ValidationReport, ProvenanceRecord, MappingDecision.
+- All user-facing structured output typed — LintReport, EmbeddingReport (RootModel), SuggestionReport (RootModel), ValidationReport, ProvenanceRecord, CoverageReport.
 - Construct in CLI; serialize with `model.model_dump(mode="json")` before `json.dumps()`.
 
 **Config precedence (config.py):**
@@ -130,7 +130,7 @@ All 9 tools in `pyproject.toml [project.scripts]`:
 - `rosetta-suggest` → `rosetta/cli/suggest.py:cli`
 - `rosetta-lint` → `rosetta/cli/lint.py:cli`
 - `rosetta-validate` → `rosetta/cli/validate.py:cli`
-- `rosetta-rml-gen` → `rosetta/cli/rml_gen.py:cli`
+- `rosetta-yarrrml-gen` → `rosetta/cli/yarrrml_gen.py:cli`
 - `rosetta-provenance` → `rosetta/cli/provenance.py:cli`
 - `rosetta-accredit` → `rosetta/cli/accredit.py:cli`
 - `rosetta-translate` → `rosetta/cli/translate.py:cli`

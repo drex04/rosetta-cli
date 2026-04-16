@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, ConfigDict, RootModel
 
 # --- Lint ---
 
@@ -141,13 +141,27 @@ class StatusEntry(BaseModel):
     mapping_date: str | None
 
 
-# --- RML Generation ---
+# --- YARRRML Generation (coverage) ---
 
 
-class MappingDecision(BaseModel):
-    source_uri: str
-    target_uri: str
-    field_ref: str | None = None  # rml:reference value; defaults to URI last segment
-    fnml_function: str | None = None  # set in Plan 02
-    multiplier: float | None = None
-    offset: float | None = None
+class CoverageReport(BaseModel):
+    # review-2: ConfigDict(extra="forbid") — same gotcha that bit SSSOMRow in 16-00.
+    # Catches field-name typos at construction time.
+    model_config = ConfigDict(extra="forbid")  # pyright: ignore[reportUnannotatedClassAttribute]
+
+    source_schema_prefix: str
+    master_schema_prefix: str
+    rows_total: int
+    rows_after_prefix_filter: int
+    rows_after_predicate_filter: int
+    rows_after_justification_filter: int
+    resolved_class_mappings: list[str] = []
+    resolved_slot_mappings: list[str] = []
+    unresolved_subjects: list[dict[str, str]] = []  # {"curie", "reason"}
+    unresolved_objects: list[dict[str, str]] = []
+    skipped_non_exact_predicates: list[dict[str, str]] = []  # {"row_id", "predicate_id"}
+    composite_groups: list[
+        dict[str, object]
+    ] = []  # {"group_id", "member_row_ids": [...], "target_slot"}  # noqa: E501
+    datatype_warnings: list[dict[str, str]] = []
+    unmapped_required_master_slots: list[str] = []

@@ -16,6 +16,8 @@ dependencies = [
     "schema-automator>=0.5.5",
     "sssom>=0.4.15",
     "linkml>=1.10.0",
+    "linkml-map>=0.5.2",
+    "curies>=0.13.3",
 ]
 
 [project.scripts]
@@ -24,7 +26,7 @@ rosetta-embed      = "rosetta.cli.embed:cli"
 rosetta-suggest    = "rosetta.cli.suggest:cli"
 rosetta-lint       = "rosetta.cli.lint:cli"
 rosetta-validate   = "rosetta.cli.validate:cli"
-rosetta-rml-gen    = "rosetta.cli.rml_gen:cli"
+rosetta-yarrrml-gen = "rosetta.cli.yarrrml_gen:cli"
 rosetta-provenance = "rosetta.cli.provenance:cli"
 rosetta-accredit   = "rosetta.cli.accredit:cli"
 rosetta-translate  = "rosetta.cli.translate:cli"
@@ -63,6 +65,7 @@ dev = [
     "ruff>=0.15.10",
     "vulture>=2.14",
     "refurb>=2.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.radon]

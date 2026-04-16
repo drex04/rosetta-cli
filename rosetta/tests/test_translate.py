@@ -32,12 +32,12 @@ def _make_schema(
         cls = ClassDefinition(cls_name)
         for k, v in attrs.items():
             setattr(cls, k, v)
-        schema.classes[cls_name] = cls
+        schema.classes[cls_name] = cls  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
     for slot_name, attrs in (slots or {}).items():
         slot = SlotDefinition(slot_name)
         for k, v in attrs.items():
             setattr(slot, k, v)
-        schema.slots[slot_name] = slot
+        schema.slots[slot_name] = slot  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
     return schema
 
 
@@ -62,9 +62,9 @@ def test_translate_linkml_de_to_en(monkeypatch: pytest.MonkeyPatch) -> None:
 
     schema = _make_schema(classes={"geschwindigkeit": {"title": "Geschwindigkeit"}})
     result = translate_schema(schema, source_lang="DE", deepl_key="fake-key")
-    cls = result.classes["geschwindigkeit"]
-    assert cls.title == "Speed"
-    assert "Geschwindigkeit" in (cls.aliases or [])
+    cls = result.classes["geschwindigkeit"]  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
+    assert cls.title == "Speed"  # pyright: ignore[reportAttributeAccessIssue]
+    assert "Geschwindigkeit" in (cls.aliases or [])  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_translate_linkml_slot(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,9 +82,9 @@ def test_translate_linkml_slot(monkeypatch: pytest.MonkeyPatch) -> None:
 
     schema = _make_schema(slots={"speed_kts": {"title": "Geschwindigkeit"}})
     result = translate_schema(schema, source_lang="DE", deepl_key="fake-key")
-    slot = result.slots["speed_kts"]
-    assert slot.title == "Speed"
-    assert "Geschwindigkeit" in (slot.aliases or [])
+    slot = result.slots["speed_kts"]  # pyright: ignore[reportCallIssue, reportArgumentType, reportOptionalSubscript]
+    assert slot.title == "Speed"  # pyright: ignore[reportAttributeAccessIssue]
+    assert "Geschwindigkeit" in (slot.aliases or [])  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_translate_linkml_passthrough(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,0 +1,22 @@
+# sssom_version: https://w3id.org/sssom/spec/0.15
+# mapping_set_id: http://rosetta.interop/audit-log/test-nor
+# curie_map:
+#   nor_radar: http://rosetta.interop/nor_radar/
+#   mc: http://rosetta.interop/master-cop/
+#   deu_radar: http://rosetta.interop/deu_radar/
+#   ex: http://example.org/
+#   skos: http://www.w3.org/2004/02/skos/core#
+#   owl: http://www.w3.org/2002/07/owl#
+#   semapv: https://w3id.org/semapv/vocab/
+subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label	object_label	mapping_date	record_id	subject_type	object_type	mapping_group_id	composition_expr
+nor_radar:Observation	skos:exactMatch	mc:Track	semapv:HumanCuration	0.9		Track	2026-04-16	r001				
+nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r002				
+nor_radar:lengdegrad	skos:exactMatch	mc:hasLongitude	semapv:HumanCuration	0.9		hasLongitude	2026-04-16	r003				
+nor_radar:hoyde_m	skos:exactMatch	mc:hasAltitude	semapv:HumanCuration	0.9		hasAltitude	2026-04-16	r004				
+nor_radar:hastighet_kmh	skos:exactMatch	mc:hasSpeed	semapv:HumanCuration	0.9		hasSpeed	2026-04-16	r005				
+nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006a	composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]
+nor_radar:lengdegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006b	composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]
+nor_radar:avstand_km	skos:closeMatch	mc:hasRange	semapv:HumanCuration	0.9		hasRange	2026-04-16	r007				
+nor_radar:peiling_grader	skos:narrowMatch	mc:hasBearing	semapv:HumanCuration	0.9		hasBearing	2026-04-16	r008				
+nor_radar:signalstyrke_dbm	owl:differentFrom	mc:hasConfidence	semapv:HumanCuration	0.9		hasConfidence	2026-04-16	r009				
+deu_radar:foo	skos:exactMatch	mc:bar	semapv:HumanCuration	0.9		bar	2026-04-16	r010				

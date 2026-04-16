@@ -15,7 +15,7 @@ NATO/defense integration engineers (and coding agents) who need to map national 
 ## Scope — v1 (Milestones 1–3)
 
 **In:**
-- 8 CLI tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-rml-gen`, `rosetta-provenance`, `rosetta-accredit`
+- 8 CLI tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-yarrrml-gen`, `rosetta-provenance`, `rosetta-accredit`
 - Local file-based RDF store (directories of `.ttl` files)
 - Lexical embeddings (LaBSE via sentence-transformers)
 - SHACL validation (pySHACL)

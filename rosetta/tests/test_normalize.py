@@ -15,14 +15,14 @@ def test_normalize_json_schema() -> None:
     """deu_patriot.json → SchemaDefinition with at least 1 slot."""
     schema = normalize_schema(FIXTURES / "deu_patriot.json")
     assert schema is not None
-    assert len(schema.slots) >= 1 or len(schema.classes) >= 1
+    assert len(schema.slots) >= 1 or len(schema.classes) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_openapi() -> None:
     """usa_c2.yaml (OpenAPI) → SchemaDefinition with at least 1 class."""
     schema = normalize_schema(FIXTURES / "usa_c2.yaml", fmt="openapi")
     assert schema is not None
-    assert len(schema.classes) >= 1 or len(schema.slots) >= 1
+    assert len(schema.classes) >= 1 or len(schema.slots) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_xsd(tmp_path: Path) -> None:
@@ -40,7 +40,7 @@ def test_normalize_xsd(tmp_path: Path) -> None:
     xsd_file.write_text(xsd_content)
     schema = normalize_schema(xsd_file)
     assert schema is not None
-    assert len(schema.classes) >= 1 or len(schema.slots) >= 1
+    assert len(schema.classes) >= 1 or len(schema.slots) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_csv(tmp_path: Path) -> None:
@@ -49,8 +49,8 @@ def test_normalize_csv(tmp_path: Path) -> None:
     csv_file.write_text("name,age\nAlice,30\nBob,25\n")
     schema = normalize_schema(csv_file)
     assert schema is not None
-    slot_names = list(schema.slots.keys())
-    assert any("name" in s.lower() for s in slot_names) or len(schema.classes) >= 1
+    slot_names = list(schema.slots.keys())  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
+    assert any("name" in s.lower() for s in slot_names) or len(schema.classes) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_tsv(tmp_path: Path) -> None:
@@ -59,7 +59,7 @@ def test_normalize_tsv(tmp_path: Path) -> None:
     tsv_file.write_text("name\tage\nAlice\t30\nBob\t25\n")
     schema = normalize_schema(tsv_file)
     assert schema is not None
-    assert len(schema.slots) >= 1 or len(schema.classes) >= 1
+    assert len(schema.slots) >= 1 or len(schema.classes) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_json_sample(tmp_path: Path) -> None:
@@ -68,7 +68,7 @@ def test_normalize_json_sample(tmp_path: Path) -> None:
     sample_file.write_text('[{"speed_kts": 400, "altitude_ft": 35000}]')
     schema = normalize_schema(sample_file, fmt="json-sample")
     assert schema is not None
-    assert len(schema.slots) >= 1 or len(schema.classes) >= 1
+    assert len(schema.slots) >= 1 or len(schema.classes) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_rdfs(tmp_path: Path) -> None:
@@ -85,7 +85,7 @@ ex:Speed a rdfs:Class ;
     ttl_file.write_text(ttl_content)
     schema = normalize_schema(ttl_file)
     assert schema is not None
-    assert len(schema.classes) >= 1 or len(schema.slots) >= 1
+    assert len(schema.classes) >= 1 or len(schema.slots) >= 1  # pyright: ignore[reportArgumentType]
 
 
 def test_normalize_auto_detect_ttl(tmp_path: Path) -> None:

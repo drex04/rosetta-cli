@@ -20,8 +20,8 @@
 - REQ-13: `rosetta-lint` suggests FnML functions from repository when unit mismatch is detected
 - REQ-14: `rosetta-lint` exits with code 1 on BLOCK findings (composable in shell scripts)
 - REQ-15: `rosetta-lint` supports `--strict` mode (WARNINGs treated as BLOCKs)
-- REQ-16: `rosetta-rml-gen` generates valid RML/FnML Turtle from lint-approved decision files
-- REQ-17: `rosetta-rml-gen` wraps object maps in `fnml:functionValue` when FnML function is specified
+- REQ-16: `rosetta-yarrrml-gen` generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas
+- REQ-17: `rosetta-yarrrml-gen` emits a `CoverageReport` JSON when `--coverage-report` is specified
 
 ## Milestone 3: "Can we track who did what?" (Phase 6–8)
 

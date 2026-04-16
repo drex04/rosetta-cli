@@ -4,7 +4,7 @@
 
 ## Naming Patterns
 
-- **Files:** `snake_case.py`; CLI files named after tool (`rml_gen.py` → `rosetta-rml-gen`)
+- **Files:** `snake_case.py`; CLI files named after tool (`yarrrml_gen.py` → `rosetta-yarrrml-gen`)
 - **Functions:** `snake_case` verbs — `load_graph()`, `append_log()`, `check_sssom_proposals()`; private helpers prefixed `_`
 - **Variables:** `snake_case`; short locals (`g` for Graph); UPPER_SNAKE constants (`UNIT_STRING_TO_IRI`, `ROSE_NS`)
 - **Classes:** `PascalCase` Pydantic models — `LintFinding`, `ValidationReport`, `SSSOMRow`

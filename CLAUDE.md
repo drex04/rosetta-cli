@@ -14,7 +14,7 @@ Fall back to Read only when you need the full file for editing.
 ## Project
 
 Composable CLI tools for semantic mapping between NATO defense schemas and a master ontology.
-Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-rml-gen`, `rosetta-provenance`, `rosetta-accredit`.
+Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-yarrrml-gen`, `rosetta-provenance`, `rosetta-accredit`.
 
 ## Stack
 

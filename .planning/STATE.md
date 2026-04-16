@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-15T08:00:00.000Z"
+last_updated: "2026-04-16T13:00:00.000Z"
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 17
+  completed_phases: 15
+  total_plans: 17
+  completed_plans: 18
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 14 (User Review — approve/reject → approved SSSOM)
-- **Plan:** 1 (complete)
-- **Status:** Phase 14 complete — all 14 phases done
+- **Phase:** 16 (rml-gen v2 — SSSOM → linkml-map TransformSpec → YARRRML → JSON-LD)
+- **Plan:** 16-00 and 16-01 complete; 16-02 next (YarrrmlCompiler in linkml-map fork)
+- **Status:** Plan 16-01 (TransformSpec builder) complete on 2026-04-16; `rosetta-yarrrml-gen` CLI live; 294/294 tests passing; 8/8 quality gates clean
 
 ## Phase Progress
 
@@ -37,6 +37,7 @@ progress:
 | 12 | Schema Normalization (LinkML + schema-automator) | Complete |
 | 13 | Semantic Matching (embed + suggest → SSSOM) | Complete |
 | 14 | User Review (approve/reject → approved SSSOM) | Complete |
+| 15 | rosetta-lint SSSOM enrichment | Complete |
 
 ## Phase 1 Completion
 
@@ -124,6 +125,29 @@ progress:
 - **Status:** Complete
 - **Key changes:** Audit-log accreditation pipeline — append-only SSSOM log replaces ledger.json; accredit CLI (ingest/review/status/dump); suggest auto-reads log for boost/derank; lint --sssom mode; SSSOMRow.mapping_date + record_id fields added
 
+## Phase 15 Plan 01 Completion
+
+- **Plan:** `.planning/phases/15-lint-sssom/15-01-PLAN.md`
+- **Commit:** a78d5ca
+- **Tests:** 253/253 passing (12 new SSSOM unit/datatype tests; 17 RDF-mode tests removed)
+- **Completed:** 2026-04-15
+- **Key changes:** RDF lint mode removed; rosetta-lint now SSSOM-only; unit/datatype compatibility checks via QUDT; datatype propagates LinkML slot.range → embed → suggest → lint; 11-column SSSOM TSV; DATETIME_MIN public rename
+
+## Phase 16 Plan 00 Completion
+
+- **Plan:** `.planning/phases/16-rml-gen-v2/16-00-PLAN.md`
+- **Commit:** 52e4999
+- **Tests:** 266/266 passing (12 new tests across 4 files)
+- **Completed:** 2026-04-16
+- **Key changes:** SSSOMRow +4 composite-entity fields (subject_type, object_type, mapping_group_id, composition_expr); suggest TSV 11→15 cols; audit log 9→13 cols with atomic migration of pre-16-00 9-col files via `_migrate_audit_log_if_needed`; `check_prefix_collision` in rosetta-ingest; `rosetta-ingest` stamps `annotations.rosetta_source_format` + per-slot path annotations (`rosetta_csv_column`/`rosetta_jsonpath`/`rosetta_xpath`) for downstream consumption by Plan 16-01.
+
+## Phase 16 Plan 01 Completion
+
+- **Plan:** `.planning/phases/16-rml-gen-v2/16-01-PLAN.md`
+- **Tests:** 294/294 passing (37 new yarrrml-gen tests; 9 old rml-gen tests removed)
+- **Completed:** 2026-04-16
+- **Key changes:** `rosetta-rml-gen` → `rosetta-yarrrml-gen` (entry point + all docs); legacy `rml_builder.py` + `rml_gen.py` deleted; new `transform_builder.py` (filter/classify/compose/derive/orchestrate) + `yarrrml_gen.py` CLI; `CoverageReport` Pydantic model (replaces `MappingDecision`) with `extra="forbid"`; `linkml-map 0.5.2` + `curies 0.13.3` pinned; GA4 hybrid source-format resolution (CLI flag OR schema annotation); 13-col SSSOM → linkml-map `TransformationSpecification` round-trips through `model_validate`; composite mappings (`mapping_group_id` + `composition_expr`) flow to `SlotDerivation.expr`; `--force` bypasses unresolvable CURIEs only — mixed-kind / missing-class / inconsistent-composite always fatal.
+
 ## Next Action
 
-Phase 14 Plan 01 is complete. All 14 phases of the v2.0 milestone are done.
+Plan 16-01 complete. Plan 16-02 (`YarrrmlCompiler` — TransformSpec → YARRRML, contributed to linkml-map fork) ready to plan. Prerequisites locked: source-format annotation contract, per-slot path annotations (`rosetta_jsonpath`/`rosetta_xpath`/`rosetta_csv_column`), TransformSpec.comments carrying effective source format.

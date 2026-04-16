@@ -35,7 +35,7 @@ Nine entrypoints (all in `pyproject.toml`):
 - `rosetta-translate` → `rosetta/cli/translate.py` — machine translate labels (DeepL API)
 - `rosetta-lint` → `rosetta/cli/lint.py` — validate SSSOM unit + datatype compatibility (RDF mode removed Phase 15)
 - `rosetta-validate` → `rosetta/cli/validate.py` — SHACL shape checking
-- `rosetta-rml-gen` → `rosetta/cli/rml_gen.py` — generate RML transform specs
+- `rosetta-yarrrml-gen` → `rosetta/cli/yarrrml_gen.py` — generate linkml-map TransformSpec YAML
 - `rosetta-provenance` → `rosetta/cli/provenance.py` — document mapping origin
 - `rosetta-accredit` → `rosetta/cli/accredit.py` — manage audit-log (ingest/review/status/dump, Phase 14)
 
