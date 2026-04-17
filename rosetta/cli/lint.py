@@ -10,7 +10,7 @@ from rosetta.core.accredit import load_log, parse_sssom_tsv
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
-from rosetta.core.unit_detect import detect_unit
+from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 from rosetta.core.units import (
     load_qudt_graph,
     suggest_fnml,
@@ -127,34 +127,38 @@ def _unit_label(row_id: str, label: str) -> str:
     return local
 
 
+def _unit_not_detected(row_id: str, side: str, name: str, description: str) -> LintFinding:
+    """Build an INFO finding distinguishing 'no unit' from 'recognized, no QUDT IRI'."""
+    if recognized_unit_without_iri(name, description):
+        message = f"Unit recognized in {side} field but has no QUDT IRI mapping"
+    else:
+        message = f"No detectable unit in {side} field name"
+    return LintFinding(
+        rule="unit_not_detected",
+        severity="INFO",
+        source_uri=row_id,
+        message=message,
+    )
+
+
 def _check_units(
     findings: list[LintFinding],
     row: SSSOMRow,
     qudt_graph: rdflib.Graph,
 ) -> None:
     """Append unit-related findings for a single SSSOM row."""
-    src_iri = detect_unit(_unit_label(row.subject_id, row.subject_label), row.subject_label)
-    tgt_iri = detect_unit(_unit_label(row.object_id, row.object_label), row.object_label)
+    src_name = _unit_label(row.subject_id, row.subject_label)
+    tgt_name = _unit_label(row.object_id, row.object_label)
+    src_iri = detect_unit(src_name, row.subject_label)
+    tgt_iri = detect_unit(tgt_name, row.object_label)
 
     if src_iri is None or tgt_iri is None:
         if src_iri is None:
             findings.append(
-                LintFinding(
-                    rule="unit_not_detected",
-                    severity="INFO",
-                    source_uri=row.subject_id,
-                    message="No detectable unit in subject field name",
-                )
+                _unit_not_detected(row.subject_id, "subject", src_name, row.subject_label)
             )
         if tgt_iri is None:
-            findings.append(
-                LintFinding(
-                    rule="unit_not_detected",
-                    severity="INFO",
-                    source_uri=row.object_id,
-                    message="No detectable unit in object field name",
-                )
-            )
+            findings.append(_unit_not_detected(row.object_id, "object", tgt_name, row.object_label))
         return
 
     compat = units_compatible(src_iri, tgt_iri, qudt_graph)

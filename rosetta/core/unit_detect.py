@@ -129,6 +129,21 @@ def detect_unit(name: str, description: str) -> str | None:
     return _detect_from_nlp(description)
 
 
+def recognized_unit_without_iri(name: str, description: str) -> bool:
+    """Return True if name/description matched a unit pattern that maps to None.
+
+    Lets callers distinguish "known unit with no QUDT IRI" (e.g. dBm) from
+    "no unit detected at all" — both cases make detect_unit() return None.
+    """
+    for pattern, iri in _NAME_PATTERNS:
+        if pattern.search(name):
+            return iri is None
+    for pattern, iri in _DESC_PATTERNS:
+        if pattern.search(description):
+            return iri is None
+    return False
+
+
 def _detect_from_nlp(description: str) -> str | None:
     """quantulum3 + pint layer — lazy imports, single UnitRegistry per process."""
     global _ureg  # noqa: PLW0603

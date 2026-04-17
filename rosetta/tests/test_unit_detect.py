@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
-from rosetta.core.unit_detect import detect_unit
+from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 
 # ---------------------------------------------------------------------------
 # Name-pattern tests — expected values are QUDT IRI strings (or None)
@@ -180,3 +182,77 @@ def test_detect_unit_dbm_desc_case_sensitive() -> None:
 def test_detect_unit_dBm_desc_exact_case() -> None:
     # dBm has no QUDT IRI — desc-pattern returns None, short-circuiting NLP
     assert detect_unit("field", "power in dBm") is None
+
+
+# ---------------------------------------------------------------------------
+# recognized_unit_without_iri — distinguishes dBm from truly unknown
+# ---------------------------------------------------------------------------
+
+
+def test_recognized_unit_without_iri_dbm_name() -> None:
+    assert recognized_unit_without_iri("signal_dbm", "")
+
+
+def test_recognized_unit_without_iri_dbm_desc() -> None:
+    assert recognized_unit_without_iri("field", "power in dBm")
+
+
+def test_recognized_unit_without_iri_unknown_is_false() -> None:
+    assert not recognized_unit_without_iri("callsign", "unrelated prose")
+
+
+def test_recognized_unit_without_iri_mapped_is_false() -> None:
+    # Recognized AND mapped — not a "without IRI" case
+    assert not recognized_unit_without_iri("altitude_m", "")
+
+
+# ---------------------------------------------------------------------------
+# NLP defensive paths — ImportError, pint rejection
+# ---------------------------------------------------------------------------
+
+
+def test_detect_unit_nlp_importerror_returns_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing quantulum3/pint degrades gracefully to None, never crashes."""
+    from rosetta.core import unit_detect
+
+    # Block the imports inside _detect_from_nlp by shadowing with None in sys.modules
+    monkeypatch.setitem(sys.modules, "quantulum3", None)
+    monkeypatch.setitem(sys.modules, "quantulum3.parser", None)
+    # Force regex layers to miss so _detect_from_nlp is reached
+    assert unit_detect.detect_unit("unknown_field", "no units here at all") is None
+
+
+def test_detect_unit_nlp_pint_rejection_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If pint rejects a quantulum3 candidate, the loop continues to the next one.
+
+    Induces the rejection by monkeypatching _ureg.parse_expression to raise
+    on the first call and succeed on the second, simulating a multi-candidate
+    description where candidate #1 is unparseable and #2 is valid.
+    """
+    from pint import UnitRegistry
+
+    from rosetta.core import unit_detect
+
+    real_ureg = UnitRegistry()
+    calls = {"n": 0}
+
+    def flaky_parse(expr: str) -> object:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise ValueError("simulated pint rejection")
+        return real_ureg.parse_expression(expr)
+
+    class FakeUreg:
+        parse_expression = staticmethod(flaky_parse)
+
+    monkeypatch.setattr(unit_detect, "_ureg", FakeUreg())
+
+    # Description with two quantities — quantulum3 extracts both; first is
+    # rejected by our flaky parse_expression, second maps to unit:GM.
+    result = unit_detect._detect_from_nlp("100 widgets and 500 grams")
+    assert result == "unit:GM"
+    assert calls["n"] >= 2, "parse_expression should be called more than once"

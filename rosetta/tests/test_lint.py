@@ -423,7 +423,39 @@ def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
     infos = [f for f in data["findings"] if f["rule"] == "unit_not_detected"]
     assert infos, "Expected unit_not_detected finding for dBm"
     assert infos[0]["severity"] == "INFO"
-    assert "No detectable unit" in infos[0]["message"]
+    # dBm: recognized unit with no QUDT IRI → distinct message from 'no unit found'
+    assert "no QUDT IRI mapping" in infos[0]["message"]
+
+
+def test_lint_sssom_unit_detected_from_prose_label(tmp_path: Path) -> None:
+    """Description-arg threading: subject_label carries prose like 'Altitude in metres'
+    so detect_unit's _DESC_PATTERNS layer fires on the human label, not the field id.
+    Confirms _check_units wires label → description correctly.
+    """
+    sssom = tmp_path / "prose.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "ex:value_a",
+                "subject_label": "Altitude in metres",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:value_b",
+                "object_label": "Ceiling in feet",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    # Prose labels drive detection: metre + foot share dimension → WARNING
+    warnings = [f for f in data["findings"] if f["rule"] == "unit_conversion_required"]
+    assert warnings, "Expected unit_conversion_required finding driven by prose labels"
+    assert "unit:M" in warnings[0]["message"]
+    assert "unit:FT" in warnings[0]["message"]
 
 
 def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:
