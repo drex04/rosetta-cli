@@ -4,6 +4,10 @@
 
 Be concise. State what changed and what's next; skip narration and recap. One or two sentences per update is almost always enough.
 
+## Fix-on-Sight
+
+If you find bugs or code quality issues during review, investigation, or any other work, **fix them immediately in the same change**. Do not file follow-up tickets, deferred-items lists, or "revisit later" notes. Every issue surfaced in review must be addressed before the work is considered done.
+
 ## Code Exploration
 
 Use claude-mem smart tools as the primary tools for understanding code:
