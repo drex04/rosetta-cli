@@ -91,6 +91,7 @@ User-facing JSON outputs are typed via Pydantic v2:
 - **rdflib SPARQL boundaries:** `row.attribute` access on query results is untyped — use `# pyright: ignore[reportAttributeAccessIssue]` at every access point. Standard solution for untyped library integration. _(learnings: 2026-04-13)_
 - **radon CLI exclusion:** `rosetta/cli/` is excluded from radon complexity checks — Click command handlers have inherently high CC scores (grade F, CC 45–56) that are not actionable. Only `rosetta/core/` business logic is checked. _(learnings: 2026-04-15)_
 - **vulture false positives:** Pydantic field declarations and Click decorators trigger vulture false positives — `--min-confidence 80` is required. Test fixtures also fire; tests are excluded via `--exclude rosetta/tests`. _(learnings: 2026-04-15)_
+- **linkml-map fork pin:** `linkml-map` is pinned via `[tool.uv.sources]` to SHA `48afe279` on `drex04/linkml-map` (branch `feat/yarrrml-compiler`). Run `uv sync` after any SHA change; the fork's `YarrrmlCompiler` lives at `linkml_map.compiler.yarrrml_compiler`. _(learnings: 2026-04-17)_
 
 ## Conventions
 

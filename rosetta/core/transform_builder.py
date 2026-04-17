@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast  # noqa: F401
 
 from linkml_map.datamodel.transformer_model import (
     ClassDerivation,
+    KeyVal,
     SlotDerivation,
     TransformationSpecification,
     UnitConversionConfiguration,
@@ -575,11 +577,61 @@ def _assemble_class_derivations(
     ]
 
 
+ROSETTA_GLOBAL_PREFIXES: dict[str, str] = {
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "semapv": "https://w3id.org/semapv/vocab/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "qudt": "http://qudt.org/schema/qudt/",
+}
+
+
+def _build_prefix_map(
+    source: SchemaDefinition,
+    master: SchemaDefinition,
+) -> dict[str, KeyVal]:
+    """Merge prefix maps from rosetta globals, master, and source (source wins on collision).
+
+    Returns a dict[str, KeyVal] suitable for TransformationSpecification.prefixes.
+    """
+    merged: dict[str, str] = ROSETTA_GLOBAL_PREFIXES.copy()
+
+    def _add_schema_prefixes(schema: SchemaDefinition, dest: dict[str, str]) -> None:
+        raw: object = schema.prefixes or {}
+        if isinstance(raw, dict):
+            items = raw.items()  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
+        elif isinstance(raw, list):
+            # Some linkml versions serialize prefixes as a list of Prefix objects
+            items = ((getattr(p, "prefix_prefix", None) or str(p), p) for p in raw)  # pyright: ignore[reportUnknownVariableType,reportUnknownArgumentType]
+        else:
+            return
+        for k, v in items:  # pyright: ignore[reportUnknownVariableType]
+            uri = getattr(v, "prefix_reference", None) or str(v)
+            dest[str(k)] = str(uri)
+
+    _add_schema_prefixes(master, merged)
+    _add_schema_prefixes(source, merged)
+
+    return {k: KeyVal(key=k, value=iri) for k, iri in merged.items()}
+
+
+def _resolve_schema_path(raw: str | Path, label: str) -> str:
+    """Validate *raw* is a non-empty path to an existing file; return its absolute str form.
+
+    Raises ValueError with *label* in the message on any failure.
+    """
+    path_str = str(raw) if raw is not None else ""
+    if not path_str or not Path(path_str).exists():
+        raise ValueError(f"build_spec: {label} is required and must exist; got {raw!r}")
+    return str(Path(path_str).resolve())
+
+
 def build_spec(
     sssom_rows: list[SSSOMRow],
     source: SchemaDefinition,
     master: SchemaDefinition,
     *,
+    source_schema_path: str | Path,
+    target_schema_path: str | Path,
     include_manual: bool = False,
     force: bool = False,
     prefiltered: tuple[list[SSSOMRow], dict[str, list[SSSOMRow]]] | None = None,
@@ -595,6 +647,10 @@ def build_spec(
     provided (remaining, excluded) tuple is used directly. Library callers that do
     not pass prefiltered continue to work without change (defaults to None).
     """
+    # Validate and resolve schema paths (fail-fast; never write empty string to spec)
+    _resolved_src = _resolve_schema_path(source_schema_path, "source_schema_path")
+    _resolved_tgt = _resolve_schema_path(target_schema_path, "target_schema_path")
+
     src_prefix = str(source.default_prefix or "")
     if not src_prefix:
         raise ValueError("source schema lacks default_prefix")
@@ -641,6 +697,9 @@ def build_spec(
         id=f"https://rosetta.interop/transform/{src_prefix}-to-{mst_prefix}",
         title=f"Transform {src_prefix} → {mst_prefix}",
         class_derivations=class_derivations,
+        source_schema=_resolved_src,
+        target_schema=_resolved_tgt,
+        prefixes=_build_prefix_map(source, master),
     )
 
     return spec, coverage

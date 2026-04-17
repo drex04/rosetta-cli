@@ -131,6 +131,8 @@ def cli(
             rows,
             source_def,
             master_def,
+            source_schema_path=str(Path(source_schema).resolve()),
+            target_schema_path=str(Path(master_schema).resolve()),
             include_manual=include_manual,
             force=force,
             prefiltered=(remaining, excluded),

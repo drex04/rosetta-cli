@@ -20,6 +20,7 @@ from pydantic import ValidationError
 from rosetta.cli.yarrrml_gen import cli
 from rosetta.core.models import CoverageReport, SSSOMRow
 from rosetta.core.transform_builder import (
+    ROSETTA_GLOBAL_PREFIXES,
     _build_slot_owner_index,
     _ClassifyContext,
     _ClassMapping,
@@ -102,6 +103,17 @@ _FIXTURES = Path("rosetta/tests/fixtures")
 _NOR_SCHEMA = _FIXTURES / "nor_radar.linkml.yaml"
 _MC_SCHEMA = _FIXTURES / "master_cop.linkml.yaml"
 _NOR_SSSOM = _FIXTURES / "sssom_nor_approved.sssom.tsv"
+
+
+@pytest.fixture(scope="module")
+def dummy_schema_paths(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """Write two empty placeholder YAML files once per test session; return (src, tgt) paths."""
+    base = tmp_path_factory.mktemp("schema_paths")
+    src = base / "src.yaml"
+    tgt = base / "tgt.yaml"
+    src.write_text("")
+    tgt.write_text("")
+    return src, tgt
 
 
 # ====== Unit tests — filter_rows ======
@@ -291,7 +303,14 @@ def test_build_spec_emits_valid_transformspec() -> None:
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
     mst = cast(SchemaDefinition, yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
-    spec, _cov = build_spec(rows, src, mst, force=True)
+    spec, _cov = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=str(_NOR_SCHEMA.resolve()),
+        target_schema_path=str(_MC_SCHEMA.resolve()),
+        force=True,
+    )
     # Round-trip via model_validate
     TransformationSpecification.model_validate(spec.model_dump())  # pyright: ignore[reportUnknownMemberType]
 
@@ -304,11 +323,21 @@ def test_build_spec_class_derivations_is_list() -> None:
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
     mst = cast(SchemaDefinition, yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
-    spec, _cov = build_spec(rows, src, mst, force=True)
+    spec, _cov = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=str(_NOR_SCHEMA.resolve()),
+        target_schema_path=str(_MC_SCHEMA.resolve()),
+        force=True,
+    )
     assert isinstance(spec.class_derivations, list)
 
 
-def test_build_spec_errors_on_unresolvable_without_force() -> None:
+def test_build_spec_errors_on_unresolvable_without_force(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": []}, {})
     mst = _mkschema("mst", {"Thing": []}, {})
     rows = [
@@ -316,48 +345,73 @@ def test_build_spec_errors_on_unresolvable_without_force() -> None:
         _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),  # unresolvable object
     ]
     with pytest.raises(ValueError, match="Unresolvable CURIEs"):
-        build_spec(rows, src, mst, force=False)
+        build_spec(
+            rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+        )
 
 
-def test_build_spec_force_proceeds_with_unresolvable_logged() -> None:
+def test_build_spec_force_proceeds_with_unresolvable_logged(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": []}, {})
     mst = _mkschema("mst", {"Thing": []}, {})
     rows = [
         _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
         _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),  # unresolvable object
     ]
-    _spec, coverage = build_spec(rows, src, mst, force=True)
+    _spec, coverage = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
+    )
     assert len(coverage.unresolved_objects) == 1
 
 
-def test_build_spec_force_does_not_bypass_mixed_kind() -> None:
+def test_build_spec_force_does_not_bypass_mixed_kind(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": []}, {})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     rows = [
         _mkrow(subject_id="src:Widget", object_id="mst:beta"),  # mixed: class→slot
     ]
     with pytest.raises(ValueError, match="mixed-kind"):
-        build_spec(rows, src, mst, force=True)
+        build_spec(
+            rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
+        )
 
 
-def test_build_spec_force_does_not_bypass_missing_class_mapping() -> None:
+def test_build_spec_force_does_not_bypass_missing_class_mapping(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     # Only a slot mapping — no class-level mapping row
     rows = [_mkrow(subject_id="src:alpha", object_id="mst:beta")]
     with pytest.raises(ValueError, match="no class-level mapping"):
-        build_spec(rows, src, mst, force=True)
+        build_spec(
+            rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
+        )
 
 
-def test_build_spec_errors_on_missing_class_mapping_for_mapped_slot() -> None:
+def test_build_spec_errors_on_missing_class_mapping_for_mapped_slot(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     rows = [_mkrow(subject_id="src:alpha", object_id="mst:beta")]
     with pytest.raises(ValueError, match="no class-level mapping"):
-        build_spec(rows, src, mst, force=False)
+        build_spec(
+            rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+        )
 
 
-def test_build_spec_errors_on_missing_class_mapping_for_composite_only_owner() -> None:
+def test_build_spec_errors_on_missing_class_mapping_for_composite_only_owner(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha", "gamma"]}, {"alpha": "string", "gamma": "string"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     # Composite group only — no class-level mapping row for Thing
@@ -374,10 +428,15 @@ def test_build_spec_errors_on_missing_class_mapping_for_composite_only_owner() -
         composition_expr="[{alpha}]",
     )
     with pytest.raises(ValueError, match="no class-level mapping"):
-        build_spec([r1, r2], src, mst, force=True)
+        build_spec(
+            [r1, r2], src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
+        )
 
 
-def test_build_spec_datatype_warning_for_mismatched_ranges() -> None:
+def test_build_spec_datatype_warning_for_mismatched_ranges(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "integer"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     rows = [
@@ -389,7 +448,9 @@ def test_build_spec_datatype_warning_for_mismatched_ranges() -> None:
             object_datatype="xsd:string",
         ),
     ]
-    _spec, coverage = build_spec(rows, src, mst, force=False)
+    _spec, coverage = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
     assert len(coverage.datatype_warnings) == 1
 
 
@@ -401,7 +462,14 @@ def test_build_spec_composite_group_flows_to_expr() -> None:
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
     mst = cast(SchemaDefinition, yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
-    spec, _cov = build_spec(rows, src, mst, force=True)
+    spec, _cov = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=str(_NOR_SCHEMA.resolve()),
+        target_schema_path=str(_MC_SCHEMA.resolve()),
+        force=True,
+    )
     # Find the composite SlotDerivation with expr
     found_expr: str | None = None
     cds = spec.class_derivations or []
@@ -419,7 +487,10 @@ def test_build_spec_composite_group_flows_to_expr() -> None:
     assert found_expr == "[{breddegrad},{lengdegrad}]"
 
 
-def test_build_spec_populates_unmapped_required_master_slots() -> None:
+def test_build_spec_populates_unmapped_required_master_slots(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
     # Master class Thing has 3 required slots; we only map beta
     mst = SchemaDefinition(
@@ -444,11 +515,16 @@ def test_build_spec_populates_unmapped_required_master_slots() -> None:
         _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
         _mkrow(subject_id="src:alpha", object_id="mst:beta"),
     ]
-    _spec, coverage = build_spec(rows, src, mst, force=False)
+    _spec, coverage = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
     assert len(coverage.unmapped_required_master_slots) == 2
 
 
-def test_build_spec_coverage_datatype_warnings_populated() -> None:
+def test_build_spec_coverage_datatype_warnings_populated(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "integer"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     rows = [
@@ -460,7 +536,9 @@ def test_build_spec_coverage_datatype_warnings_populated() -> None:
             object_datatype="xsd:string",
         ),
     ]
-    _spec, coverage = build_spec(rows, src, mst, force=False)
+    _spec, coverage = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
     assert len(coverage.datatype_warnings) == 1
     assert coverage.datatype_warnings[0]["subject_datatype"] == "xsd:integer"
     assert coverage.datatype_warnings[0]["object_datatype"] == "xsd:string"
@@ -821,12 +899,15 @@ def test_cli_comments_carry_effective_source_format(tmp_path: Path) -> None:
     assert "rosetta:source_format=csv" in spec_text
 
 
-def test_build_spec_accepts_prefiltered_tuple() -> None:
+def test_build_spec_accepts_prefiltered_tuple(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
     """build_spec honours prefiltered= kwarg and skips internal filter_rows.
 
     Verifies that coverage filter-stage counts are consistent whether
     prefiltered is supplied or omitted.
     """
+    src_path, tgt_path = dummy_schema_paths
     src = _mkschema("nor_radar", {"Observation": ["frequency"]}, {"frequency": "string"})
     mst = _mkschema("cop", {"Track": ["frequency"]}, {"frequency": "string"})
 
@@ -841,10 +922,20 @@ def test_build_spec_accepts_prefiltered_tuple() -> None:
     remaining, excluded = filter_rows(rows, "nor_radar", include_manual=False)
     assert len(excluded["prefix"]) == 1  # the "other:Foo" row
 
-    _, coverage_pre = build_spec(rows, src, mst, force=True, prefiltered=(remaining, excluded))
+    _, coverage_pre = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=src_path,
+        target_schema_path=tgt_path,
+        force=True,
+        prefiltered=(remaining, excluded),
+    )
 
     # Also call without prefiltered to confirm counts match
-    _, coverage_plain = build_spec(rows, src, mst, force=True)
+    _, coverage_plain = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
+    )
 
     assert coverage_pre.rows_after_prefix_filter == coverage_plain.rows_after_prefix_filter
     assert coverage_pre.rows_after_predicate_filter == coverage_plain.rows_after_predicate_filter
@@ -855,3 +946,165 @@ def test_build_spec_accepts_prefiltered_tuple() -> None:
     # Sanity: 3 total rows, 1 excluded by prefix → 2 pass
     assert coverage_pre.rows_after_prefix_filter == 2
     assert coverage_pre.rows_after_justification_filter == 2
+
+
+# ====== New tests — schema paths + prefix population ======
+
+
+def test_build_spec_populates_source_and_target_schema(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
+    src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
+    mst = _mkschema("mst", {"Thing": ["alpha"]}, {"alpha": "string"})
+    rows = [
+        _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
+        _mkrow(subject_id="src:alpha", object_id="mst:alpha"),
+    ]
+    spec, _ = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
+    assert spec.source_schema == str(src_path.resolve())
+    assert spec.target_schema == str(tgt_path.resolve())
+
+
+def test_build_spec_raises_on_missing_source_path(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    _src_path, tgt_path = dummy_schema_paths
+    src = _mkschema("src", {"Widget": []}, {})
+    mst = _mkschema("mst", {"Thing": []}, {})
+    rows = [_mkrow(subject_id="src:Widget", object_id="mst:Thing")]
+    with pytest.raises(ValueError, match="source_schema_path"):
+        build_spec(rows, src, mst, source_schema_path="", target_schema_path=tgt_path, force=True)  # pyright: ignore[reportArgumentType]
+
+
+def test_build_spec_raises_on_missing_target_path(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, _tgt_path = dummy_schema_paths
+    src = _mkschema("src", {"Widget": []}, {})
+    mst = _mkschema("mst", {"Thing": []}, {})
+    rows = [_mkrow(subject_id="src:Widget", object_id="mst:Thing")]
+    with pytest.raises(ValueError, match="target_schema_path"):
+        build_spec(
+            rows,
+            src,
+            mst,
+            source_schema_path=src_path,
+            target_schema_path="/nonexistent/file.yaml",
+            force=True,
+        )
+
+
+def test_build_spec_prefixes_include_rosetta_globals(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
+    src = _mkschema("ex", {"Widget": ["alpha"]}, {"alpha": "string"})
+    mst = _mkschema("mc", {"Thing": ["alpha"]}, {"alpha": "string"})
+    rows = [
+        _mkrow(subject_id="ex:Widget", object_id="mc:Thing"),
+        _mkrow(subject_id="ex:alpha", object_id="mc:alpha"),
+    ]
+    spec, _ = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
+    prefixes = spec.prefixes or {}
+    # Rosetta globals must be present
+    for key, expected_iri in ROSETTA_GLOBAL_PREFIXES.items():
+        assert key in prefixes, f"Global prefix '{key}' missing from spec.prefixes"
+        kv = prefixes[key]
+        assert kv.value == expected_iri, (
+            f"prefix '{key}' IRI mismatch: {kv.value!r} != {expected_iri!r}"
+        )
+    # Schema-own prefixes
+    assert "ex" in prefixes
+    assert "mc" in prefixes
+
+
+def test_build_spec_prefixes_source_wins_on_collision(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    src_path, tgt_path = dummy_schema_paths
+    from linkml_runtime.linkml_model import ClassDefinition, SlotDefinition
+
+    src = SchemaDefinition(
+        id="https://ex/src",
+        name="src",
+        default_prefix="src",
+        prefixes={
+            "src": {"prefix_prefix": "src", "prefix_reference": "https://ex/src/"},
+            "common": {
+                "prefix_prefix": "common",
+                "prefix_reference": "https://source.example/common/",
+            },
+        },
+        classes={"Widget": ClassDefinition(name="Widget", class_uri="src:Widget", slots=["alpha"])},
+        slots={"alpha": SlotDefinition(name="alpha", slot_uri="src:alpha", range="string")},
+    )  # pyright: ignore[reportCallIssue]
+    mst = SchemaDefinition(
+        id="https://ex/mst",
+        name="mst",
+        default_prefix="mst",
+        prefixes={
+            "mst": {"prefix_prefix": "mst", "prefix_reference": "https://ex/mst/"},
+            "common": {
+                "prefix_prefix": "common",
+                "prefix_reference": "https://master.example/common/",
+            },
+        },
+        classes={"Thing": ClassDefinition(name="Thing", class_uri="mst:Thing", slots=["alpha"])},
+        slots={"alpha": SlotDefinition(name="alpha", slot_uri="mst:alpha", range="string")},
+    )  # pyright: ignore[reportCallIssue]
+    rows = [
+        _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
+        _mkrow(subject_id="src:alpha", object_id="mst:alpha"),
+    ]
+    spec, _ = build_spec(
+        rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
+    )
+    prefixes = spec.prefixes or {}
+    assert "common" in prefixes
+    # Source prefix must win
+    assert prefixes["common"].value == "https://source.example/common/"
+
+
+def test_cli_populates_spec_source_target_paths(tmp_path: Path) -> None:
+    from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]  # noqa: F401
+
+    out_yaml = tmp_path / "spec.yaml"
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--sssom",
+            str(_NOR_SSSOM),
+            "--source-schema",
+            str(_NOR_SCHEMA),
+            "--master-schema",
+            str(_MC_SCHEMA),
+            "--output",
+            str(out_yaml),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
+    spec_data = yaml.safe_load(out_yaml.read_text())
+    assert spec_data.get("source_schema") == str(_NOR_SCHEMA.resolve())
+    assert spec_data.get("target_schema") == str(_MC_SCHEMA.resolve())
+    prefixes = spec_data.get("prefixes") or {}
+    # prefixes may be a list of dicts (YAML serialization of dict[str, KeyVal])
+    # or a plain dict — handle both shapes
+    if isinstance(prefixes, list):
+        skos_entries = [
+            p for p in prefixes if (p.get("key") if isinstance(p, dict) else None) == "skos"
+        ]
+        assert skos_entries, "skos prefix not found in spec prefixes list"
+        assert skos_entries[0].get("value") == "http://www.w3.org/2004/02/skos/core#"
+    else:
+        assert "skos" in prefixes
+        skos_val = prefixes["skos"]
+        if isinstance(skos_val, dict):
+            assert skos_val.get("value") == "http://www.w3.org/2004/02/skos/core#"
+        else:
+            assert skos_val == "http://www.w3.org/2004/02/skos/core#"

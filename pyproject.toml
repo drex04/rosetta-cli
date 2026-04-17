@@ -16,7 +16,7 @@ dependencies = [
     "schema-automator>=0.5.5",
     "sssom>=0.4.15",
     "linkml>=1.10.0",
-    "linkml-map>=0.5.2",
+    "linkml-map",
     "curies>=0.13.3",
 ]
 
@@ -85,3 +85,6 @@ ignore_missing_imports = true
 [tool.bandit]
 exclude_dirs = ["rosetta/tests"]
 skips = []
+
+[tool.uv.sources]
+linkml-map = { git = "https://github.com/drex04/linkml-map.git", rev = "48afe2799453c9cd8405ed9df8d8debf74d594c9" }

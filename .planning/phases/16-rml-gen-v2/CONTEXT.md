@@ -91,6 +91,35 @@ Findings and decisions from reviewing Plans 16-00 and 16-01. Both plans locked i
 - **[review-2] Pre-flight verified live:** `linkml_map.datamodel.transformer_model.{TransformationSpecification, ClassDerivation, SlotDerivation, UnitConversionConfiguration}` all import successfully in a scratch venv against current PyPI. `linkml_map.__version__` attribute is missing — use `uv pip show` to capture instead.
 - **[review-2] 16-00 prerequisites all satisfied** (commit 52e4999): SSSOMRow has the four composite fields, audit log is 13 columns, `rosetta-ingest` stamps `rosetta_source_format` and per-slot path annotations. `MappingDecision` consumers confirmed limited to `cli/rml_gen.py`, `core/rml_builder.py`, `core/models.py`, `tests/test_rml_gen.py` — all deleted/stubbed by Tasks 2 + 3.
 
+### From plan-review of 16-02 (2026-04-17)
+
+Plan 16-02 locked in **HOLD + harden** mode. Six decisions locked:
+
+- **[review] Schema field carries absolute filesystem path, not name.** `build_spec()` writes `spec.source_schema = str(source_path)` and `spec.target_schema = str(target_path)` where the paths are the `--source-schema` / `--master-schema` CLI arguments into `rosetta-yarrrml-gen`. The YarrrmlCompiler passes them to `SchemaView()` verbatim. Rationale: Plan 16-02 Task 2a's pseudocode calls `SchemaView(specification.source_schema)` expecting a path; `source.name` ("nor_radar", "master_cop_ontology") would fail that call. build_spec must therefore accept paths, which means `yarrrml_gen.py` passes them in beside the already-loaded SchemaDefinitions.
+- **[review] build_spec raises on missing schema paths; never writes `""`.** Silent empty strings would bypass compile-time validation and surface as opaque ValueErrors later. Fail fast.
+- **[review] Composite member extraction: parse `composition_expr`, not `mapping_group_id`.** 16-01's `_build_composite_slot_derivation` collapses groups into a single SlotDerivation with a joint `composition_expr` and does NOT preserve `mapping_group_id` on the output. Plan 16-02 Task 2f's original "group by mapping_group_id in SlotDerivation.comments" rule has no data to act on. Compiler detects composites via `slot_deriv.expr is not None` and parses member source-slot names from the expression string. Composition_expr parser is documented + tested.
+- **[review] Composite TriplesMap subject = `<parent_subject>/<composite_slot_name>`.** Composites lack source-class identifiers. Deterministic parent-qualified suffix is 1:1 with the parent row and avoids blank-node portability issues across morph-kgc.
+- **[review] Source-class subject template uses SOURCE schema default_prefix.** Preserves provenance and round-trip row identity. `rdf:type` to target class URI still fires via po entry. Target-prefix alternative would collapse identity across source systems.
+- **[review] YarrrmlCompiler receives `spec.prefixes` pre-merged by rosetta-cli.** `build_spec()` merges source prefixes + target prefixes + rosetta globals ({skos, semapv, xsd, qudt}) into `spec.prefixes`. Fork compiler reads `spec.prefixes` directly into the YARRRML `prefixes:` block — no fork-side hardcoded rosetta vocabulary. Keeps the fork agnostic of rosetta-cli conventions.
+- **[review] JSONPath / XPath annotations consumed verbatim.** 16-00 Task 7 already stamps `rosetta_jsonpath = "$.<slot>"` in proper JSONPath form. Re-wrapping yields `$.($.latitude)`. CSV annotation (column name) is wrapped in `$(column)`. XML (XPath) is verbatim. Fallback branch wraps for JSON/CSV, raises for XML.
+- **[review] `--target-schema` added only on `compile` command.** Upstream cli.py already defines a `--target-schema` option on a non-compile command (line 45). Verify no symbol shadow during Task 5 implementation.
+- **[review] Task 7 integration test covers the `-s` / `--target-schema` omitted path.** Proves the self-describing-spec contract (spec carries the paths) actually works when CLI overrides aren't passed — the whole point of Finding 1/2's path-carrying decision.
+
+### From 16-02 brainstorm (2026-04-17)
+
+- **GA-02-1 (subject identifier strategy):** Auto-detect identifier slot via `SchemaView` standard `identifier: true` discovery, then fall back to `id` / `identifier` / `{class}_id` heuristic, then positional `$(__row)`. Hard fail if nothing found. Emit compiler warning on heuristic fallback.
+- **GA-02-2 (composite TriplesMap):** Composites emit separate YARRRML `mappings:` blocks with their own subject template and properties. The owning class's mapping references via `o: mapping: <composite-name>` (YARRRML's `rr:parentTriplesMap` equivalent). Not inline — separate TriplesMaps.
+- **GA-02-3 (datatype coercion):** Always emit `datatype:` on `o:` entries when `SlotDerivation.range` is set. Explicit over implicit.
+- **GA-02-4 (source reference):** YARRRML emits placeholder `sources:` with `$(DATA_FILE)` substituted at morph-kgc runtime (16-03). Format/iterator derived from `rosetta:source_format` comment on the TransformSpec.
+- **GA-02-5 (fork branch policy):** Feature branch `feat/yarrrml-compiler` off upstream-tracking `main`. Atomic commits per subtask. rosetta-cli pins feature-branch SHA.
+- **Compiler structure (A2):** YarrrmlCompiler subclasses `Compiler` directly (not `J2BasedCompiler`), rolls own Jinja Environment with `autoescape=False` for YAML safety. Upstream `J2BasedCompiler.autoescape=True` corrupts non-HTML output.
+- **CLI registration (B1):** Add `elif target == "yarrrml"` in the fork's `cli/cli.py::compile`. Smallest diff; no plugin registry churn.
+- **Schema injection (C2+C1):** 16-01 `build_spec()` extended to populate `spec.source_schema` and `spec.target_schema`. Fork CLI adds `--target-schema` override option. Compiler reads target schema from spec field or CLI override.
+- **Template approach (D1):** Single flat `yarrrml.j2` template. Refactor to macros only if template exceeds ~100 lines.
+- **FnML GREL (E2):** Pre-compute GREL strings in Python (`_grel_for_linear(m, b)`), pass into template context. Template stays declarative.
+- **Fork repo:** `https://github.com/drex04/linkml-map`
+- **16-01 prerequisite extension:** `build_spec()` must populate `spec.source_schema` and `spec.target_schema` before 16-02 can proceed. Small rosetta-cli change included as Task 0 of 16-02.
+
 ## Deferred Ideas
 
 - **Upgrade `subject_type`/`object_type` from prose string `"composed entity expression"` to the SSSOM CURIE `sssom:CompositeEntity`.** — deferred pending move to full SSSOM validation. Forward-compat note added to README in 16-00 Task 5.3.
