@@ -12,7 +12,6 @@ from rosetta.core.io import open_output
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 from rosetta.core.unit_detect import detect_unit
 from rosetta.core.units import (
-    UNIT_STRING_TO_IRI,
     load_qudt_graph,
     suggest_fnml,
     units_compatible,
@@ -134,11 +133,11 @@ def _check_units(
     qudt_graph: rdflib.Graph,
 ) -> None:
     """Append unit-related findings for a single SSSOM row."""
-    src_unit_str = detect_unit(_unit_label(row.subject_id, row.subject_label), "")
-    tgt_unit_str = detect_unit(_unit_label(row.object_id, row.object_label), "")
+    src_iri = detect_unit(_unit_label(row.subject_id, row.subject_label), row.subject_label)
+    tgt_iri = detect_unit(_unit_label(row.object_id, row.object_label), row.object_label)
 
-    if src_unit_str is None or tgt_unit_str is None:
-        if src_unit_str is None:
+    if src_iri is None or tgt_iri is None:
+        if src_iri is None:
             findings.append(
                 LintFinding(
                     rule="unit_not_detected",
@@ -147,7 +146,7 @@ def _check_units(
                     message="No detectable unit in subject field name",
                 )
             )
-        if tgt_unit_str is None:
+        if tgt_iri is None:
             findings.append(
                 LintFinding(
                     rule="unit_not_detected",
@@ -156,21 +155,6 @@ def _check_units(
                     message="No detectable unit in object field name",
                 )
             )
-        return
-
-    src_iri = UNIT_STRING_TO_IRI.get(src_unit_str)
-    tgt_iri = UNIT_STRING_TO_IRI.get(tgt_unit_str)
-
-    if src_iri is None or tgt_iri is None:
-        unit_name = src_unit_str if src_iri is None else tgt_unit_str
-        findings.append(
-            LintFinding(
-                rule="unit_not_detected",
-                severity="INFO",
-                source_uri=row.subject_id,
-                message=f"Unit '{unit_name}' has no QUDT IRI mapping",
-            )
-        )
         return
 
     compat = units_compatible(src_iri, tgt_iri, qudt_graph)
@@ -182,7 +166,7 @@ def _check_units(
                 severity="BLOCK",
                 source_uri=row.subject_id,
                 target_uri=row.object_id,
-                message=f"Incompatible unit dimensions: {src_unit_str} vs {tgt_unit_str}",
+                message=f"Incompatible unit dimensions: {src_iri} vs {tgt_iri}",
             )
         )
     elif compat is True:
@@ -193,7 +177,7 @@ def _check_units(
                     severity="WARNING",
                     source_uri=row.subject_id,
                     target_uri=row.object_id,
-                    message=f"Same dimension, different units: {src_unit_str} vs {tgt_unit_str}",
+                    message=f"Same dimension, different units: {src_iri} vs {tgt_iri}",
                     fnml_suggestion=suggest_fnml(src_iri, tgt_iri, qudt_graph),
                 )
             )

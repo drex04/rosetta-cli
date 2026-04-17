@@ -16,19 +16,6 @@ from rosetta.core.models import FnmlSuggestion
 UNIT_NS = "http://qudt.org/vocab/unit/"
 QUDT_NS = "http://qudt.org/schema/qudt/"
 
-# Maps detect_unit() output strings to QUDT unit: IRIs.
-# Keys MUST match detect_unit() return values exactly.
-# dBm intentionally maps to None (no standard QUDT IRI).
-UNIT_STRING_TO_IRI: dict[str, str | None] = {
-    "meter": "unit:M",
-    "kilometer": "unit:KiloM",
-    "km_per_hour": "unit:KiloM-PER-HR",
-    "foot": "unit:FT",
-    "knot": "unit:KN",
-    "degree": "unit:DEG",
-    "dBm": None,
-}
-
 
 # ---------------------------------------------------------------------------
 # Graph loading

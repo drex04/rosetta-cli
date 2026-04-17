@@ -124,3 +124,59 @@ unit:degC
     rdfs:label            "Degree Celsius" ;
     qudt:symbol           "°C" ;
     qudt:hasDimensionVector "A0E0L0I0M0H1T0D0" .
+
+unit:DEG_F
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Degree Fahrenheit" ;
+    qudt:symbol           "°F" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H1T0D0" .
+
+# ── Frequency ─────────────────────────────────────────────────────────────────
+
+unit:HZ
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Hertz" ;
+    qudt:symbol           "Hz" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T-1D0" .
+
+unit:KiloHZ
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Kilohertz" ;
+    qudt:symbol           "kHz" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T-1D0" .
+
+unit:MegaHZ
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Megahertz" ;
+    qudt:symbol           "MHz" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T-1D0" .
+
+unit:GigaHZ
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Gigahertz" ;
+    qudt:symbol           "GHz" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T-1D0" .
+
+# ── Additional Angle ──────────────────────────────────────────────────────────
+
+unit:MilliRAD
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Milliradian" ;
+    qudt:symbol           "mrad" ;
+    qudt:hasDimensionVector "A0E0L0I0M0H0T0D0" .
+
+# ── Additional Pressure ───────────────────────────────────────────────────────
+
+unit:HectoPa
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Hectopascal" ;
+    qudt:symbol           "hPa" ;
+    qudt:hasDimensionVector "A0E0L-1I0M1H0T-2D0" .
+
+# ── Additional Speed ──────────────────────────────────────────────────────────
+
+unit:MI-PER-HR
+    rdf:type              qudt:Unit ;
+    rdfs:label            "Mile per Hour" ;
+    qudt:symbol           "mph" ;
+    qudt:hasDimensionVector "A0E0L1I0M0H0T-1D0" .

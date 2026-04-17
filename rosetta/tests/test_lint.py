@@ -11,7 +11,6 @@ from click.testing import CliRunner
 
 from rosetta.cli.lint import cli
 from rosetta.core.units import (
-    UNIT_STRING_TO_IRI,
     dimension_vector,
     load_qudt_graph,
     suggest_fnml,
@@ -31,23 +30,6 @@ def qudt_graph():
 # ---------------------------------------------------------------------------
 # Section 1 — units.py unit tests
 # ---------------------------------------------------------------------------
-
-
-def test_unit_string_to_iri_meter():
-    assert UNIT_STRING_TO_IRI["meter"] == "unit:M"
-
-
-def test_unit_string_to_iri_foot():
-    assert UNIT_STRING_TO_IRI["foot"] == "unit:FT"
-
-
-def test_unit_string_to_iri_dbm():
-    assert "dBm" in UNIT_STRING_TO_IRI
-    assert UNIT_STRING_TO_IRI["dBm"] is None
-
-
-def test_unit_string_to_iri_unknown():
-    assert UNIT_STRING_TO_IRI.get("furlongs") is None
 
 
 def test_load_qudt_graph_parses(qudt_graph):
@@ -415,9 +397,12 @@ def test_lint_sssom_unit_not_detected(tmp_path: Path) -> None:
 
 
 def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
-    """subject 'signal_dbm' and object 'rx_dbm' (dBm has no QUDT IRI) → unit_not_detected INFO."""
-    # Both sides detect "dBm" so we reach the IRI-mapping None check.
-    # detect_unit matches (?:^|_)dbm$ (case-insensitive) → "dBm" → UNIT_STRING_TO_IRI["dBm"] is None
+    """subject 'signal_dbm' and object 'rx_dbm' → unit_not_detected INFO.
+
+    dBm has no QUDT IRI, so detect_unit returns None directly — the dBm path
+    now collapses to the single unit_not_detected finding (no separate
+    "no QUDT IRI mapping" step).
+    """
     sssom = tmp_path / "dbm.sssom.tsv"
     _write_sssom(
         sssom,
@@ -438,7 +423,6 @@ def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
     infos = [f for f in data["findings"] if f["rule"] == "unit_not_detected"]
     assert infos, "Expected unit_not_detected finding for dBm"
     assert infos[0]["severity"] == "INFO"
-    assert "no QUDT IRI mapping" in infos[0]["message"]
 
 
 def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:

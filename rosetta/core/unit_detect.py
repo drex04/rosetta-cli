@@ -1,46 +1,157 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING, Any
 
-# Each entry: (pattern, unit_string, apply_to_name, apply_to_description)
-# Order matters — more specific patterns must come before less specific ones.
-_NAME_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # km/h variants — MUST come before _km to avoid false match
-    (re.compile(r"(?:_kmh|km[/_]h)", re.IGNORECASE), "km_per_hour"),
-    # individual unit suffixes — all end-anchored
-    (re.compile(r"(?:^|_)meters?$", re.IGNORECASE), "meter"),
-    (re.compile(r"(?:^|_)m$", re.IGNORECASE), "meter"),
-    (re.compile(r"(?:^|_)km$", re.IGNORECASE), "kilometer"),
-    (re.compile(r"(?:^|_)ft$", re.IGNORECASE), "foot"),
-    (re.compile(r"(?:^|_)kts$", re.IGNORECASE), "knot"),
-    (re.compile(r"(?:^|_)(?:deg|grad|grader)$", re.IGNORECASE), "degree"),
-    (re.compile(r"(?:^|_)dbm$", re.IGNORECASE), "dBm"),
+if TYPE_CHECKING:
+    from pint import UnitRegistry
+
+# ---------------------------------------------------------------------------
+# Regex tables — ordered most-specific first; all map to QUDT IRI strings.
+# ---------------------------------------------------------------------------
+
+_NAME_PATTERNS: list[tuple[re.Pattern[str], str | None]] = [
+    # Speed — compound before bare length/time tokens
+    (re.compile(r"(?:_kmh|km[/_]h)", re.IGNORECASE), "unit:KiloM-PER-HR"),
+    (re.compile(r"(?:^|_)mps$", re.IGNORECASE), "unit:M-PER-SEC"),
+    (re.compile(r"(?:^|_)mph$", re.IGNORECASE), "unit:MI-PER-HR"),
+    # Frequency — GHz/MHz/kHz before bare Hz
+    (re.compile(r"(?:^|_)(?:ghz|gigahertz)$", re.IGNORECASE), "unit:GigaHZ"),
+    (re.compile(r"(?:^|_)(?:mhz|megahertz)$", re.IGNORECASE), "unit:MegaHZ"),
+    (re.compile(r"(?:^|_)(?:khz|kilohertz)$", re.IGNORECASE), "unit:KiloHZ"),
+    (re.compile(r"(?:^|_)hz$", re.IGNORECASE), "unit:HZ"),
+    # Length — km before bare m
+    (re.compile(r"(?:^|_)meters?$", re.IGNORECASE), "unit:M"),
+    (re.compile(r"(?:^|_)km$", re.IGNORECASE), "unit:KiloM"),
+    (re.compile(r"(?:^|_)m$", re.IGNORECASE), "unit:M"),
+    (re.compile(r"(?:^|_)ft$", re.IGNORECASE), "unit:FT"),
+    (re.compile(r"(?:^|_)nmi$", re.IGNORECASE), "unit:NauticalMile"),
+    (re.compile(r"(?:^|_)kts$", re.IGNORECASE), "unit:KN"),
+    # Angle — mrad before rad, deg/grad separated from rad/radians
+    (re.compile(r"(?:^|_)mrad$", re.IGNORECASE), "unit:MilliRAD"),
+    (re.compile(r"(?:^|_)(?:deg|grad|grader)$", re.IGNORECASE), "unit:DEG"),
+    (re.compile(r"(?:^|_)(?:rad|radians?)$", re.IGNORECASE), "unit:RAD"),
+    # Power / signal — dBm has no QUDT IRI; short-circuit with None
+    (re.compile(r"(?:^|_)dbm$", re.IGNORECASE), None),
+    # Mass
+    (re.compile(r"(?:^|_)kg$", re.IGNORECASE), "unit:KiloGM"),
+    # Pressure — hPa before Pa
+    (re.compile(r"(?:^|_)hpa$", re.IGNORECASE), "unit:HectoPa"),
+    (re.compile(r"(?:^|_)pa$", re.IGNORECASE), "unit:PA"),
+    # Time
+    (re.compile(r"(?:^|_)(?:secs?|seconds?)$", re.IGNORECASE), "unit:SEC"),
+    (re.compile(r"(?:^|_)(?:hrs?|hours?)$", re.IGNORECASE), "unit:HR"),
+    # Temperature
+    (re.compile(r"(?:^|_)(?:celsius|degc)$", re.IGNORECASE), "unit:degC"),
+    (re.compile(r"(?:^|_)(?:fahrenheit|degf)$", re.IGNORECASE), "unit:DEG_F"),
+    (re.compile(r"(?:^|_)kelvin$", re.IGNORECASE), "unit:K"),
 ]
 
-_DESC_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bdecimal\s+degrees?\b", re.IGNORECASE), "degree"),
-    (re.compile(r"\bkm/h\b", re.IGNORECASE), "km_per_hour"),
-    (re.compile(r"\bkilometers?\b", re.IGNORECASE), "kilometer"),
-    (re.compile(r"\b(?:feet|foot)\b", re.IGNORECASE), "foot"),
-    (re.compile(r"\bknots?\b", re.IGNORECASE), "knot"),
-    (re.compile(r"\bmetres?\b", re.IGNORECASE), "meter"),
-    (re.compile(r"\bdegree\b", re.IGNORECASE), "degree"),
-    (re.compile(r"\bdBm\b"), "dBm"),
+_DESC_PATTERNS: list[tuple[re.Pattern[str], str | None]] = [
+    (re.compile(r"\bdecimal\s+degrees?\b", re.IGNORECASE), "unit:DEG"),
+    (re.compile(r"\bkm/h\b", re.IGNORECASE), "unit:KiloM-PER-HR"),
+    (re.compile(r"\bm/s\b", re.IGNORECASE), "unit:M-PER-SEC"),
+    (re.compile(r"\bkilometers?\b", re.IGNORECASE), "unit:KiloM"),
+    (re.compile(r"\bnautical\s+miles?\b", re.IGNORECASE), "unit:NauticalMile"),
+    (re.compile(r"\b(?:feet|foot)\b", re.IGNORECASE), "unit:FT"),
+    (re.compile(r"\bknots?\b", re.IGNORECASE), "unit:KN"),
+    (re.compile(r"\bmetres?\b", re.IGNORECASE), "unit:M"),
+    (re.compile(r"\bdegree\b", re.IGNORECASE), "unit:DEG"),
+    (re.compile(r"\bmilliradians?\b|\bmrads?\b", re.IGNORECASE), "unit:MilliRAD"),
+    (re.compile(r"\bradians?\b", re.IGNORECASE), "unit:RAD"),
+    (re.compile(r"\bGHz\b"), "unit:GigaHZ"),
+    (re.compile(r"\bMHz\b"), "unit:MegaHZ"),
+    (re.compile(r"\bkHz\b"), "unit:KiloHZ"),
+    (re.compile(r"\bhertz\b|\bHz\b", re.IGNORECASE), "unit:HZ"),
+    (re.compile(r"\bkilograms?\b", re.IGNORECASE), "unit:KiloGM"),
+    (re.compile(r"\bhectopascals?\b|\bhPa\b"), "unit:HectoPa"),
+    (re.compile(r"\bpascals?\b", re.IGNORECASE), "unit:PA"),
+    (re.compile(r"\bseconds?\b", re.IGNORECASE), "unit:SEC"),
+    (re.compile(r"\bminutes?\b", re.IGNORECASE), "unit:MIN"),
+    (re.compile(r"\bhours?\b", re.IGNORECASE), "unit:HR"),
+    (re.compile(r"\bkelvin\b", re.IGNORECASE), "unit:K"),
+    (re.compile(r"\bcelsius\b", re.IGNORECASE), "unit:degC"),
+    (re.compile(r"\bfahrenheit\b", re.IGNORECASE), "unit:DEG_F"),
+    (re.compile(r"\bdBm\b"), None),
 ]
+
+# ---------------------------------------------------------------------------
+# NLP fallback — quantulum3 extracts unit candidates; pint canonicalises them.
+# Keys are the exact str() of pint's parse_expression().units output.
+# ---------------------------------------------------------------------------
+
+_PINT_TO_QUDT_IRI: dict[str, str | None] = {
+    "meter": "unit:M",
+    "kilometer": "unit:KiloM",
+    "kilometer / hour": "unit:KiloM-PER-HR",
+    "foot": "unit:FT",
+    "knot": "unit:KN",
+    "degree": "unit:DEG",
+    "nautical_mile": "unit:NauticalMile",
+    "meter / second": "unit:M-PER-SEC",
+    "mile / hour": "unit:MI-PER-HR",
+    "radian": "unit:RAD",
+    "milliradian": "unit:MilliRAD",
+    "kilogram": "unit:KiloGM",
+    "gram": "unit:GM",
+    "second": "unit:SEC",
+    "minute": "unit:MIN",
+    "hour": "unit:HR",
+    "pascal": "unit:PA",
+    "hectopascal": "unit:HectoPa",
+    "kelvin": "unit:K",
+    "degree_Celsius": "unit:degC",
+    "degree_Fahrenheit": "unit:DEG_F",
+    "hertz": "unit:HZ",
+    "kilohertz": "unit:KiloHZ",
+    "megahertz": "unit:MegaHZ",
+    "gigahertz": "unit:GigaHZ",
+}
+
+_ureg: UnitRegistry | None = None  # pyright: ignore[reportMissingTypeArgument]
 
 
 def detect_unit(name: str, description: str) -> str | None:
-    """Detect the physical unit for a field from its name and description.
+    """Return the QUDT unit IRI for a field, or None if not detected.
 
-    Apply end-anchored regex patterns to the field name first, then the
-    description. Return the first match, or None if no unit is detected.
+    Cascade: name regex → description regex → quantulum3+pint NLP on
+    description. Returns None both when no unit is detected and when the
+    detected unit has no QUDT IRI (e.g. dBm).
     """
-    for pattern, unit in _NAME_PATTERNS:
+    for pattern, iri in _NAME_PATTERNS:
         if pattern.search(name):
-            return unit
+            return iri
 
-    for pattern, unit in _DESC_PATTERNS:
+    for pattern, iri in _DESC_PATTERNS:
         if pattern.search(description):
-            return unit
+            return iri
 
+    return _detect_from_nlp(description)
+
+
+def _detect_from_nlp(description: str) -> str | None:
+    """quantulum3 + pint layer — lazy imports, single UnitRegistry per process."""
+    global _ureg  # noqa: PLW0603
+    try:
+        from pint import UnitRegistry  # noqa: PLC0415
+        from quantulum3 import parser as q3  # noqa: PLC0415
+    except ImportError:
+        return None
+
+    if _ureg is None:
+        _ureg = UnitRegistry()
+
+    try:
+        candidates: list[Any] = list(q3.parse(description))
+    except Exception:  # noqa: BLE001
+        return None
+
+    for qty in candidates:
+        try:
+            parsed = _ureg.parse_expression(qty.unit.name)
+            key = str(parsed.units)
+            if key in _PINT_TO_QUDT_IRI:
+                return _PINT_TO_QUDT_IRI[key]
+        except Exception:  # noqa: BLE001
+            continue
     return None

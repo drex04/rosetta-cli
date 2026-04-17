@@ -24,6 +24,8 @@ created: 2026-04-16
 - [review] **Task 2 done criterion adds unit:MIN SPARQL check:** `unit:MIN` appears in `_DESC_PATTERNS` and `_PINT_TO_QUDT_IRI`. If absent from the TTL graph, dimension checks silently return `None`. Done criterion must verify it.
 - [review] **4 duplicate detect_unit tests in test_lint.py deleted, not replaced:** Coverage already exists in `test_unit_detect.py`. Adding duplicates violates CLAUDE.md stub-test convention.
 - [review] **`test_detect_unit_dBm_desc_exact_case` updated to assert `is None`:** Old assertion `== "dBm"` (canonical string) will fail after IRI-native migration.
+- [review-2] **Truths outrank task-body code snippets:** The first-pass review added 17 `[review]` truths mandating code changes (deg/rad split, `_ureg` singleton, `q3.parse()` guard, ImportError handling, delete test_lint.py detect_unit tests, preserve `_unit_label()`, dBm assert-is-None), but PLAN.md's Task 3/5/6 bodies still show the pre-review code. Executor MUST treat truths as canonical and regenerate task bodies to match; do not follow the stale inline snippets.
+- [review-2] **Thread description into _check_units:** Current `_check_units` passes `description=""` to `detect_unit`, making the Task 3 NLP cascade unreachable from the only production caller. `_check_units` MUST pass `row.subject_label` / `row.object_label` as the description arg so the quantulum3+pint layer actually fires on lint input.
 
 ## Deferred Ideas
 

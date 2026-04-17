@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-17T16:30:00.000Z"
+last_updated: "2026-04-17T19:56:00.000Z"
 progress:
   total_phases: 17
-  completed_phases: 16
-  total_plans: 17
-  completed_plans: 20
+  completed_phases: 17
+  total_plans: 18
+  completed_plans: 21
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 16 complete; Phase 17 (QUDT-native unit detection) next
-- **Plan:** 16-00, 16-01, 16-02, 16-03 all complete — Phase 16 SSSOM → JSON-LD pipeline closed end-to-end
-- **Status:** Plan 16-03 (morph-kgc runner + JSON-LD framing + E2E) complete on 2026-04-17; 332/332 tests passing (329 fast + 3 slow, +27 net new); 8/8 quality gates clean
+- **Phase:** 17 complete — all v2.0 phases closed
+- **Plan:** 17-01 (QUDT-native multi-library unit detection) complete
+- **Status:** Plan 17-01 complete on 2026-04-17; 367/367 fast tests passing (+35 net new vs Phase 16 close); 8/8 quality gates clean. `detect_unit()` now returns QUDT IRIs directly; quantulum3+pint NLP cascade reachable from `rosetta-lint`.
 
 ## Phase Progress
 
@@ -39,6 +39,7 @@ progress:
 | 14 | User Review (approve/reject → approved SSSOM) | Complete |
 | 15 | rosetta-lint SSSOM enrichment | Complete |
 | 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
+| 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
 
 ## Phase 1 Completion
 
