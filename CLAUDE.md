@@ -1,5 +1,9 @@
 # Rosetta CLI
 
+## Response Style
+
+Be concise. State what changed and what's next; skip narration and recap. One or two sentences per update is almost always enough.
+
 ## Code Exploration
 
 Use claude-mem smart tools as the primary tools for understanding code:
