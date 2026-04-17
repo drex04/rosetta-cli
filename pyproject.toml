@@ -18,6 +18,7 @@ dependencies = [
     "linkml>=1.10.0",
     "linkml-map",
     "curies>=0.13.3",
+    "morph-kgc==2.10.0",
 ]
 
 [project.scripts]

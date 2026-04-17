@@ -166,6 +166,13 @@ def test_yarrrml_compile_csv_references_match_annotations(tmp_path: Path) -> Non
     assert "$(lengdegrad)" in raw_yaml, (
         "Expected $(lengdegrad) reference from rosetta_csv_column annotation"
     )
+    # Fork-drift guard (Plan 16-03): the compiler must emit the $(DATA_FILE)
+    # placeholder verbatim so rosetta/core/rml_runner.py's _substitute_data_path
+    # can swap in the concrete data path at --run time.
+    assert "$(DATA_FILE)" in raw_yaml, (
+        "Expected $(DATA_FILE) placeholder in YARRRML sources block — "
+        "rml_runner._substitute_data_path relies on it."
+    )
 
     # YARRRML output uses mappings as a dict-of-dicts with 'po' lists.
     # Collect all object values (second element of [predicate, object] pairs) across all mappings.

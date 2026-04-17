@@ -120,12 +120,36 @@ Plan 16-02 locked in **HOLD + harden** mode. Six decisions locked:
 - **Fork repo:** `https://github.com/drex04/linkml-map`
 - **16-01 prerequisite extension:** `build_spec()` must populate `spec.source_schema` and `spec.target_schema` before 16-02 can proceed. Small rosetta-cli change included as Task 0 of 16-02.
 
+### From 16-03 brainstorm (2026-04-17)
+
+- **GA-03-1 (morph-kgc config):** Config built as INI **string** via `configparser` + `StringIO`. YARRRML written to `work_dir/mapping.yml` as a real file because morph-kgc reads it by path from the INI.
+- **GA-03-2 (data-file binding):** Fork's YARRRML emits `$(DATA_FILE)` placeholder in `sources:`. `rml_runner._substitute_data_path` performs a string replace before writing. Multi-source deferred.
+- **GA-03-3 (JSON-LD context):** Generated in-process via `linkml.generators.jsonldcontextgen.ContextGenerator(master_schema).serialize()`. `--context-output` flag optionally persists the context JSON. No shell-out.
+- **GA-03-4 (`--run` stdout semantics):** JSON-LD to stdout if no `--jsonld-output`; to file if both. Without `--run`, CLI emits TransformSpec YAML (unchanged from 16-01/02). Exit 1 on any morph-kgc error; no partial output.
+- **GA-03-5 (E2E fixture):** Synthesise 3-row `nor_radar_sample.csv`; reuse existing `nor_radar.linkml.yaml` + `master_cop.linkml.yaml`. Slow test asserts JSON-LD parses, `@context` contains master `default_prefix`, ≥1 typed instance, one unit-converted numeric field.
+- **GA-03-6 (no new Pydantic output model):** JSON-LD is a standard; `CoverageReport` unchanged. Internal dataclasses keep `extra="forbid"`.
+- **GA-03-7 (runner split):** Two public fns (`run_materialize`, `graph_to_jsonld`) + three private helpers. Each fn ≤ radon grade B.
+- **GA-03-8 (work_dir):** Default `tempfile.mkdtemp()` cleaned on exit; `--workdir PATH` overrides for debugging.
+- **GA-03-9 (YARRRML on disk):** YARRRML written to `.yml` before morph-kgc invocation; morph-kgc detects by extension.
+
+### From plan-review of 16-03 (2026-04-17)
+
+Plan 16-03 locked in **HOLD + harden** mode. Review findings integrated as `[review]` truths in PLAN.md frontmatter. Three decisions needed user input:
+
+- **[review] Tempdir cleanup via context manager (not atexit).** `run_materialize` exposed as `@contextlib.contextmanager` yielding the `rdflib.Graph`; on exit rmtree's the work directory. CLI uses `with run_materialize(...) as graph:`. Test helpers always pass `--workdir tmp_path` to avoid `atexit`/`CliRunner` incompatibility (atexit handlers fire at interpreter exit, not per-test — dirs would leak). Rationale: clean, testable, no leaks.
+- **[review] Empty-graph handling: warn + exit 0.** If `morph_kgc.materialize()` returns a graph with 0 triples, the CLI emits `Warning: materialization produced 0 triples; check data file and mappings` to stderr and still writes the (effectively empty) JSON-LD to stdout with exit code 0. Rationale: Unix-pipeline friendly; does not silently drop output; makes the condition visible without breaking composability.
+- **[review] E2E numeric assertion: pytest.approx(rel=1e-2) + structural guard.** Pre-assert `set(csv_columns) ⊆ set(schema_slots)` for a clear precondition failure; find the unit-converted field via compaction-tolerant key lookup (iterate `@context` + parsed `@graph` entries, match by CURIE-expanded IRI or short-name); value asserted with `pytest.approx(expected, rel=1e-2)`. Rationale: robust to GREL/morph-kgc upgrades while still proving unit conversion happened.
+
+Other findings applied directly as plan truths without user input (see `[review]` entries in 16-03-PLAN.md `must_haves.truths`): constructor signature correction, morph-kgc logging suppression, `--jsonld-output` OSError wrapping, `@context` key required (no fallback), `run_materialize`-raises unit test, `$(DATA_FILE)` placeholder constant + fast-CI assertion, `click.get_binary_stream` instead of `sys.stdout.buffer`, enumerated exception types in SPEC §5, `--workdir` path canonicalisation + writability probe, RuntimeError wrapping of `mapping.yml` / `graph.serialize` / `ContextGenerator` errors, extra fast CLI tests for `--workdir`/`--context-output`/empty-graph.
+
 ## Deferred Ideas
 
 - **Upgrade `subject_type`/`object_type` from prose string `"composed entity expression"` to the SSSOM CURIE `sssom:CompositeEntity`.** — deferred pending move to full SSSOM validation. Forward-compat note added to README in 16-00 Task 5.3.
 - **`--dry-run` and `--stats` flags on `rosetta-yarrrml-gen`.** — delight opportunity surfaced during scope challenge, deferred to keep 16-01 HOLD-tight.
 - **Reader-side reconciliation for wider-than-current audit log headers.** — `_migrate_audit_log_if_needed` in 16-00 no-ops if existing header is wider than `AUDIT_LOG_COLUMNS` (future-version tolerance). Full downgrade-migration is not in scope.
 - **Auto-inference of deeper JSONPath expressions for nested JSON slots.** — 16-00 Task 7 stamps `$.<slot_name>` flat paths only; nested-object handling deferred.
+- **`--run + --output` asymmetric stdout matrix.** 16-03 review W8: when both flags are set, CLI writes TransformSpec YAML to `--output` and JSON-LD to stdout. Reviewer flagged the asymmetry; decided to document in CLI `--help` and add a test rather than refuse the combo. Future UX polish opportunity if the asymmetry confuses users.
+- **Streaming materialization for large graphs.** 16-03 review W7/9-1: `morph_kgc.materialize()` returns the full graph in memory; `ContextGenerator` re-parses master schema each `--run`. Acceptable for Phase 16 demo scale; revisit if NATO deployment workloads push past ~100k triples or interactive latency budgets.
 
 ## Scope and boundaries
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import cast
@@ -11,9 +12,11 @@ import yaml  # for YAMLError
 from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
+from linkml_runtime.utils.schemaview import SchemaView  # type: ignore[import-untyped]
 
 from rosetta.core.accredit import parse_sssom_tsv
 from rosetta.core.io import open_output
+from rosetta.core.rml_runner import graph_to_jsonld, run_materialize
 from rosetta.core.transform_builder import build_spec, filter_rows
 
 
@@ -55,11 +58,50 @@ def _resolve_source_format(cli_flag: str | None, source_def: SchemaDefinition) -
         "annotations.rosetta_source_format; exit 1 if neither is present."
     ),
 )
-@click.option("--output", type=click.Path(), default=None)
+@click.option(
+    "--output",
+    type=click.Path(),
+    default=None,
+    help=(
+        "Write the TransformSpec YAML to a file. Note: --output controls only the "
+        "TransformSpec YAML. When combined with --run, the JSON-LD still streams to "
+        "stdout (or to --jsonld-output if provided)."
+    ),
+)
 @click.option("--coverage-report", type=click.Path(), default=None)
 @click.option("--include-manual", is_flag=True, default=False)
 @click.option("--allow-empty", is_flag=True, default=False)
 @click.option("--force", is_flag=True, default=False)
+@click.option(
+    "--run",
+    is_flag=True,
+    default=False,
+    help="After generating the TransformSpec, compile to YARRRML and materialize JSON-LD.",
+)
+@click.option(
+    "--data",
+    type=click.Path(),
+    default=None,
+    help="Source data file (required with --run).",
+)
+@click.option(
+    "--jsonld-output",
+    type=click.Path(),
+    default=None,
+    help="Write JSON-LD to this file instead of stdout.",
+)
+@click.option(
+    "--workdir",
+    type=click.Path(),
+    default=None,
+    help="Directory to retain morph-kgc artifacts for debugging; ephemeral tempdir if omitted.",
+)
+@click.option(
+    "--context-output",
+    type=click.Path(),
+    default=None,
+    help="Optional JSON-LD @context dump path.",
+)
 def cli(
     sssom: str,
     source_schema: str,
@@ -70,6 +112,11 @@ def cli(
     include_manual: bool,
     allow_empty: bool,
     force: bool,
+    run: bool,
+    data: str | None,
+    jsonld_output: str | None,
+    workdir: str | None,
+    context_output: str | None,
 ) -> None:
     """Generate a linkml-map TransformSpec from an approved SSSOM audit log."""
     # 1. Parse SSSOM audit log
@@ -151,7 +198,7 @@ def cli(
         click.echo(f"Error serializing TransformSpec: {exc}", err=True)
         sys.exit(1)
 
-    # 9. Write to stdout or --output
+    # 9. Write TransformSpec to stdout or --output
     with open_output(output) as out:
         out.write(yaml_text)
 
@@ -162,5 +209,90 @@ def cli(
         except OSError as exc:
             click.echo(f"Error writing coverage report {coverage_report}: {exc}", err=True)
             sys.exit(1)
+
+    # 11. If --run not set, stop here (behavior preserved from 16-02).
+    if not run:
+        sys.exit(0)
+
+    # 12. --run requires --data.
+    if not data:
+        click.echo("Error: --run requires --data", err=True)
+        sys.exit(1)
+
+    data_path = Path(data)
+    if not data_path.is_file():
+        click.echo(f"Error: --data path does not exist or is not a file: {data}", err=True)
+        sys.exit(1)
+
+    # 13. Compile TransformSpec → YARRRML via forked linkml-map compiler.
+    try:
+        from linkml_map.compiler.yarrrml_compiler import (
+            YarrrmlCompiler,  # type: ignore[import-untyped]
+        )
+
+        compiler = YarrrmlCompiler(
+            source_schemaview=SchemaView(str(Path(source_schema).resolve())),
+            target_schemaview=SchemaView(str(Path(master_schema).resolve())),
+        )
+        yarrrml_text: str = compiler.compile(spec).serialization  # pyright: ignore[reportUnknownMemberType]
+    except (OSError, PermissionError, FileNotFoundError, yaml.YAMLError, ValueError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except Exception as exc:
+        click.echo(f"Error compiling YARRRML: {exc}", err=True)
+        sys.exit(1)
+
+    # 14. Resolve workdir with writability probe.
+    resolved_workdir: Path | None
+    if workdir:
+        resolved_workdir = Path(workdir).resolve()
+        try:
+            resolved_workdir.mkdir(parents=True, exist_ok=True)
+            probe = resolved_workdir / ".writable_probe"
+            probe.touch()
+            probe.unlink()
+        except OSError as exc:
+            click.echo(f"Error: --workdir {resolved_workdir} not writable: {exc}", err=True)
+            sys.exit(1)
+    else:
+        resolved_workdir = None
+
+    # 15. Materialize + frame as JSON-LD.
+    context_out_path = Path(context_output).resolve() if context_output else None
+    try:
+        with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
+            if len(graph) == 0:
+                click.echo(
+                    "Warning: materialization produced 0 triples; check data file and mappings",
+                    err=True,
+                )
+            jsonld_bytes = graph_to_jsonld(
+                graph, Path(master_schema), context_output=context_out_path
+            )
+    except (
+        OSError,
+        PermissionError,
+        FileNotFoundError,
+        json.JSONDecodeError,
+        yaml.YAMLError,
+        UnicodeDecodeError,
+        RuntimeError,
+        ValueError,
+    ) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    # 16. Write JSON-LD to file or stdout.
+    if jsonld_output:
+        try:
+            Path(jsonld_output).write_bytes(jsonld_bytes)
+        except OSError as exc:
+            click.echo(f"Error writing JSON-LD output {jsonld_output}: {exc}", err=True)
+            sys.exit(1)
+    else:
+        click.get_binary_stream("stdout").write(jsonld_bytes)
 
     sys.exit(0)

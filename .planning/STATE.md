@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-17T06:45:00.000Z"
+last_updated: "2026-04-17T16:30:00.000Z"
 progress:
   total_phases: 17
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 17
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 16 (rml-gen v2 — SSSOM → linkml-map TransformSpec → YARRRML → JSON-LD)
-- **Plan:** 16-00, 16-01, 16-02 complete; 16-03 next (morph-kgc execution + JSON-LD framing + E2E)
-- **Status:** Plan 16-02 (YarrrmlCompiler in forked linkml-map) complete on 2026-04-17; fork pinned at SHA 48afe27995 on drex04/linkml-map `feat/yarrrml-compiler`; 305/305 fast tests passing (+2 slow subprocess tests); 8/8 quality gates clean
+- **Phase:** 16 complete; Phase 17 (QUDT-native unit detection) next
+- **Plan:** 16-00, 16-01, 16-02, 16-03 all complete — Phase 16 SSSOM → JSON-LD pipeline closed end-to-end
+- **Status:** Plan 16-03 (morph-kgc runner + JSON-LD framing + E2E) complete on 2026-04-17; 332/332 tests passing (329 fast + 3 slow, +27 net new); 8/8 quality gates clean
 
 ## Phase Progress
 
@@ -38,6 +38,7 @@ progress:
 | 13 | Semantic Matching (embed + suggest → SSSOM) | Complete |
 | 14 | User Review (approve/reject → approved SSSOM) | Complete |
 | 15 | rosetta-lint SSSOM enrichment | Complete |
+| 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
 
 ## Phase 1 Completion
 
@@ -157,6 +158,17 @@ progress:
 - **Completed:** 2026-04-17
 - **Key changes:** `YarrrmlCompiler` added to forked linkml-map, compiles `TransformationSpecification` → YARRRML consumable by morph-kgc; `Compiler` subclass with own `Environment(autoescape=False)` to preserve YAML; composite slots emit separate TriplesMap blocks via `parentTriplesMap` references; composite subject template = `<parent_subject>/<composite_slot_name>`; source-class subjects use SOURCE schema's default_prefix; JSONPath/XPath annotations read verbatim, CSV column names wrapped in `$(…)`; GREL emitted for linear unit conversions. rosetta-cli: `build_spec()` extended with required `source_schema_path` / `target_schema_path` kwargs (absolute paths, fail-fast on missing) and `spec.prefixes` pre-merging (source + target + rosetta globals {skos, semapv, xsd, qudt}; source wins on collision). Fork pinned via `[tool.uv.sources]` in rosetta-cli `pyproject.toml`. 13 `[review]` truths from plan-review 2026-04-17 all honored; latent `all_slots(class_name=...)` → `class_slots(...)` bug surfaced by Task 4 was fixed in-place.
 
+## Phase 16 Plan 03 Completion
+
+- **Plan:** `.planning/phases/16-rml-gen-v2/16-03-PLAN.md`
+- **Tests:** 332/332 passing (329 fast + 3 slow; +24 fast tests: 15 rml_runner unit + 9 CLI `--run` + 1 fork-drift assertion — plus +1 slow E2E)
+- **Completed:** 2026-04-17
+- **Key changes:** `rosetta/core/rml_runner.py` new module — `run_materialize` as `@contextlib.contextmanager` yielding `rdflib.Graph`, `graph_to_jsonld` with in-process `linkml.generators.jsonldcontextgen.ContextGenerator` (raises `ValueError` if parsed dict lacks `@context` — no silent fallback), private helpers `_substitute_data_path` / `_build_ini` / `_generate_jsonld_context`, morph-kgc logging suppressed to keep stdout clean for `| jq`, RuntimeError wrapping on `mapping.yml` / `graph.serialize` / `ContextGenerator` errors, `_DATA_FILE_PLACEHOLDER` module constant. `rosetta-yarrrml-gen` extended with `--run`, `--data`, `--jsonld-output`, `--workdir` (with `Path.resolve()` + `Path.touch()` writability probe), `--context-output`; empty-graph → stderr warning + exit 0; uses `click.get_binary_stream("stdout").write(...)` for CliRunner-safe output. 17 `[review]` truths from plan-review 2026-04-17 all honored. Fork-drift guard added to `test_yarrrml_compile_integration.py`. README section rewritten with worked example + stdout matrix + exit codes.
+
+## Known gap (not blocking phase completion)
+
+- **Numeric unit conversion end-to-end:** `transform_builder.build_slot_derivation` in 16-01 leaves `unit_conversion=None`; fork emits GREL only when present. Plan 16-03 E2E asserts passthrough values via compaction-tolerant key lookup + `pytest.approx(rel=1e-2)`. Structural truth #3 satisfied (linear-convertible slot reaches JSON-LD); numeric conversion deferred to a future 16-01 patch or to Phase 17's unit-detect work.
+
 ## Next Action
 
-Plan 16-02 complete. Plan 16-03 (morph-kgc runner + JSON-LD framing + end-to-end data execution) is next. The self-describing TransformSpec contract locked here — absolute-path `source_schema` / `target_schema` + pre-merged `spec.prefixes` — means 16-03 can invoke morph-kgc without re-specifying schemas on the CLI.
+Phase 16 complete. Phase 17 (QUDT-native multi-library unit detection) is independent of Phase 16 and can begin any time. Roadmap entry: `detect_unit()` returns QUDT IRIs directly; expanded regex + quantulum3/pint cascade; `UNIT_STRING_TO_IRI` table retired.

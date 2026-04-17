@@ -1,0 +1,4 @@
+sporings_id,breddegrad,lengdegrad,hoyde_m,kurs_grader,hastighet_kmh,avstand_km,peiling_grader,tidsstempel,klassifisering,signalstyrke_dbm
+NOR-001,60.1892,11.1045,4100.0,135,390,87,128,2026-04-12T06:19:40Z,UKJENT,-77
+NOR-002,59.9139,10.7522,2500.0,210,320,62,95,2026-04-12T06:20:10Z,HOSTILE,-82
+NOR-003,61.4720,5.8690,1800.0,90,280,54,110,2026-04-12T06:20:40Z,NEUTRAL,-73

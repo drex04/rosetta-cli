@@ -545,12 +545,14 @@ uv run rosetta-validate \
 
 ### rosetta-yarrrml-gen
 
-Generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas. This is the data-format-agnostic first half of the SSSOM → YARRRML pipeline; the compiled YARRRML + JSON-LD output arrive in Phase 16-02 (`YarrrmlCompiler`) and 16-03 (`morph-kgc` execution).
+Generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas. With `--run`, the same invocation compiles the spec to YARRRML (via the forked `linkml_map.compiler.yarrrml_compiler.YarrrmlCompiler`), materializes it against a concrete data file via [morph-kgc](https://morph-kgc.readthedocs.io/), and frames the resulting RDF as JSON-LD using a `@context` derived from the master LinkML schema.
+
+Single-source data binding only. JSON-LD `@frame` output and multi-source binding are deferred.
 
 ```
 Usage: rosetta-yarrrml-gen [OPTIONS]
 
-Options:
+Spec-generation options:
   --sssom PATH           Approved SSSOM audit log (13+ column TSV). [required]
   --source-schema PATH   Source LinkML schema (from rosetta-ingest). [required]
   --master-schema PATH   Master ontology LinkML schema. [required]
@@ -559,6 +561,9 @@ Options:
                          schema's annotations.rosetta_source_format; exit 1
                          if neither is present.
   --output PATH          Output TransformSpec YAML path. Default: stdout.
+                         Note: --output controls only the TransformSpec YAML.
+                         When combined with --run the JSON-LD is still written
+                         to stdout (or to --jsonld-output if given).
   --coverage-report PATH Emit a CoverageReport JSON alongside the TransformSpec.
   --include-manual       Additionally accept semapv:ManualMappingCuration rows
                          (default: only semapv:HumanCuration).
@@ -567,9 +572,32 @@ Options:
                          continue. Does NOT bypass mixed-kind mappings,
                          missing class-level mappings, or inconsistent
                          composite expressions — those are always fatal.
+
+Materialization options (Phase 16-03):
+  --run                  After writing the TransformSpec, compile to YARRRML
+                         and materialize JSON-LD via morph-kgc.
+  --data PATH            Source data file. Required with --run.
+  --jsonld-output PATH   Write JSON-LD to file instead of stdout.
+  --workdir PATH         Directory to retain morph-kgc artifacts (mapping.yml,
+                         intermediates) for debugging. Ephemeral tempdir if
+                         omitted; caller-supplied dirs are never cleaned up.
+  --context-output PATH  Optional JSON-LD @context dump path.
 ```
 
-**Example**
+**Behavioral matrix (stdout)**
+
+| `--run` | `--output` | `--jsonld-output` | stdout contents                      |
+| ------- | ---------- | ----------------- | ------------------------------------ |
+| off     | —          | n/a               | TransformSpec YAML                   |
+| off     | set        | n/a               | (empty; YAML to file)                |
+| on      | —          | —                 | TransformSpec YAML, then JSON-LD     |
+| on      | —          | set               | TransformSpec YAML only              |
+| on      | set        | —                 | JSON-LD (YAML to file)               |
+| on      | set        | set               | (empty; YAML to file, JSON-LD to file) |
+
+With `--run + --jsonld-output` (and no `--output`) the CLI still writes the YAML to stdout; pass `--output` to redirect it cleanly.
+
+**Example — spec only**
 
 ```bash
 uv run rosetta-yarrrml-gen \
@@ -580,13 +608,12 @@ uv run rosetta-yarrrml-gen \
   --coverage-report demo_out/nor_to_mc.coverage.json
 ```
 
-Output (excerpt):
+Spec output (excerpt):
 
 ```yaml
 comments:
 - rosetta:source_format=csv
 id: https://rosetta.interop/transform/nor_radar-to-mc
-title: Transform nor_radar → mc
 class_derivations:
 - name: Track
   populated_from: Observation
@@ -596,10 +623,41 @@ class_derivations:
       populated_from: breddegrad
 ```
 
+**Example — full pipeline (NOR radar CSV → JSON-LD)**
+
+```bash
+uv run rosetta-yarrrml-gen \
+  --sssom store/audit-log.sssom.tsv \
+  --source-schema demo_out/nor_radar.linkml.yaml \
+  --master-schema demo_out/master_cop.linkml.yaml \
+  --output demo_out/nor_to_mc.transform.yaml \
+  --run \
+  --data demo_out/nor_radar.csv \
+  --jsonld-output demo_out/nor_tracks.jsonld \
+  --workdir demo_out/morph_artifacts
+```
+
+JSON-LD output (excerpt):
+
+```json
+{
+  "@context": { "mc": "https://ontology.nato.int/core/MasterCOP#", ... },
+  "@graph": [
+    { "@id": "nor_radar:Observation/NOR-001",
+      "@type": "Track",
+      "hasAltitude": 4100.0,
+      "hasLatitude": 60.1892 }
+  ]
+}
+```
+
 **Exit codes**
 
-- `0` — success (TransformSpec written).
-- `1` — any of: malformed input file; unresolvable CURIEs (without `--force`); mixed-kind mapping; missing class-level mapping for a mapped slot; inconsistent `composition_expr` within a group; empty filtered SSSOM (without `--allow-empty`); source schema has no `default_prefix`; `--source-format` not provided and source schema lacks `annotations.rosetta_source_format`.
+- `0` — success (TransformSpec written; JSON-LD emitted if `--run`).
+- `1` — any of: malformed input file; unresolvable CURIEs (without `--force`); mixed-kind mapping; missing class-level mapping for a mapped slot; inconsistent `composition_expr`; empty filtered SSSOM (without `--allow-empty`); source schema has no `default_prefix`; `--source-format` not provided and no `annotations.rosetta_source_format`; `--run` without `--data`; `--workdir` not writable; YARRRML compilation error; morph-kgc materialization error; `@context` generation error; JSON-LD serialization error; placeholder `$(DATA_FILE)` missing from compiled YARRRML; write error on `--jsonld-output` or `--context-output`.
+- `2` — Click validation error (e.g. missing required option).
+
+Empty materialized graph (0 triples) is NOT an error: a warning is written to stderr and an empty-graph JSON-LD is emitted on stdout with exit 0.
 
 **Coverage report**
 
