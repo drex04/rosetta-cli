@@ -210,3 +210,7 @@ __marimo__/
 pytest-of-ubuntu/
 .fallow/
 uv-*.lock
+
+# Rosetta runtime artifacts
+demo_out/
+store/audit-log.sssom.tsv
