@@ -28,7 +28,7 @@ _FIXTURES = Path("rosetta/tests/fixtures")
 _NOR_SCHEMA = _FIXTURES / "nor_radar.linkml.yaml"
 _MC_SCHEMA = _FIXTURES / "master_cop.linkml.yaml"
 _NOR_SSSOM = _FIXTURES / "sssom_nor_approved.sssom.tsv"
-_ROSETTA_CWD = Path("/home/ubuntu/dev/rosetta-cli")
+_ROSETTA_CWD = Path(__file__).resolve().parents[2]
 
 
 # ---------------------------------------------------------------------------

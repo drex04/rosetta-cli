@@ -619,9 +619,9 @@ def _resolve_schema_path(raw: str | Path, label: str) -> str:
 
     Raises ValueError with *label* in the message on any failure.
     """
-    path_str = str(raw) if raw is not None else ""
-    if not path_str or not Path(path_str).exists():
-        raise ValueError(f"build_spec: {label} is required and must exist; got {raw!r}")
+    path_str = str(raw)
+    if not path_str or not Path(path_str).is_file():
+        raise ValueError(f"build_spec: {label} is required and must exist as a file; got {raw!r}")
     return str(Path(path_str).resolve())
 
 
