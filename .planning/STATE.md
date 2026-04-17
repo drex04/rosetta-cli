@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-16T13:00:00.000Z"
+last_updated: "2026-04-17T06:45:00.000Z"
 progress:
   total_phases: 17
   completed_phases: 15
   total_plans: 17
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # State
@@ -16,8 +16,8 @@ progress:
 ## Current Position
 
 - **Phase:** 16 (rml-gen v2 — SSSOM → linkml-map TransformSpec → YARRRML → JSON-LD)
-- **Plan:** 16-00 and 16-01 complete; 16-02 next (YarrrmlCompiler in linkml-map fork)
-- **Status:** Plan 16-01 (TransformSpec builder) complete on 2026-04-16; `rosetta-yarrrml-gen` CLI live; 294/294 tests passing; 8/8 quality gates clean
+- **Plan:** 16-00, 16-01, 16-02 complete; 16-03 next (morph-kgc execution + JSON-LD framing + E2E)
+- **Status:** Plan 16-02 (YarrrmlCompiler in forked linkml-map) complete on 2026-04-17; fork pinned at SHA 48afe27995 on drex04/linkml-map `feat/yarrrml-compiler`; 305/305 fast tests passing (+2 slow subprocess tests); 8/8 quality gates clean
 
 ## Phase Progress
 
@@ -148,6 +148,15 @@ progress:
 - **Completed:** 2026-04-16
 - **Key changes:** `rosetta-rml-gen` → `rosetta-yarrrml-gen` (entry point + all docs); legacy `rml_builder.py` + `rml_gen.py` deleted; new `transform_builder.py` (filter/classify/compose/derive/orchestrate) + `yarrrml_gen.py` CLI; `CoverageReport` Pydantic model (replaces `MappingDecision`) with `extra="forbid"`; `linkml-map 0.5.2` + `curies 0.13.3` pinned; GA4 hybrid source-format resolution (CLI flag OR schema annotation); 13-col SSSOM → linkml-map `TransformationSpecification` round-trips through `model_validate`; composite mappings (`mapping_group_id` + `composition_expr`) flow to `SlotDerivation.expr`; `--force` bypasses unresolvable CURIEs only — mixed-kind / missing-class / inconsistent-composite always fatal.
 
+## Phase 16 Plan 02 Completion
+
+- **Plan:** `.planning/phases/16-rml-gen-v2/16-02-PLAN.md`
+- **Commit:** 9a8ee53
+- **Fork SHA:** 48afe2799453c9cd8405ed9df8d8debf74d594c9 (`feat/yarrrml-compiler` on `drex04/linkml-map`)
+- **Tests:** 305/305 fast tests passing (+6 new `test_build_spec_*` unit tests; 4 new integration tests — 2 fast, 2 slow); fork-side: 13 YarrrmlCompiler unit tests + 1 CLI integration test
+- **Completed:** 2026-04-17
+- **Key changes:** `YarrrmlCompiler` added to forked linkml-map, compiles `TransformationSpecification` → YARRRML consumable by morph-kgc; `Compiler` subclass with own `Environment(autoescape=False)` to preserve YAML; composite slots emit separate TriplesMap blocks via `parentTriplesMap` references; composite subject template = `<parent_subject>/<composite_slot_name>`; source-class subjects use SOURCE schema's default_prefix; JSONPath/XPath annotations read verbatim, CSV column names wrapped in `$(…)`; GREL emitted for linear unit conversions. rosetta-cli: `build_spec()` extended with required `source_schema_path` / `target_schema_path` kwargs (absolute paths, fail-fast on missing) and `spec.prefixes` pre-merging (source + target + rosetta globals {skos, semapv, xsd, qudt}; source wins on collision). Fork pinned via `[tool.uv.sources]` in rosetta-cli `pyproject.toml`. 13 `[review]` truths from plan-review 2026-04-17 all honored; latent `all_slots(class_name=...)` → `class_slots(...)` bug surfaced by Task 4 was fixed in-place.
+
 ## Next Action
 
-Plan 16-01 complete. Plan 16-02 (`YarrrmlCompiler` — TransformSpec → YARRRML, contributed to linkml-map fork) ready to plan. Prerequisites locked: source-format annotation contract, per-slot path annotations (`rosetta_jsonpath`/`rosetta_xpath`/`rosetta_csv_column`), TransformSpec.comments carrying effective source format.
+Plan 16-02 complete. Plan 16-03 (morph-kgc runner + JSON-LD framing + end-to-end data execution) is next. The self-describing TransformSpec contract locked here — absolute-path `source_schema` / `target_schema` + pre-merged `spec.prefixes` — means 16-03 can invoke morph-kgc without re-specifying schemas on the CLI.
