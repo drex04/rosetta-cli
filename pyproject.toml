@@ -88,7 +88,4 @@ exclude_dirs = ["rosetta/tests"]
 skips = []
 
 [tool.uv.sources]
-# Points at a local checkout containing the truth-#3 fix (unit-conversion
-# FnML emits rosetta UDF IRI refs). Re-pin to a pushed git SHA once the
-# fork commit lands on drex04/linkml-map feat/yarrrml-compiler.
-linkml-map = { path = "/home/ubuntu/dev/linkml-map-fork", editable = true }
+linkml-map = { git = "https://github.com/drex04/linkml-map.git", rev = "00150683e9ad03cefa00e3c0e2d55f0e3cc6df9f" }
