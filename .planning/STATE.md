@@ -165,9 +165,10 @@ progress:
 - **Completed:** 2026-04-17
 - **Key changes:** `rosetta/core/rml_runner.py` new module — `run_materialize` as `@contextlib.contextmanager` yielding `rdflib.Graph`, `graph_to_jsonld` with in-process `linkml.generators.jsonldcontextgen.ContextGenerator` (raises `ValueError` if parsed dict lacks `@context` — no silent fallback), private helpers `_substitute_data_path` / `_build_ini` / `_generate_jsonld_context`, morph-kgc logging suppressed to keep stdout clean for `| jq`, RuntimeError wrapping on `mapping.yml` / `graph.serialize` / `ContextGenerator` errors, `_DATA_FILE_PLACEHOLDER` module constant. `rosetta-yarrrml-gen` extended with `--run`, `--data`, `--jsonld-output`, `--workdir` (with `Path.resolve()` + `Path.touch()` writability probe), `--context-output`; empty-graph → stderr warning + exit 0; uses `click.get_binary_stream("stdout").write(...)` for CliRunner-safe output. 17 `[review]` truths from plan-review 2026-04-17 all honored. Fork-drift guard added to `test_yarrrml_compile_integration.py`. README section rewritten with worked example + stdout matrix + exit codes.
 
-## Known gap (not blocking phase completion)
+## Phase 16 Plan 03 Follow-up (2026-04-17)
 
-- **Numeric unit conversion end-to-end:** `transform_builder.build_slot_derivation` in 16-01 leaves `unit_conversion=None`; fork emits GREL only when present. Plan 16-03 E2E asserts passthrough values via compaction-tolerant key lookup + `pytest.approx(rel=1e-2)`. Structural truth #3 satisfied (linear-convertible slot reaches JSON-LD); numeric conversion deferred to a future 16-01 patch or to Phase 17's unit-detect work.
+- **Truth #3 closed end-to-end.** `transform_builder.build_slot_derivation` now detects units via `detect_unit()` on source + target slot names/descriptions and emits `UnitConversionConfiguration` for known linear pairs (m↔ft, etc.). Fork's `YarrrmlCompiler` patched to emit FnML function refs at stable rosetta UDF IRIs (replacing the broken `grel:value` emission). `rml_runner` writes a Python UDF file into `work_dir` and wires it via morph-kgc's `udfs=` INI option. E2E verifies numeric conversion (4100 m → ~13451 ft) within 1% via `pytest.approx(rel=1e-2)`.
+- **Fork SHA:** local commit `89e79d4` on `feat/yarrrml-compiler`. Until pushed, `pyproject.toml` `[tool.uv.sources]` points at the local checkout at `/home/ubuntu/dev/linkml-map-fork`. Re-pin to the pushed SHA after `git push origin feat/yarrrml-compiler` on the fork.
 
 ## Next Action
 

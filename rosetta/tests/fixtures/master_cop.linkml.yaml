@@ -112,6 +112,11 @@ slots:
     description: Altitude above mean sea level in meters.
     slot_uri: mc:hasAltitude
     range: double
+  hasAltitudeFt:
+    name: hasAltitudeFt
+    description: Altitude above mean sea level in feet.
+    slot_uri: mc:hasAltitudeFt
+    range: double
   hasCallsign:
     name: hasCallsign
     description: The tactical callsign assigned to a unit or aircraft.
@@ -419,6 +424,7 @@ classes:
     slots:
     - hasLongitude
     - hasAltitude
+    - hasAltitudeFt
     - hasCallsign
     - hasLatitude
     - hasSource

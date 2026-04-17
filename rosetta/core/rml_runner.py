@@ -30,6 +30,71 @@ from linkml.generators.jsonldcontextgen import ContextGenerator  # type: ignore[
 
 _DATA_FILE_PLACEHOLDER: str = "$(DATA_FILE)"
 
+# Python source for the UDF file written into work_dir. The forked
+# YarrrmlCompiler emits function refs at these stable IRIs when a
+# SlotDerivation carries a linear unit_conversion (see
+# LINEAR_CONVERSION_FUN_IDS in the fork's yarrrml_compiler.py).
+# morph-kgc prepends its own `udf` decorator at load time; our file only
+# needs `@udf(fun_id=..., value=...)` + the function body.
+_ROSETTA_UDF_NS: str = "https://rosetta.interop/udf/"
+_GREL_VALUE_PARAM_IRI: str = "http://users.ugent.be/~bjdmeest/function/grel.ttl#valueParameter"
+_UDF_SOURCE: str = f'''"""Auto-written by rosetta-cli rml_runner. Do not edit in place."""
+
+
+@udf(
+    fun_id="{_ROSETTA_UDF_NS}meter_to_foot",
+    value="{_GREL_VALUE_PARAM_IRI}",
+)
+def meter_to_foot(value):
+    return float(value) * 3.28084
+
+
+@udf(
+    fun_id="{_ROSETTA_UDF_NS}foot_to_meter",
+    value="{_GREL_VALUE_PARAM_IRI}",
+)
+def foot_to_meter(value):
+    return float(value) * 0.3048
+
+
+@udf(
+    fun_id="{_ROSETTA_UDF_NS}kilogram_to_pound",
+    value="{_GREL_VALUE_PARAM_IRI}",
+)
+def kilogram_to_pound(value):
+    return float(value) * 2.20462
+
+
+@udf(
+    fun_id="{_ROSETTA_UDF_NS}celsius_to_fahrenheit",
+    value="{_GREL_VALUE_PARAM_IRI}",
+)
+def celsius_to_fahrenheit(value):
+    return float(value) * 1.8 + 32.0
+
+
+@udf(
+    fun_id="{_ROSETTA_UDF_NS}kelvin_to_celsius",
+    value="{_GREL_VALUE_PARAM_IRI}",
+)
+def kelvin_to_celsius(value):
+    return float(value) - 273.15
+'''
+
+
+def _write_udf_file(work_dir: Path) -> Path:
+    """Write the rosetta UDF Python module into ``work_dir`` and return its path.
+
+    morph-kgc loads this file via the INI ``udfs=<path>`` option and
+    registers each ``@udf``-decorated function under its ``fun_id`` IRI.
+    """
+    udf_path = work_dir / "rosetta_udfs.py"
+    try:
+        udf_path.write_text(_UDF_SOURCE, encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write UDF file to {udf_path}: {exc}") from exc
+    return udf_path
+
 
 def _substitute_data_path(yarrrml: str, data_path: Path) -> str:
     """Replace the ``$(DATA_FILE)`` placeholder in ``yarrrml`` with ``data_path``.
@@ -41,10 +106,18 @@ def _substitute_data_path(yarrrml: str, data_path: Path) -> str:
     return yarrrml.replace(_DATA_FILE_PLACEHOLDER, str(data_path))
 
 
-def _build_ini(mapping_path: Path) -> str:
-    """Return a morph-kgc INI config string for a single YARRRML mapping file."""
+def _build_ini(mapping_path: Path, udf_path: Path | None = None) -> str:
+    """Return a morph-kgc INI config string for a single YARRRML mapping file.
+
+    If ``udf_path`` is given, a ``udfs=<abs-path>`` line is emitted in the
+    ``[CONFIGURATION]`` block so morph-kgc registers the rosetta UDFs.
+    """
     absolute = str(mapping_path.resolve())
-    return f"[CONFIGURATION]\noutput_format=N-TRIPLES\n\n[DataSource1]\nmappings={absolute}\n"
+    udf_line = f"udfs={udf_path.resolve()}\n" if udf_path is not None else ""
+    return (
+        f"[CONFIGURATION]\noutput_format=N-TRIPLES\n{udf_line}"
+        f"\n[DataSource1]\nmappings={absolute}\n"
+    )
 
 
 def _generate_jsonld_context(master_schema_path: Path) -> dict[str, Any]:
@@ -109,7 +182,8 @@ def run_materialize(
         except OSError as exc:
             raise RuntimeError(f"Failed to write mapping file to {mapping_path}: {exc}") from exc
 
-        ini_string = _build_ini(mapping_path)
+        udf_path = _write_udf_file(effective_dir)
+        ini_string = _build_ini(mapping_path, udf_path=udf_path)
         graph: rdflib.Graph = morph_kgc.materialize(ini_string)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         yield graph
     finally:

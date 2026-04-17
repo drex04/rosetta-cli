@@ -17,6 +17,18 @@ from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.utils.schemaview import SchemaView
 
 from rosetta.core.models import CoverageReport, SSSOMRow
+from rosetta.core.unit_detect import detect_unit
+
+# Linear unit-conversion pairs supported by the forked YarrrmlCompiler's
+# LINEAR_GREL_CONVERSIONS table (compiler/yarrrml_compiler.py). Only pairs in
+# this set trigger UnitConversionConfiguration emission; unknown pairs fall
+# through to passthrough references. Keep in sync with the fork.
+_LINEAR_CONVERSION_PAIRS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("meter", "foot"),
+        ("foot", "meter"),
+    }
+)
 
 # ---------------------------------------------------------------------------
 # 4b — Row filtering
@@ -79,6 +91,8 @@ class _SlotMapping:
     target_slot_name: str
     target_owning_class: str
     row: SSSOMRow
+    source_unit: str | None = None
+    target_unit: str | None = None
 
 
 @dataclass
@@ -139,6 +153,25 @@ def _local_name(curie: str) -> str:
     return curie.split(":", 1)[-1] if ":" in curie else curie
 
 
+def _build_slot_mapping(
+    src_slot: Any, mst_slot: Any, row: SSSOMRow, ctx: _ClassifyContext
+) -> _SlotMapping:
+    """Assemble a _SlotMapping with owning classes + detected units."""
+    owner_src = _owning_class(ctx.src_slot_owners, str(src_slot.name), "source")
+    owner_mst = _owning_class(ctx.mst_slot_owners, str(mst_slot.name), "master")
+    src_desc = str(getattr(src_slot, "description", "") or "")
+    mst_desc = str(getattr(mst_slot, "description", "") or "")
+    return _SlotMapping(
+        source_slot_name=str(src_slot.name),
+        source_owning_class=owner_src,
+        target_slot_name=str(mst_slot.name),
+        target_owning_class=owner_mst,
+        row=row,
+        source_unit=detect_unit(str(src_slot.name), src_desc),
+        target_unit=detect_unit(str(mst_slot.name), mst_desc),
+    )
+
+
 def classify_row(row: SSSOMRow, ctx: _ClassifyContext) -> _Classification:
     """Resolve subject in source schema, object in master schema.
     Mixed-kind (slot↔class) is signalled via _Unresolved(side="mixed"); caller raises.
@@ -157,23 +190,7 @@ def classify_row(row: SSSOMRow, ctx: _ClassifyContext) -> _Classification:
             row=row,
         )
     if src_slot and mst_slot:
-        owner_src = _owning_class(
-            ctx.src_slot_owners,
-            str(src_slot.name),
-            "source",  # pyright: ignore[reportUnknownMemberType]
-        )
-        owner_mst = _owning_class(
-            ctx.mst_slot_owners,
-            str(mst_slot.name),
-            "master",  # pyright: ignore[reportUnknownMemberType]
-        )
-        return _SlotMapping(
-            source_slot_name=str(src_slot.name),
-            source_owning_class=owner_src,
-            target_slot_name=str(mst_slot.name),
-            target_owning_class=owner_mst,
-            row=row,
-        )
+        return _build_slot_mapping(src_slot, mst_slot, row, ctx)
     if not src_class and not src_slot:
         return _Unresolved(row=row, side="subject", reason="no matching class_uri or slot_uri")
     if not mst_class and not mst_slot:
@@ -231,9 +248,25 @@ def build_slot_derivation(m: _SlotMapping) -> SlotDerivation:
 
     GA3: if subject_datatype and object_datatype both present and differ,
     set range=object_datatype (target datatype).
-    Unit conversion is deferred to 16-02's YarrrmlCompiler.
+
+    Unit conversion: when both source and target units are detected (via
+    detect_unit on slot name + description), differ, and the pair appears in
+    _LINEAR_CONVERSION_PAIRS, emit UnitConversionConfiguration(source_unit=...,
+    target_unit=...). The fork's YarrrmlCompiler reads these and emits a GREL
+    expression from its LINEAR_GREL_CONVERSIONS table. Unknown pairs and
+    same-unit pairs fall through to passthrough references.
     """
     unit_conv: UnitConversionConfiguration | None = None
+    if (
+        m.source_unit
+        and m.target_unit
+        and m.source_unit != m.target_unit
+        and (m.source_unit, m.target_unit) in _LINEAR_CONVERSION_PAIRS
+    ):
+        unit_conv = UnitConversionConfiguration(
+            source_unit=m.source_unit,
+            target_unit=m.target_unit,
+        )
     dtype_range: str | None = None
     if m.row.subject_datatype and m.row.object_datatype:
         if m.row.subject_datatype != m.row.object_datatype:
@@ -509,6 +542,8 @@ def _remap_to_mapped_classes(
                 target_slot_name=sm.target_slot_name,
                 target_owning_class=nearest,
                 row=sm.row,
+                source_unit=sm.source_unit,
+                target_unit=sm.target_unit,
             )
         remapped_slots.append(sm)
 
@@ -582,6 +617,10 @@ ROSETTA_GLOBAL_PREFIXES: dict[str, str] = {
     "semapv": "https://w3id.org/semapv/vocab/",
     "xsd": "http://www.w3.org/2001/XMLSchema#",
     "qudt": "http://qudt.org/schema/qudt/",
+    # GREL function namespace — required by morph-kgc when FnML blocks emitted
+    # by the fork's YarrrmlCompiler (LINEAR_GREL_CONVERSIONS) reference
+    # grel:value or other grel:* functions.
+    "grel": "http://users.ugent.be/~bjdmeest/function/grel.ttl#",
 }
 
 

@@ -8,15 +8,15 @@ This test walks the full pipeline:
       → rdflib.Graph     (morph_kgc.materialize)
       → JSON-LD bytes    (rdflib + linkml ContextGenerator)
 
-Design notes / acknowledged relaxations (per Plan 16-03 Task 6, step 4):
-  1. The current `build_slot_derivation` in rosetta/core/transform_builder.py
-     does not populate `SlotDerivation.unit_conversion` (explicitly deferred to
-     a later plan). As a consequence the fork's YarrrmlCompiler emits passthrough
-     references like `[mc:hasAltitude, $(hoyde_m)]` rather than a GREL expression
-     such as `value.toNumber() * 3.28084`. We therefore assert the **numeric
-     passthrough** (e.g., 4100.0 for hoyde_m) with `pytest.approx(..., rel=1e-2)`.
-     When unit_conversion wiring lands, tighten this assertion to the converted
-     value per review truth #3 (m → ft × 3.28084).
+Design notes:
+  1. Unit conversion end-to-end (Plan 16-03 truth #3): `hoyde_m` (meters) →
+     `hasAltitudeFt` (feet). transform_builder.build_slot_derivation detects
+     the m→ft pair via detect_unit() on slot names + descriptions, emits
+     UnitConversionConfiguration(source_unit="meter", target_unit="foot"),
+     which the fork's YarrrmlCompiler compiles to GREL
+     `value.toNumber() * 3.28084`. morph-kgc evaluates the GREL at materialization
+     time. The assertion below checks the converted numeric values with
+     pytest.approx(rel=1e-2).
   2. The master schema fixture contains a LinkML typo (`range: dateTime` instead
      of `datetime`) which `linkml.generators.jsonldcontextgen.ContextGenerator`
      rejects with a `ValueError`. To keep the E2E focused on the pipeline (and
@@ -198,14 +198,25 @@ def test_e2e_nor_radar_csv_to_jsonld(tmp_path: Path) -> None:
                             continue
         return out
 
-    # hoyde_m → hasAltitude: passthrough when unit_conversion unwired (see docstring).
-    # The 3 CSV rows supply altitudes 4100, 2500, 1800 meters.
-    observed_values = _collect_numeric(typed_entries, ("hasAltitude", "hoyde_m"))
+    # hoyde_m (meters) → hasAltitudeFt (feet): transform_builder.build_slot_derivation
+    # detects the m→ft pair and emits UnitConversionConfiguration; the fork's
+    # YarrrmlCompiler compiles it to GREL `value.toNumber() * 3.28084` which
+    # morph-kgc evaluates at materialization time.
+    # Source altitudes: 4100, 2500, 1800 meters → expected feet values below.
+    observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude", "hoyde_m"))
     assert observed_values, (
-        "Could not locate hasAltitude / hoyde_m numeric values in JSON-LD; "
+        "Could not locate hasAltitudeFt / hoyde_m numeric values in JSON-LD; "
         f"entries={json.dumps(typed_entries)[:600]}"
     )
-    expected_set = {4100.0, 2500.0, 1800.0}
-    assert any(
-        any(v == pytest.approx(exp, rel=1e-2) for exp in expected_set) for v in observed_values
-    ), f"No observed value matches expected altitudes {expected_set}; observed={observed_values}"
+    expected_feet = {4100.0 * 3.28084, 2500.0 * 3.28084, 1800.0 * 3.28084}
+    converted_hits = [
+        v
+        for v in observed_values
+        if any(v == pytest.approx(exp, rel=1e-2) for exp in expected_feet)
+    ]
+    assert converted_hits, (
+        "No observed value matches expected converted altitudes "
+        f"{sorted(expected_feet)!r}; observed={sorted(observed_values)!r}. "
+        "This suggests the m→ft unit_conversion is not flowing through "
+        "build_slot_derivation → YarrrmlCompiler → GREL → morph-kgc."
+    )
