@@ -1789,8 +1789,7 @@ wheels = [
 
 [[package]]
 name = "linkml-map"
-version = "0.0.0.post322.dev0+48afe27"
-source = { git = "https://github.com/drex04/linkml-map.git?rev=48afe2799453c9cd8405ed9df8d8debf74d594c9#48afe2799453c9cd8405ed9df8d8debf74d594c9" }
+source = { editable = "/home/ubuntu/dev/linkml-map-fork" }
 dependencies = [
     { name = "asteval" },
     { name = "click" },
@@ -1809,6 +1808,42 @@ dependencies = [
     { name = "pyyaml" },
     { name = "simpleeval" },
     { name = "ucumvert" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "asteval", specifier = ">=1.0.5" },
+    { name = "click", specifier = ">=8" },
+    { name = "curies" },
+    { name = "deepdiff", specifier = ">=6.0" },
+    { name = "duckdb", specifier = ">=1.1.0" },
+    { name = "flatten-dict", specifier = ">=0.4.2" },
+    { name = "graphviz", specifier = ">=0.20" },
+    { name = "jinja2", specifier = ">=3" },
+    { name = "lark", specifier = ">=1" },
+    { name = "linkml", specifier = ">=1.10.0" },
+    { name = "linkml-runtime", specifier = ">=1.10.0" },
+    { name = "more-itertools", specifier = ">=10.0.0" },
+    { name = "pint", specifier = ">=0.20" },
+    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pyyaml" },
+    { name = "simpleeval", specifier = ">=1.0.3" },
+    { name = "ucumvert", specifier = ">=0.2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "deepdiff", specifier = ">=6.0" },
+    { name = "deptry", specifier = ">=0.23" },
+    { name = "jupyter", specifier = ">=1.1" },
+    { name = "mkdocs-mermaid2-plugin", specifier = ">=0.6" },
+    { name = "mkdocs-windmill" },
+    { name = "mkdocstrings", extras = ["crystal", "python"] },
+    { name = "mknotebooks", specifier = ">=0.8" },
+    { name = "pre-commit", specifier = ">=4.3.0" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "ruff", specifier = ">=0.11" },
+    { name = "tox", specifier = ">=4" },
 ]
 
 [[package]]
@@ -3599,7 +3634,7 @@ requires-dist = [
     { name = "deepl", specifier = ">=1.18,<2" },
     { name = "genson", specifier = ">=1.2" },
     { name = "linkml", specifier = ">=1.10.0" },
-    { name = "linkml-map", git = "https://github.com/drex04/linkml-map.git?rev=48afe2799453c9cd8405ed9df8d8debf74d594c9" },
+    { name = "linkml-map", editable = "/home/ubuntu/dev/linkml-map-fork" },
     { name = "morph-kgc", specifier = "==2.10.0" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "pydantic", specifier = ">=2.13.0" },
