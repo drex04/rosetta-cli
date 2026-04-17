@@ -423,6 +423,7 @@ def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
     infos = [f for f in data["findings"] if f["rule"] == "unit_not_detected"]
     assert infos, "Expected unit_not_detected finding for dBm"
     assert infos[0]["severity"] == "INFO"
+    assert "No detectable unit" in infos[0]["message"]
 
 
 def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:

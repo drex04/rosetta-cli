@@ -125,10 +125,22 @@ def test_detect_unit_from_description(description: str, expected: str | None) ->
 
 
 def test_detect_unit_quantulum3_megahertz() -> None:
-    """quantulum3 fires when regex patterns miss; pint canonicalises and maps."""
-    # Avoid 'megahertz' keyword in desc — force NLP path via numeric + unit token
-    result = detect_unit("carrier_wave", "operating at 100 MHz carrier")
+    """quantulum3 fires when both regex layers miss; pint canonicalises and maps.
+
+    "megahertz" (lowercase, spelled out) is absent from _DESC_PATTERNS — the
+    \\bhertz\\b entry does not match inside "megahertz" (no word boundary),
+    so this description bypasses all regex and reaches _detect_from_nlp.
+    """
+    result = detect_unit("carrier_wave", "operating at 100 megahertz")
     assert result == "unit:MegaHZ"
+
+
+def test_detect_unit_quantulum3_gram_pure_nlp() -> None:
+    """'gram' has no _NAME_PATTERNS or _DESC_PATTERNS entry — only the NLP
+    layer can produce unit:GM, confirming _detect_from_nlp is reachable and
+    functional for units with regex-free coverage."""
+    result = detect_unit("weight_field", "approximately 500 grams")
+    assert result == "unit:GM"
 
 
 def test_detect_unit_quantulum3_no_false_positive() -> None:
