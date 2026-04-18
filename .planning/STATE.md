@@ -204,15 +204,17 @@ progress:
 - **Completed:** 2026-04-18
 - **Key changes:** 7 adversarial test files under `rosetta/tests/adversarial/`: `test_malformed_inputs` (JSON/XSD/CSV parse failures + inline BOM + empty-master), `test_schema_mismatch` (datatype_mismatch via int↔string divergence, renamed-field aliasing), `test_sssom_mistakes` (duplicate MMC, wrong column count, phantom-derank via HC-transition guard, clean-ingest baseline), `test_cli_misuse` (--run without --data, nonexistent input → Click exit 2, stdout/file collision, missing args → Click exit 2), `test_unit_pitfalls` (dBm recognized-but-unmapped, British "metre" via NLP cascade, ambiguous "count", lint dBm diagnostic), `test_yarrrml_hygiene` (dateTime typo → ContextGenerator error), `test_translate_errors` (6 DeepL exception paths via `fake_deepl`, zero API credits). 3 new committed adversarial fixtures (`malformed_nested.json`, `truncated_complex.xsd`, `wrong_encoding.csv`). Each adversarial test asserts exit code + stable stderr substring + "no partial output" invariant. Observed-behavior pinning used where production surfaces differ from plan assumptions (documented inline). 
 
-## Latent hardening opportunities surfaced during 18-03
+## Hardening closed (2026-04-18, commit 2c6c826)
 
-These are NOT bugs — they're rough edges documented for a future polish phase:
+4 of the 5 latent rough edges surfaced during 18-03 were fixed:
 
-- `parse_sssom_tsv` tolerates short column counts via `.get()` defaults — an explicit column-count check would give better error messages than the current fallthrough to duplicate-pair detection.
-- `rosetta-yarrrml-gen --run` guard ("--run requires --data") fires AFTER the TransformSpec YAML is written, not before — order should be reversed so no partial artifact lands on guard failure.
-- `rosetta-yarrrml-gen` has no collision guard when both `--output -` and `--jsonld-output -` target stdout.
-- `rosetta-translate` unconditionally prepends original titles to aliases when `source_lang != EN`, even for titles already in English. May be intentional — verify with product intent.
-- `schema-automator.CsvDataGeneralizer` does not strip UTF-8 BOM; adding `encoding="utf-8-sig"` at our wrapper layer would make CSV ingest forgiving of Excel-style BOM files.
+- ✅ `parse_sssom_tsv` now raises ValueError on missing required columns (subject_id, predicate_id, object_id, mapping_justification, confidence). CLI catches + emits a clear diagnostic and exits 1.
+- ✅ `rosetta-yarrrml-gen --run` validation moved to step 0; no partial TransformSpec YAML lands on guard failure.
+- ✅ `rosetta-yarrrml-gen` rejects simultaneous `--output -` + `--jsonld-output -` (stdout collision guard).
+- ✅ CSV ingest strips UTF-8 BOM (`_strip_bom_if_present` pre-processes BOM-prefixed files to a clean tempfile before `CsvDataGeneralizer` sees them).
+- **Not fixed (intentional):** `rosetta-translate` unconditionally prepends original titles to aliases when `source_lang != EN`. User confirmed this is fine for mixed-language schemas.
+
+Additionally, `conftest.py` now preloads rdflib's SPARQL parser grammar so schema-automator's pyparsing pollution can't corrupt later SPARQL queries in the same pytest session — a test-isolation fragility that was being masked by lucky ordering on master.
 
 ## Phase 18 — Summary
 
