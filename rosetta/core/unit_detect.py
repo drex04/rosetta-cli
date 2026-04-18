@@ -114,15 +114,15 @@ _PINT_TO_QUDT_IRI: dict[str, str | None] = {
 _ureg: UnitRegistry | None = None  # pyright: ignore[reportMissingTypeArgument]
 
 
-_CAMEL_BOUNDARY: re.Pattern[str] = re.compile(r"(?<=[a-z])(?=[A-Z])")
+_CAMEL_BOUNDARY: re.Pattern[str] = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 
 def _snake_case(name: str) -> str:
-    """Insert underscores at lowercase→uppercase CamelCase boundaries.
+    """Insert underscores at lowercase/digit→uppercase CamelCase boundaries.
 
-    ``hasAltitudeFt`` → ``has_Altitude_Ft`` so a trailing-unit regex like
-    ``(?:^|_)ft$`` can match across CamelCase without growing every pattern
-    with a CamelCase alternative.
+    ``hasAltitudeFt`` → ``has_Altitude_Ft`` and ``alt123Ft`` → ``alt123_Ft``
+    so a trailing-unit regex like ``(?:^|_)ft$`` matches across CamelCase
+    without growing every pattern with a CamelCase alternative.
     """
     return _CAMEL_BOUNDARY.sub("_", name)
 

@@ -124,3 +124,23 @@ def test_normalize_unsupported_raises(tmp_path: Path) -> None:
     bad_file.write_text("whatever")
     with pytest.raises(ValueError, match="Cannot infer format"):
         normalize_schema(bad_file)
+
+
+def test_normalize_csv_with_bom_cleans_up_tempfile(tmp_path: Path) -> None:
+    """CSV ingest of a BOM-prefixed file must not leak a rosetta_nobom_ tempfile.
+
+    Regression: previously ``_strip_bom_if_present`` created a tempfile that
+    was never unlinked by the csv/tsv dispatch branch.
+    """
+    import tempfile as _tempfile
+
+    tmpdir = Path(_tempfile.gettempdir())
+    before = {p.name for p in tmpdir.glob("rosetta_nobom_*")}
+
+    csv_file = tmp_path / "bom.csv"
+    csv_file.write_bytes(b"\xef\xbb\xbfname,age\nAlice,30\n")
+    normalize_schema(csv_file, fmt="csv")
+
+    after = {p.name for p in tmpdir.glob("rosetta_nobom_*")}
+    leaked = after - before
+    assert not leaked, f"BOM tempfile leaked: {leaked}"

@@ -284,3 +284,10 @@ def test_detect_unit_camelcase_preserves_negative_cases() -> None:
 
     assert detect_unit("program", "") is None
     assert detect_unit("name", "") is None
+
+
+def test_detect_unit_camelcase_trailing_ft_after_digits() -> None:
+    """digit→uppercase boundary also splits: ``alt123Ft`` → ``alt123_Ft``."""
+    from rosetta.core.unit_detect import detect_unit
+
+    assert detect_unit("alt123Ft", "") == "unit:FT"

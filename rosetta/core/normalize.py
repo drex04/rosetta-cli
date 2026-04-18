@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import tempfile
@@ -122,10 +123,24 @@ def _strip_bom_if_present(input_path: Path) -> Path:
             src.read(len(_UTF8_BOM))  # skip BOM
             dst.write(src.read())
     finally:
-        import os as _os
-
-        _os.close(fd)
+        os.close(fd)
     return tmp_path
+
+
+def _import_tabular(input_path: Path, name: str, *, separator: str) -> SchemaDefinition:
+    """Run CsvDataGeneralizer with BOM-stripped input; clean up any tempfile."""
+    from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
+        CsvDataGeneralizer,
+    )
+
+    resolved = _strip_bom_if_present(input_path)
+    try:
+        return CsvDataGeneralizer(column_separator=separator).convert(  # type: ignore[no-any-return]
+            str(resolved), schema_name=name
+        )
+    finally:
+        if resolved is not input_path:
+            resolved.unlink(missing_ok=True)
 
 
 def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
@@ -157,22 +172,10 @@ def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
             return XsdImportEngine().convert(str(input_path))  # type: ignore[no-any-return]
 
         case "csv":
-            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
-                CsvDataGeneralizer,
-            )
-
-            resolved = _strip_bom_if_present(input_path)
-            return CsvDataGeneralizer(column_separator=",").convert(str(resolved), schema_name=name)  # type: ignore[no-any-return]
+            return _import_tabular(input_path, name, separator=",")
 
         case "tsv":
-            from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
-                CsvDataGeneralizer,
-            )
-
-            resolved = _strip_bom_if_present(input_path)
-            return CsvDataGeneralizer(column_separator="\t").convert(
-                str(resolved), schema_name=name
-            )  # type: ignore[no-any-return]
+            return _import_tabular(input_path, name, separator="\t")
 
         case "json-sample":
             from genson import SchemaBuilder  # type: ignore[import-untyped]
