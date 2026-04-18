@@ -27,17 +27,9 @@ def test_yarrrml_gen_run_without_data(
 ) -> None:
     """`--run` without `--data` → exit 1 with "--run requires --data" on stderr.
 
-    The guard lives at ``rosetta/cli/yarrrml_gen.py`` section 11,
-    "Validate --run args before any I/O" — but "any I/O" refers only to the
-    materialization pass. The TransformSpec YAML (``--output``) is written
-    earlier in the pipeline (~step 9), so the YAML *does* land on disk before
-    the --run/--data guard fires. The behavioural invariant we pin is narrower:
-    the JSON-LD output (the materialization product) is NOT produced.
-
-    Observed as of Phase 18-03: exit 1, stderr contains "--run requires --data",
-    and no ``--jsonld-output`` file is written. If the TransformSpec write is
-    later moved behind the --run guard, tighten this test to also forbid
-    ``output_yaml``.
+    The guard fires at step 0 of the CLI (before any artifact write). Neither
+    the TransformSpec YAML nor the JSON-LD materialization product lands on
+    disk.
     """
     output_yaml = tmp_path / "spec.transform.yaml"
     jsonld_out = tmp_path / "out.jsonld"
@@ -67,11 +59,13 @@ def test_yarrrml_gen_run_without_data(
     # 2. Stderr substring — stable phrase from the guard.
     assert "--data" in result.stderr
     assert "--run" in result.stderr or "requires" in result.stderr
-    # 3. Behavioural invariant: the JSON-LD materialization product is NOT written,
-    #    even though the upstream TransformSpec YAML is already on disk when the
-    #    --run/--data guard fires.
+    # 3. Behavioural invariant: no partial artifact on disk (neither spec YAML
+    #    nor JSON-LD) — guard fires before any write.
     assert not jsonld_out.exists(), (
         "JSON-LD output must not be produced when the --run/--data guard fires"
+    )
+    assert not output_yaml.exists(), (
+        "TransformSpec YAML must not be written when the --run/--data guard fires"
     )
 
 
@@ -116,22 +110,12 @@ def test_yarrrml_gen_stdout_and_file_collision(
     master_schema_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """`--output -` and `--jsonld-output -` together under `--run`.
+    """`--output -` + `--jsonld-output -` under `--run` → exit 1, clear diagnostic.
 
-    As of Phase 18-03 the CLI does NOT explicitly forbid this combination. The
-    `--output` flag only accepts a Click PATH; '-' is treated as a filename
-    literal (not a stdout sentinel), so the invocation writes a file literally
-    named '-' in the current directory — which is a filesystem artefact rather
-    than a friendly error. Meanwhile `--jsonld-output -` is interpreted the
-    same way. This test pins the **observed** behaviour: Click accepts both
-    values without a dedicated collision guard and the command proceeds past
-    argument parsing.
-
-    If we later add an explicit "both streams cannot target stdout" guard,
-    update this test to expect exit != 0 with a clear diagnostic.
+    Both values target stdout; merging the TransformSpec YAML and the JSON-LD
+    bytes into a single stream would produce a malformed document. The step-0
+    guard rejects the combination before any write.
     """
-    output_spec = tmp_path / "spec.transform.yaml"
-
     result = CliRunner(mix_stderr=False).invoke(
         yarrrml_gen_cli,
         [
@@ -144,7 +128,7 @@ def test_yarrrml_gen_stdout_and_file_collision(
             "--source-format",
             "csv",
             "--output",
-            str(output_spec),
+            "-",
             "--jsonld-output",
             "-",
             "--run",
@@ -153,19 +137,16 @@ def test_yarrrml_gen_stdout_and_file_collision(
         ],
     )
 
-    # 1. Exit code — pin the observed exit code (accept any integer ≥ 0).
-    assert isinstance(result.exit_code, int), "exit code must be an integer"
-    # 2. Argument parsing did not reject the combination outright (no Click usage error).
-    combined = (result.stderr or "") + (result.output or "")
-    assert "Usage:" not in combined or result.exit_code in (0, 1), (
-        f"Click usage error implies a new collision guard was added; update this test. "
-        f"stderr={result.stderr!r}"
+    # 1. Exit code — guard-rejected.
+    assert result.exit_code == 1, (
+        f"expected exit 1 when --output and --jsonld-output both target stdout; "
+        f"got {result.exit_code}"
     )
-    # 3. Behavioural invariant: whether or not the run succeeded, the CLI did not
-    #    crash with a Python traceback (stderr does not contain "Traceback").
-    assert "Traceback" not in (result.stderr or ""), (
-        f"uncaught exception in yarrrml-gen with colliding stdout sinks: {result.stderr!r}"
-    )
+    # 2. Stderr substring — names both flags + 'stdout'.
+    assert "stdout" in result.stderr
+    assert "--output" in result.stderr and "--jsonld-output" in result.stderr
+    # 3. Behavioural invariant: no traceback on stderr.
+    assert "Traceback" not in result.stderr
 
 
 def test_suggest_missing_required_args(tmp_path: Path) -> None:

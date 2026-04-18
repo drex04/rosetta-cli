@@ -119,44 +119,36 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
 
 
 def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """Too-few-column TSV (8 cols) — observed behaviour pinned.
+    """TSV header missing required SSSOM columns → exit 1, clear diagnostic, no log write.
 
-    `parse_sssom_tsv` tolerates <13-column inputs via `.get()` defaults, so 8-column
-    rows parse into `SSSOMRow` with empty subject_id / object_id / etc. The downstream
-    pre-scan then fires on the empty-pair duplicate (`Duplicate MMC pair in file: (, )`)
-    because both rows collapse to the same (empty, empty) pair.
-
-    As of Phase 18-03 the CLI does NOT gate on column count directly; instead the
-    empty-key duplicate trips the in-file MMC pre-scan. This test pins the observed
-    exit code and the fact that nothing is written, without over-specifying the
-    error phrase. If a column-count guard is added later, update this test to
-    exercise it directly.
+    `parse_sssom_tsv` raises `ValueError` at the parse boundary when the header
+    lacks any of the 5 required SSSOM columns (subject_id, predicate_id, object_id,
+    mapping_justification, confidence). The CLI catches the exception and emits
+    a clean error naming the missing columns. No log file is created.
     """
     log_path = _log_path_from_toml(tmp_rosetta_toml)
     assert not log_path.exists()
 
-    tsv_file = tmp_path / "short_cols.sssom.tsv"
-    # 8-column header + two data rows (first 8 columns of 13).
-    short_cols = _SSSOM_COLUMNS[:8]  # drops `record_id`
+    tsv_file = tmp_path / "missing_required_cols.sssom.tsv"
+    # Header lacks `confidence` and `mapping_justification` — both required.
+    bad_cols = ["subject_id", "predicate_id", "object_id"]
     with tsv_file.open("w", encoding="utf-8") as f:
         f.write(_SSSOM_FILE_HEADER)
-        f.write("\t".join(short_cols) + "\n")
-        f.write(
-            "\t".join(["a", "skos:exactMatch", "b", MMC_JUSTIFICATION, "0.9", "", "", ""]) + "\n"
-        )
-        f.write(
-            "\t".join(["a", "skos:exactMatch", "b", MMC_JUSTIFICATION, "0.8", "", "", ""]) + "\n"
-        )
+        f.write("\t".join(bad_cols) + "\n")
+        f.write("\t".join(["a", "skos:exactMatch", "b"]) + "\n")
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
         ["--config", str(tmp_rosetta_toml), "ingest", str(tsv_file)],
     )
 
-    # 1. Exit code — any non-zero failure is acceptable; observed: 1 via duplicate pre-scan.
-    assert result.exit_code != 0, f"expected non-zero exit on malformed TSV; got {result.exit_code}"
-    # 2. Stderr substring — there must be SOME error message on stderr.
-    assert "Error" in result.stderr or len(result.stderr) > 0
+    # 1. Exit code — explicit failure from the new header guard.
+    assert result.exit_code == 1, (
+        f"expected exit 1 on missing required columns; got {result.exit_code}"
+    )
+    # 2. Stderr — names the missing columns for the user.
+    assert "missing required" in result.stderr.lower()
+    assert "confidence" in result.stderr or "mapping_justification" in result.stderr
     # 3. Behavioural invariant: no audit-log file was created.
     assert not log_path.exists(), "log file must not be created on a rejected ingest"
 

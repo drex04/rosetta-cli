@@ -8,7 +8,17 @@ from typing import Any
 import pytest
 from rdflib import Graph
 
-from rosetta.core.rdf_utils import ROSE_NS, bind_namespaces
+# Force rdflib's SPARQL parser grammar to compile before any schema-automator
+# import touches pyparsing's mutable grammar registry. Without this, test
+# ordering that reaches schema-automator first (e.g. through CSV/XSD ingest)
+# leaves the SPARQL grammar corrupted by the time later tests try to query
+# a Graph, surfacing as `pyparsing.exceptions.ParseException: Expected
+# {SelectQuery | ConstructQuery | DescribeQuery | AskQuery}`.
+from rdflib.plugins.sparql.parser import parseQuery as _sparql_preload
+
+_sparql_preload("SELECT * WHERE { ?s ?p ?o }")
+
+from rosetta.core.rdf_utils import ROSE_NS, bind_namespaces  # noqa: E402
 
 _FIXTURES_ROOT: Path = Path(__file__).parent / "fixtures"
 _NATIONS: Path = _FIXTURES_ROOT / "nations"

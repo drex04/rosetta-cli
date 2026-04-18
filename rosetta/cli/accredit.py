@@ -55,7 +55,11 @@ def ingest(ctx: click.Context, file: Path) -> None:
     """Ingest an SSSOM TSV file into the audit log."""
     log_path: Path = ctx.obj["log"]
 
-    incoming = parse_sssom_tsv(file)
+    try:
+        incoming = parse_sssom_tsv(file)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     log = load_log(log_path)
 
     errors: list[str] = []

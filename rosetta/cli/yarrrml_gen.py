@@ -119,6 +119,24 @@ def cli(
     context_output: str | None,
 ) -> None:
     """Generate a linkml-map TransformSpec from an approved SSSOM audit log."""
+    # 0. Validate flag combinations before any I/O so no partial artifact lands
+    #    on a guard failure.
+    if run:
+        if not data:
+            click.echo("Error: --run requires --data", err=True)
+            sys.exit(1)
+        data_path = Path(data)
+        if not data_path.is_file():
+            click.echo(f"Error: --data path does not exist or is not a file: {data}", err=True)
+            sys.exit(1)
+        if output == "-" == jsonld_output:
+            click.echo(
+                "Error: --output - and --jsonld-output - both target stdout; "
+                "use a file path for at least one.",
+                err=True,
+            )
+            sys.exit(1)
+
     # 1. Parse SSSOM audit log
     try:
         rows = parse_sssom_tsv(Path(sssom))
@@ -210,18 +228,12 @@ def cli(
             click.echo(f"Error writing coverage report {coverage_report}: {exc}", err=True)
             sys.exit(1)
 
-    # 11. Validate --run args before any I/O.
+    # 11. Early return when --run is not set; --run flag combinations already
+    #     validated in step 0.
     if not run:
         sys.exit(0)
-
-    if not data:
-        click.echo("Error: --run requires --data", err=True)
-        sys.exit(1)
-
+    assert data is not None  # guaranteed by step 0
     data_path = Path(data)
-    if not data_path.is_file():
-        click.echo(f"Error: --data path does not exist or is not a file: {data}", err=True)
-        sys.exit(1)
 
     # 13. Compile TransformSpec → YARRRML via forked linkml-map compiler.
     try:

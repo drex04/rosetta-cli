@@ -107,7 +107,13 @@ def test_ingest_complex_xsd(tmp_path: Path, stress_dir: Path) -> None:
 
 
 def test_ingest_csv_edge_cases(tmp_path: Path, stress_dir: Path) -> None:
-    """CSV with BOM, embedded quotes/newlines, and header-space normalises to 5 slots."""
+    """CSV with BOM, embedded quotes/newlines, and header-space normalises to 5 slots.
+
+    The UTF-8 BOM is stripped by ``_strip_bom_if_present`` before the file
+    reaches schema-automator, so slot names are clean. Header-space
+    normalisation is schema-automator's concern and is NOT overridden; the
+    ``radar type`` column lands with its literal space preserved.
+    """
     out = tmp_path / "csv_edge.linkml.yaml"
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
@@ -124,11 +130,6 @@ def test_ingest_csv_edge_cases(tmp_path: Path, stress_dir: Path) -> None:
 
     schema = _load_linkml(out)
 
-    # NOTE: BOM stripping AND header-space normalisation both deferred —
-    # see plan 18-02 Risks. schema-automator's CsvDataGeneralizer preserves
-    # the raw column names, so the first slot may start with \ufeff and
-    # "radar type" retains its literal space. We assert only column count
-    # and that every expected column is present (with tolerant matching).
     slots = _slots_dict(schema)
     classes = _classes_dict(schema)
 
@@ -142,10 +143,12 @@ def test_ingest_csv_edge_cases(tmp_path: Path, stress_dir: Path) -> None:
         f"{len(all_field_names)}: {sorted(all_field_names)}"
     )
 
-    # Behavioural invariant: every source column is represented (matching by
-    # `endswith` to tolerate the unstripped BOM on the first column).
-    expected_suffixes = ["track_id", "location", "note", "reading_mhz", "radar type"]
-    for suffix in expected_suffixes:
-        assert any(n.endswith(suffix) for n in all_field_names), (
-            f"expected a slot ending in {suffix!r}, got: {sorted(all_field_names)}"
+    # Behavioural invariant: BOM is stripped from slot names.
+    for name in all_field_names:
+        assert not name.startswith("\ufeff"), f"BOM must be stripped from slot names; got {name!r}"
+    # Every source column is represented (exact match on BOM-stripped names;
+    # schema-automator preserves the literal space in `radar type`).
+    for expected in ("track_id", "location", "note", "reading_mhz", "radar type"):
+        assert expected in all_field_names, (
+            f"expected {expected!r} in slots, got: {sorted(all_field_names)}"
         )

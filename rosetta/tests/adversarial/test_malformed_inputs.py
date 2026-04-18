@@ -146,26 +146,17 @@ def test_ingest_wrong_encoding_csv(adversarial_dir: Path, tmp_path: Path) -> Non
 
 
 def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
-    """UTF-8-BOM CSV → exit 0, but BOM survives into the first slot name.
+    """UTF-8-BOM CSV → exit 0, BOM stripped from slot names.
 
-    OBSERVED BEHAVIOR: schema-automator's CSV importer does NOT strip the
-    leading UTF-8 BOM (bytes ``\\xef\\xbb\\xbf``); the BOM character
-    (``\\ufeff``) ends up as a prefix on the first column's slot name. This
-    is the same behavior locked in Plan 18-02's ``test_ingest_csv_edge_cases``
-    note — the originally committed ``csv_edge_cases.csv`` fixture was
-    written without a BOM for that reason.
-
-    NOTE: BOM stripping deferred per 18-02 Risks. Plan 18-03 Truth #16
-    proposed asserting BOM-stripped slot names; production does not yet do
-    that, so this test pins the current observed behavior. When BOM stripping
-    lands in production (core or importer), this test should be updated to
-    assert the stripped slot name and removed from the "observed-behavior-
-    pinned" list.
+    ``rosetta.core.normalize._strip_bom_if_present`` detects the UTF-8 BOM
+    (bytes ``\\xef\\xbb\\xbf``) and rewrites the file to a tmp copy before
+    handing it to schema-automator. Result: slot names are clean, no
+    ``\\ufeff`` prefix.
     """
     import yaml
 
     in_csv = tmp_path / "in.csv"
-    # UTF-8 BOM (three bytes) + CSV payload; write_bytes preserves the BOM
+    # UTF-8 BOM (three bytes) + CSV payload.
     in_csv.write_bytes(b"\xef\xbb\xbf" + b"col1,col2\n1,foo\n2,bar\n")
 
     out = tmp_path / "out.yaml"
@@ -174,26 +165,22 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
         ["--input", str(in_csv), "--format", "csv", "--output", str(out)],
     )
 
-    # 1. Exit code — ingestion succeeds (BOM is not a parse error)
+    # 1. Exit code — ingestion succeeds.
     assert result.exit_code == 0, (
         f"expected exit 0, got {result.exit_code}; stderr={result.stderr!r}"
     )
 
-    # 2. Structured output shape — valid LinkML YAML
+    # 2. Structured output shape — valid LinkML YAML.
     assert out.exists()
     data = yaml.safe_load(out.read_text())
     assert isinstance(data, dict)
 
-    # 3. Behavioral invariant — the BOM prefix survives on the first slot
-    #    name (pin observed behavior). This is intentionally the opposite of
-    #    the positive-path assertion in 18-02's csv_edge_cases test, which
-    #    uses a pre-stripped fixture.
+    # 3. Behavioural invariant — no slot name carries the BOM prefix.
     slot_names = list((data.get("slots") or {}).keys())
     assert slot_names, f"expected slots, got: {data!r}"
-    first_slot = slot_names[0]
-    assert first_slot.startswith("\ufeff"), (
-        f"expected BOM-prefixed first slot name (observed behavior), got {first_slot!r}"
-    )
+    for name in slot_names:
+        assert not name.startswith("\ufeff"), f"BOM must be stripped from slot names; got {name!r}"
+    assert "col1" in slot_names, f"expected 'col1' in stripped slots: {slot_names!r}"
 
 
 def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

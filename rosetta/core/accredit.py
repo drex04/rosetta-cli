@@ -81,23 +81,27 @@ def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
     )
 
 
-def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
-    """Parse a SSSOM TSV file. Returns [] if file absent.
+_REQUIRED_SSSOM_COLUMNS = (
+    "subject_id",
+    "predicate_id",
+    "object_id",
+    "mapping_justification",
+    "confidence",
+)
 
-    Skips malformed rows (bad float, csv parse error) with a stderr warning.
-    Reads all 13 audit-log columns using `.get()` defaults; tolerates 9-column
-    (pre-16-00 audit log), 11-column (post-Phase-15 suggest output with datatype),
-    and 13-column (post-16-00 audit log) inputs. Missing columns yield `None` on
-    the resulting `SSSOMRow`.
-    """
-    if not path.exists():
-        return []
 
-    text = path.read_text(encoding="utf-8")
-    data_lines = [line for line in text.splitlines() if not line.startswith("#")]
-    if not data_lines:
-        return []
+def _validate_sssom_header(header: list[str], path: Path) -> None:
+    """Raise ValueError if *header* is missing any required SSSOM column."""
+    missing = [col for col in _REQUIRED_SSSOM_COLUMNS if col not in header]
+    if missing:
+        raise ValueError(
+            f"SSSOM file {path} header is missing required column(s): "
+            f"{', '.join(missing)}. Found {len(header)} columns: {header!r}"
+        )
 
+
+def _parse_sssom_rows(data_lines: list[str], path: Path) -> list[SSSOMRow]:
+    """Parse SSSOM data lines into rows. Skips malformed rows with a stderr warning."""
     rows: list[SSSOMRow] = []
     try:
         reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter="\t")
@@ -111,8 +115,34 @@ def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
                 )
     except csv.Error as exc:
         print(f"WARNING: CSV parse error in {path}: {exc}", file=sys.stderr)
-
     return rows
+
+
+def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
+    """Parse a SSSOM TSV file. Returns [] if file absent.
+
+    Skips malformed rows (bad float, csv parse error) with a stderr warning.
+    Reads all 13 audit-log columns using `.get()` defaults; tolerates 9-column
+    (pre-16-00 audit log), 11-column (post-Phase-15 suggest output with datatype),
+    and 13-column (post-16-00 audit log) inputs. Missing optional columns yield
+    `None` on the resulting `SSSOMRow`.
+
+    Raises `ValueError` if the header is missing any of the core SSSOM columns
+    (`subject_id`, `predicate_id`, `object_id`, `mapping_justification`,
+    `confidence`). A short-column header was previously tolerated and the
+    empty-string fallthrough surfaced downstream as a confusing duplicate-pair
+    error; the explicit header check now fails fast at the parse boundary.
+    """
+    if not path.exists():
+        return []
+
+    text = path.read_text(encoding="utf-8")
+    data_lines = [line for line in text.splitlines() if not line.startswith("#")]
+    if not data_lines:
+        return []
+
+    _validate_sssom_header(data_lines[0].split("\t"), path)
+    return _parse_sssom_rows(data_lines, path)
 
 
 def _row_value_for_column(row: SSSOMRow, col: str, mapping_date: str, record_id: str) -> str:

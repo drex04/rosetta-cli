@@ -98,6 +98,36 @@ def _import_with_json_tempfile(data: dict[str, Any], name: str) -> SchemaDefinit
             Path(tmp_path_str).unlink()
 
 
+_UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def _strip_bom_if_present(input_path: Path) -> Path:
+    """Return *input_path* unchanged when no UTF-8 BOM is present; otherwise
+    write a BOM-stripped copy to a tempfile and return that path.
+
+    ``schema-automator.CsvDataGeneralizer`` reads the file with a default
+    encoding that does not strip the BOM, which leaves ``\\ufeff`` embedded
+    in the first column header. Pre-stripping keeps the generated slot names
+    clean without requiring a dependency change.
+    """
+    with input_path.open("rb") as fh:
+        prefix = fh.read(len(_UTF8_BOM))
+    if prefix != _UTF8_BOM:
+        return input_path
+
+    fd, tmp = tempfile.mkstemp(suffix=input_path.suffix, prefix="rosetta_nobom_")
+    tmp_path = Path(tmp)
+    try:
+        with input_path.open("rb") as src, tmp_path.open("wb") as dst:
+            src.read(len(_UTF8_BOM))  # skip BOM
+            dst.write(src.read())
+    finally:
+        import os as _os
+
+        _os.close(fd)
+    return tmp_path
+
+
 def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
     """Run the appropriate schema-automator importer for *fmt*."""
     match fmt:
@@ -131,17 +161,17 @@ def _dispatch_import(fmt: str, input_path: Path, name: str) -> SchemaDefinition:
                 CsvDataGeneralizer,
             )
 
-            return CsvDataGeneralizer(column_separator=",").convert(
-                str(input_path), schema_name=name
-            )  # type: ignore[no-any-return]
+            resolved = _strip_bom_if_present(input_path)
+            return CsvDataGeneralizer(column_separator=",").convert(str(resolved), schema_name=name)  # type: ignore[no-any-return]
 
         case "tsv":
             from schema_automator.generalizers.csv_data_generalizer import (  # type: ignore[import-untyped]
                 CsvDataGeneralizer,
             )
 
+            resolved = _strip_bom_if_present(input_path)
             return CsvDataGeneralizer(column_separator="\t").convert(
-                str(input_path), schema_name=name
+                str(resolved), schema_name=name
             )  # type: ignore[no-any-return]
 
         case "json-sample":
