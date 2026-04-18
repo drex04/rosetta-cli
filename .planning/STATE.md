@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-17T19:56:00.000Z"
+last_updated: "2026-04-18T10:58:00.000Z"
 progress:
-  total_phases: 17
+  total_phases: 18
   completed_phases: 17
-  total_plans: 18
-  completed_plans: 21
+  total_plans: 21
+  completed_plans: 22
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 17 complete — all v2.0 phases closed
-- **Plan:** 17-01 (QUDT-native multi-library unit detection) complete
-- **Status:** Plan 17-01 complete on 2026-04-17; 367/367 fast tests passing (+35 net new vs Phase 16 close); 8/8 quality gates clean. `detect_unit()` now returns QUDT IRIs directly; quantulum3+pint NLP cascade reachable from `rosetta-lint`.
+- **Phase:** 18 (Integration & E2E Test Hardening) in progress
+- **Plan:** 18-01 (Test infrastructure foundation) complete
+- **Status:** Plan 18-01 complete on 2026-04-18; 378/378 fast tests passing + 2 slow (380/381 total; 1 pre-existing e2e failure in `test_e2e_nor_radar_csv_to_jsonld` m→ft unit conversion — fork SHA drift per Phase 16-03 follow-up, unrelated to Phase 18). 8/8 quality gates clean. pytest markers `integration` + `e2e` declared; `nations/` fixture subdir live with 9 relocated fixtures; `fake_deepl` fixture proven via smoke test; CI has a new `fast-gate` job running `-m "not slow and not e2e"`. Plans 18-02 (positive-path) and 18-03 (adversarial) unblocked.
 
 ## Phase Progress
 
@@ -40,6 +40,7 @@ progress:
 | 15 | rosetta-lint SSSOM enrichment | Complete |
 | 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
+| 18 | Integration & E2E Test Hardening | In progress (1/3 plans) |
 
 ## Phase 1 Completion
 
@@ -171,6 +172,14 @@ progress:
 - **Truth #3 closed end-to-end.** `transform_builder.build_slot_derivation` now detects units via `detect_unit()` on source + target slot names/descriptions and emits `UnitConversionConfiguration` for known linear pairs (m↔ft, etc.). Fork's `YarrrmlCompiler` patched to emit FnML function refs at stable rosetta UDF IRIs (replacing the broken `grel:value` emission). `rml_runner` writes a Python UDF file into `work_dir` and wires it via morph-kgc's `udfs=` INI option. E2E verifies numeric conversion (4100 m → ~13451 ft) within 1% via `pytest.approx(rel=1e-2)`.
 - **Fork SHA:** local commit `89e79d4` on `feat/yarrrml-compiler`. Until pushed, `pyproject.toml` `[tool.uv.sources]` points at the local checkout at `/home/ubuntu/dev/linkml-map-fork`. Re-pin to the pushed SHA after `git push origin feat/yarrrml-compiler` on the fork.
 
+## Phase 18 Plan 01 Completion
+
+- **Plan:** `.planning/phases/18-integration-test-hardening/18-01-PLAN.md`
+- **Commit:** 86b3738
+- **Tests:** 378/378 fast + 2/3 slow passing (1 pre-existing e2e failure — unit-conversion fork drift, not caused by Phase 18)
+- **Completed:** 2026-04-18
+- **Key changes:** pytest markers `integration` + `e2e` declared in `pyproject.toml`; 9 fixtures relocated to `rosetta/tests/fixtures/nations/` (with `stress/` + `adversarial/` placeholders); `conftest.py` now exposes fixture-path fixtures (`nor_csv_path`, `master_schema_path`, etc.) + reusable `fake_deepl` translator mock; existing integration tests (`test_accredit_integration.py`, `test_yarrrml_compile_integration.py`, `test_yarrrml_run_e2e.py`) retagged with module-level `pytestmark` and migrated to fixture-path fixtures; unit-test fixture paths in `test_ingest.py`, `test_normalize.py`, `test_yarrrml_gen.py` + README examples updated to `nations/` subdir; CI `test` job now runs full suite (`-m "not slow"` removed); new `fast-gate` job runs `-m "not slow and not e2e"`; README "Running tests" section documents marker scheme.
+
 ## Next Action
 
-Phase 16 complete. Phase 17 (QUDT-native multi-library unit detection) is independent of Phase 16 and can begin any time. Roadmap entry: `detect_unit()` returns QUDT IRIs directly; expanded regex + quantulum3/pint cascade; `UNIT_STRING_TO_IRI` table retired.
+Plan 18-02 (positive-path pipeline coverage, including 4 translate mocks + 2 subprocess smoke tests) is unblocked. Plan 18-03 (adversarial / negative input stress tests) also unblocked — can run after or alongside 18-02. Both depend only on the 18-01 infrastructure.
