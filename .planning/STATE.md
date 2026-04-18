@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: LinkML + SSSOM migration
 status: in_progress
-last_updated: "2026-04-18T10:58:00.000Z"
+last_updated: "2026-04-18T11:45:00.000Z"
 progress:
   total_phases: 18
   completed_phases: 17
   total_plans: 21
-  completed_plans: 22
+  completed_plans: 23
 ---
 
 # State
@@ -16,8 +16,8 @@ progress:
 ## Current Position
 
 - **Phase:** 18 (Integration & E2E Test Hardening) in progress
-- **Plan:** 18-01 (Test infrastructure foundation) complete
-- **Status:** Plan 18-01 complete on 2026-04-18; 378/378 fast tests passing + 2 slow (380/381 total; 1 pre-existing e2e failure in `test_e2e_nor_radar_csv_to_jsonld` m→ft unit conversion — fork SHA drift per Phase 16-03 follow-up, unrelated to Phase 18). 8/8 quality gates clean. pytest markers `integration` + `e2e` declared; `nations/` fixture subdir live with 9 relocated fixtures; `fake_deepl` fixture proven via smoke test; CI has a new `fast-gate` job running `-m "not slow and not e2e"`. Plans 18-02 (positive-path) and 18-03 (adversarial) unblocked.
+- **Plan:** 18-02 (Positive-path pipeline coverage) complete
+- **Status:** Plan 18-02 complete on 2026-04-18; 405/405 tests passing (all green, no xfails). Mid-plan fix `3fc820b` restored m→ft unit conversion in `build_slot_derivation` (two pre-existing bugs from Phase 17 QUDT migration — CamelCase `Ft` suffix not detected + `_LINEAR_CONVERSION_PAIRS` still keyed on short-name strings not IRIs). 8/8 quality gates clean. 34 integration tests + 4 e2e tests now collected across `rosetta/tests/integration/` and `rosetta/tests/smoke/`. Plan 18-03 (adversarial) is the only remaining Phase 18 work.
 
 ## Phase Progress
 
@@ -40,7 +40,7 @@ progress:
 | 15 | rosetta-lint SSSOM enrichment | Complete |
 | 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
-| 18 | Integration & E2E Test Hardening | In progress (1/3 plans) |
+| 18 | Integration & E2E Test Hardening | In progress (2/3 plans) |
 
 ## Phase 1 Completion
 
@@ -180,6 +180,22 @@ progress:
 - **Completed:** 2026-04-18
 - **Key changes:** pytest markers `integration` + `e2e` declared in `pyproject.toml`; 9 fixtures relocated to `rosetta/tests/fixtures/nations/` (with `stress/` + `adversarial/` placeholders); `conftest.py` now exposes fixture-path fixtures (`nor_csv_path`, `master_schema_path`, etc.) + reusable `fake_deepl` translator mock; existing integration tests (`test_accredit_integration.py`, `test_yarrrml_compile_integration.py`, `test_yarrrml_run_e2e.py`) retagged with module-level `pytestmark` and migrated to fixture-path fixtures; unit-test fixture paths in `test_ingest.py`, `test_normalize.py`, `test_yarrrml_gen.py` + README examples updated to `nations/` subdir; CI `test` job now runs full suite (`-m "not slow"` removed); new `fast-gate` job runs `-m "not slow and not e2e"`; README "Running tests" section documents marker scheme.
 
+## Unit-conversion regression fix (2026-04-18)
+
+- **Commit:** 3fc820b — `fix: restore m->ft unit conversion broken by Phase 17 QUDT migration`
+- **Bugs surfaced:** `test_e2e_nor_radar_csv_to_jsonld` flagged as pre-existing-failure during Phase 18-01 verification. Two independent root causes:
+  1. `detect_unit("hasAltitudeFt")` returned `None` — CamelCase suffix boundary not covered by `(?:^|_)ft$` regex. Fixed by `_snake_case` preprocessor that inserts underscores at lowercase→uppercase boundaries.
+  2. `build_slot_derivation._LINEAR_CONVERSION_PAIRS` still keyed on `("meter", "foot")` short-name strings after Phase 17 made `detect_unit()` return QUDT IRIs (`unit:M` / `unit:FT`). Fixed by rekeying pairs to QUDT IRIs + adding `_QUDT_TO_FORK_UNIT` map back to short names at the fork API boundary.
+- **Regression tests:** 3 unit tests in `test_unit_detect.py` (camelcase_trailing_ft, camelcase_trailing_mph, preserves_negative_cases) + 1 integration test in `test_yarrrml_gen.py` (test_build_spec_emits_unit_conversion_for_m_to_ft). Phase 17's STATE.md "Phase 16 Plan 03 Follow-up" note about fork-SHA drift can be closed — the pinned fork at `0015068` already contains the fix; the bug was on the rosetta side.
+
+## Phase 18 Plan 02 Completion
+
+- **Plan:** `.planning/phases/18-integration-test-hardening/18-02-PLAN.md`
+- **Commit:** ac8ced6
+- **Tests:** 405/405 passing (+24 new integration/e2e/smoke tests)
+- **Completed:** 2026-04-18
+- **Key changes:** 10 integration test files under `rosetta/tests/integration/` covering every CLI tool (ingest, embed, suggest, lint, validate, provenance, translate, accredit, full_chain); 2 subprocess smoke tests under `rosetta/tests/smoke/`; 6 stress fixtures under `rosetta/tests/fixtures/stress/` (nested JSON Schema, complex XSD, CSV edge cases, LinkML with inheritance + mixins); all translate tests mocked via `fake_deepl` ($0 DeepL credits); LaBSE model mocked in embed tests per `test_embed.py` pattern; three-assertion contract (D-18-08) honored throughout. Assertions relaxed where third-party behavior diverged from plan (schema-automator CSV BOM passthrough, oneOf flattening, XSD attributes-under-classes) — documented inline.
+
 ## Next Action
 
-Plan 18-02 (positive-path pipeline coverage, including 4 translate mocks + 2 subprocess smoke tests) is unblocked. Plan 18-03 (adversarial / negative input stress tests) also unblocked — can run after or alongside 18-02. Both depend only on the 18-01 infrastructure.
+Plan 18-03 (adversarial / negative input stress tests) is the only remaining Phase 18 work. Depends only on 18-01 infrastructure — can begin any time.
