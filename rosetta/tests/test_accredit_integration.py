@@ -13,6 +13,8 @@ from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
 from rosetta.core.models import SSSOMRow
 
+pytestmark = [pytest.mark.integration]
+
 # ---------------------------------------------------------------------------
 # Constants for integration tests
 # ---------------------------------------------------------------------------

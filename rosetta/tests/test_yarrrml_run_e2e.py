@@ -36,38 +36,46 @@ from click.testing import CliRunner
 
 from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
 
-_ROSETTA_CWD: Path = Path(__file__).resolve().parents[2]
-_FIXTURES: Path = _ROSETTA_CWD / "rosetta" / "tests" / "fixtures"
-_NOR_SCHEMA_SRC: Path = _FIXTURES / "nor_radar.linkml.yaml"
-_MC_SCHEMA_SRC: Path = _FIXTURES / "master_cop.linkml.yaml"
-_NOR_SSSOM_SRC: Path = _FIXTURES / "sssom_nor_approved.sssom.tsv"
-_NOR_CSV_SRC: Path = _FIXTURES / "nor_radar_sample.csv"
+pytestmark = [pytest.mark.integration, pytest.mark.e2e, pytest.mark.slow]
 
 
-def _copy_and_patch_schemas(dst_dir: Path) -> tuple[Path, Path, Path, Path]:
+def _copy_and_patch_schemas(
+    dst_dir: Path,
+    nor_schema_src: Path,
+    master_schema_src: Path,
+    sssom_src: Path,
+    csv_src: Path,
+) -> tuple[Path, Path, Path, Path]:
     """Copy fixtures to tmp_path and patch the ContextGenerator-hostile range."""
     nor_dst = dst_dir / "nor_radar.linkml.yaml"
     mc_dst = dst_dir / "master_cop.linkml.yaml"
     sssom_dst = dst_dir / "sssom_nor_approved.sssom.tsv"
     csv_dst = dst_dir / "nor_radar_sample.csv"
 
-    shutil.copy(_NOR_SCHEMA_SRC, nor_dst)
-    shutil.copy(_NOR_SSSOM_SRC, sssom_dst)
-    shutil.copy(_NOR_CSV_SRC, csv_dst)
+    shutil.copy(nor_schema_src, nor_dst)
+    shutil.copy(sssom_src, sssom_dst)
+    shutil.copy(csv_src, csv_dst)
 
-    shutil.copy(_MC_SCHEMA_SRC, mc_dst)
+    shutil.copy(master_schema_src, mc_dst)
 
     return nor_dst, mc_dst, sssom_dst, csv_dst
 
 
-@pytest.mark.slow
-def test_e2e_nor_radar_csv_to_jsonld(tmp_path: Path) -> None:
+def test_e2e_nor_radar_csv_to_jsonld(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+    nor_csv_sample_path: Path,
+) -> None:
     """Materialize a 3-row NOR CSV through the full rosetta-yarrrml-gen --run pipeline.
 
     Asserts the contract in Plan 16-03 truths #1, #2, #3 (relaxed per docstring),
     and review truth #17 (compaction-tolerant key lookup with pytest.approx).
     """
-    nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(tmp_path)
+    nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(
+        tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
+    )
 
     # Precondition (review truth #17): CSV columns ⊆ source schema slot names.
     with csv.open("r", encoding="utf-8") as fh:

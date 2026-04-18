@@ -231,3 +231,15 @@ def test_cli_translate_exception_exits_1(tmp_path: Path, monkeypatch: pytest.Mon
     )
     assert result.exit_code == 1
     assert "Error" in result.output
+
+
+def test_fake_deepl_fixture_smoke(fake_deepl: Any) -> None:
+    """Smoke test: the shared `fake_deepl` fixture installs and records calls."""
+    from rosetta.core.translation import translate_schema
+
+    fake_deepl({"Geschwindigkeit": "Speed"})
+    schema = _make_schema(classes={"speed": {"title": "Geschwindigkeit"}})
+    translate_schema(schema, source_lang="DE", deepl_key="fake-key")
+
+    assert fake_deepl.state["call_count"] == 1
+    assert fake_deepl.state["last_batch"] == ["Geschwindigkeit"]

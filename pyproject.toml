@@ -56,7 +56,11 @@ target-version = "py311"
 select = ["E", "W", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
-markers = ["slow: marks tests as slow (deselect with '-m not slow')"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m not slow')",
+    "integration: marks tests as multi-component integration (deselect with '-m not integration')",
+    "e2e: marks tests as full end-to-end pipelines; always also slow (deselect with '-m not e2e')",
+]
 
 [dependency-groups]
 dev = [

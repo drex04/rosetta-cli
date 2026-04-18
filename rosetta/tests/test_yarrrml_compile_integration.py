@@ -21,13 +21,11 @@ from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
 from rosetta.core.accredit import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec
 
+pytestmark = [pytest.mark.integration]
+
 # ---------------------------------------------------------------------------
-# Shared fixture paths
+# Shared paths
 # ---------------------------------------------------------------------------
-_FIXTURES = Path("rosetta/tests/fixtures")
-_NOR_SCHEMA = _FIXTURES / "nor_radar.linkml.yaml"
-_MC_SCHEMA = _FIXTURES / "master_cop.linkml.yaml"
-_NOR_SSSOM = _FIXTURES / "sssom_nor_approved.sssom.tsv"
 _ROSETTA_CWD = Path(__file__).resolve().parents[2]
 
 
@@ -91,23 +89,23 @@ def _mkschema(
     )  # pyright: ignore[reportCallIssue]
 
 
-def _build_nor_spec(tmp_path: Path) -> object:
+def _build_nor_spec(nor_schema: Path, mc_schema: Path, nor_sssom: Path) -> object:
     """Build a TransformationSpecification from the nor_radar fixtures."""
-    rows = parse_sssom_tsv(_NOR_SSSOM)
+    rows = parse_sssom_tsv(nor_sssom)
     src = cast(
         SchemaDefinition,
-        yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+        yaml_loader.load(str(nor_schema), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
     )
     mst = cast(
         SchemaDefinition,
-        yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+        yaml_loader.load(str(mc_schema), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
     )
     spec, _ = build_spec(
         rows,
         src,
         mst,
-        source_schema_path=str(_NOR_SCHEMA.resolve()),
-        target_schema_path=str(_MC_SCHEMA.resolve()),
+        source_schema_path=str(nor_schema.resolve()),
+        target_schema_path=str(mc_schema.resolve()),
         force=True,
     )
     spec.comments = ["rosetta:source_format=csv"]
@@ -119,15 +117,20 @@ def _build_nor_spec(tmp_path: Path) -> object:
 # ---------------------------------------------------------------------------
 
 
-def test_yarrrml_compile_produces_valid_yaml(tmp_path: Path) -> None:
+def test_yarrrml_compile_produces_valid_yaml(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+) -> None:
     """Round-trip nor_radar spec through YarrrmlCompiler; output must be valid YAML."""
     from linkml_map.compiler.yarrrml_compiler import YarrrmlCompiler
 
-    spec = _build_nor_spec(tmp_path)
+    spec = _build_nor_spec(nor_linkml_path, master_schema_path, sssom_nor_path)
 
     compiler = YarrrmlCompiler(
-        source_schemaview=SchemaView(str(_NOR_SCHEMA.resolve())),
-        target_schemaview=SchemaView(str(_MC_SCHEMA.resolve())),
+        source_schemaview=SchemaView(str(nor_linkml_path.resolve())),
+        target_schemaview=SchemaView(str(master_schema_path.resolve())),
     )
     rendered = compiler.compile(spec).serialization  # pyright: ignore[reportArgumentType]  # noqa: FURB184
 
@@ -147,15 +150,20 @@ def test_yarrrml_compile_produces_valid_yaml(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_yarrrml_compile_csv_references_match_annotations(tmp_path: Path) -> None:
+def test_yarrrml_compile_csv_references_match_annotations(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+) -> None:
     """Slots with rosetta_csv_column annotations must appear as $(col) in YARRRML po."""
     from linkml_map.compiler.yarrrml_compiler import YarrrmlCompiler
 
-    spec = _build_nor_spec(tmp_path)
+    spec = _build_nor_spec(nor_linkml_path, master_schema_path, sssom_nor_path)
 
     compiler = YarrrmlCompiler(
-        source_schemaview=SchemaView(str(_NOR_SCHEMA.resolve())),
-        target_schemaview=SchemaView(str(_MC_SCHEMA.resolve())),
+        source_schemaview=SchemaView(str(nor_linkml_path.resolve())),
+        target_schemaview=SchemaView(str(master_schema_path.resolve())),
     )
     raw_yaml = compiler.compile(spec).serialization  # pyright: ignore[reportArgumentType]  # noqa: FURB184
     # breddegrad and lengdegrad slots have rosetta_csv_column annotations — the compiler
@@ -198,7 +206,12 @@ def test_yarrrml_compile_csv_references_match_annotations(tmp_path: Path) -> Non
 
 
 @pytest.mark.slow
-def test_yarrrml_compile_cli_end_to_end(tmp_path: Path) -> None:
+def test_yarrrml_compile_cli_end_to_end(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+) -> None:
     """rosetta-yarrrml-gen writes spec.yaml; linkml-map compile --target yarrrml reads it."""
     spec_out = tmp_path / "spec.yaml"
     yarrrml_out = tmp_path / "output.yarrrml.yaml"
@@ -209,11 +222,11 @@ def test_yarrrml_compile_cli_end_to_end(tmp_path: Path) -> None:
         yarrrml_gen_cli,
         [
             "--sssom",
-            str(_NOR_SSSOM),
+            str(sssom_nor_path),
             "--source-schema",
-            str(_NOR_SCHEMA),
+            str(nor_linkml_path),
             "--master-schema",
-            str(_MC_SCHEMA),
+            str(master_schema_path),
             "--output",
             str(spec_out),
             "--force",
@@ -234,11 +247,11 @@ def test_yarrrml_compile_cli_end_to_end(tmp_path: Path) -> None:
             "-T",
             str(spec_out),
             "-s",
-            str(_NOR_SCHEMA.resolve()),
+            str(nor_linkml_path.resolve()),
             "--target",
             "yarrrml",
             "--target-schema",
-            str(_MC_SCHEMA.resolve()),
+            str(master_schema_path.resolve()),
             "-o",
             str(yarrrml_out),
         ],
@@ -264,7 +277,12 @@ def test_yarrrml_compile_cli_end_to_end(tmp_path: Path) -> None:
 
 
 @pytest.mark.slow
-def test_yarrrml_compile_cli_self_describing(tmp_path: Path) -> None:
+def test_yarrrml_compile_cli_self_describing(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+) -> None:
     """Omitting --target-schema forces compiler to use spec.target_schema path."""
     spec_out = tmp_path / "spec.yaml"
     yarrrml_out = tmp_path / "output_self.yarrrml.yaml"
@@ -275,11 +293,11 @@ def test_yarrrml_compile_cli_self_describing(tmp_path: Path) -> None:
         yarrrml_gen_cli,
         [
             "--sssom",
-            str(_NOR_SSSOM),
+            str(sssom_nor_path),
             "--source-schema",
-            str(_NOR_SCHEMA),
+            str(nor_linkml_path),
             "--master-schema",
-            str(_MC_SCHEMA),
+            str(master_schema_path),
             "--output",
             str(spec_out),
             "--force",
@@ -304,7 +322,7 @@ def test_yarrrml_compile_cli_self_describing(tmp_path: Path) -> None:
             "-T",
             str(spec_out),
             "-s",
-            str(_NOR_SCHEMA.resolve()),
+            str(nor_linkml_path.resolve()),
             "--target",
             "yarrrml",
             # intentionally omit --target-schema

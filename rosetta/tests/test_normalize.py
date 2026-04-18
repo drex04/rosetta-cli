@@ -8,7 +8,7 @@ import pytest
 
 from rosetta.core.normalize import normalize_schema
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent / "fixtures" / "nations"
 
 
 def test_normalize_json_schema() -> None:

@@ -289,4 +289,60 @@ NATO-relevant units. False positives gated by pint — unmappable results return
 
 **Requirements:** REQ-UNIT-DETECT-01
 
+---
+
+## Phase 18: Integration & E2E Test Hardening
+**Goal:** Stress-test every CLI tool with realistic pipelines, diverse input formats
+(deeply nested JSON Schema, complex XSD, CSV edge cases, LinkML with inheritance/mixins),
+and adversarial inputs that exercise user-mistake recovery. Introduce a layered
+pytest-marker scheme (`integration`, `e2e`, `slow`) so subsets can be selected, and
+consolidate fixture paths into `conftest.py` so tests stop re-declaring `_FIXTURES`.
+
+**Delivers:**
+- `pyproject.toml` — new pytest markers `integration`, `e2e` declared alongside `slow`
+- `rosetta/tests/conftest.py` — shared fixture-path fixtures (`nor_csv_path`, `master_schema_path`, …) + reusable `fake_deepl` DeepL-mock fixture
+- `rosetta/tests/fixtures/nations/` — existing nation fixtures relocated
+- `rosetta/tests/fixtures/stress/` — new complex positive-path fixtures (deeply nested JSON Schema, complex XSD with `<xs:choice>` + attributes + nested namespaces, CSV with quoted fields/embedded newlines/UTF-8 BOM, LinkML with `is_a`/`mixins`/`slot_usage`)
+- `rosetta/tests/fixtures/adversarial/` — committed malformed fixtures for rich negative cases
+- `rosetta/tests/integration/` — new directory with one full-chain integration test per CLI tool that didn't previously have one (ingest, embed, suggest, lint, validate, provenance, translate, plus two full-pipeline chains)
+- `rosetta/tests/adversarial/` — new directory with negative-path tests per tool + cross-cutting (SSSOM audit-log mistakes, unit-detection pitfalls, YARRRML fixture hygiene, CLI misuse)
+- `rosetta/tests/smoke/test_entry_points.py` — two subprocess smoke tests that `subprocess.run` installed console scripts
+- `.github/workflows/ci.yml` — CI runs the full suite (drops `-m "not slow"` on the default job; adds a fast-gate job for `-m "not slow and not e2e"` for PR feedback speed)
+- `README.md` — "Running tests" section documenting marker scheme and selection examples
+
+**Plans:**
+
+### 18-01: Test infrastructure foundation
+- Declare `integration` and `e2e` markers in `pyproject.toml`
+- Consolidate fixture paths into `conftest.py` + add `fake_deepl` fixture
+- Migrate existing 9 fixtures into `fixtures/nations/` subdirectory; update call sites
+- Retag the 3 existing integration files with new markers
+- Update CI workflow to run full suite + add fast-gate job
+- Update README "Running tests" section
+
+**Requirements:** REQ-TEST-INFRA-01
+
+### 18-02: Positive-path pipeline coverage
+- Author stress fixtures: deeply nested JSON Schema, complex XSD, CSV edge cases, LinkML inheritance schema
+- Full-chain integration test per previously-uncovered tool: `ingest`, `embed`, `suggest`, `lint`, `validate`, `provenance`
+- Two cross-tool pipelines: (a) `ingest(JSON) → embed → suggest → lint`, (b) `ingest(XSD) → yarrrml-gen --run` to JSON-LD
+- Four mocked `rosetta-translate` integration tests (DE→EN pipeline, FR→EN pipeline, batch-size verification, mixed-language handling)
+- Two subprocess smoke tests (`rosetta-ingest --help`, `rosetta-yarrrml-gen --help` via installed entry points)
+
+**Requirements:** REQ-TEST-POSITIVE-01
+
+### 18-03: Adversarial / negative input stress tests
+- Malformed inputs per tool (invalid JSON, truncated XML, UTF-8 BOM confusion, wrong encoding)
+- Schema-mismatch tests (field renamed, type changed, missing required)
+- SSSOM audit-log mistakes (duplicate MMCs, wrong column count, phantom derank)
+- CLI misuse (conflicting flags, missing required files, stdout-vs-file collision)
+- Unit-detection pitfalls (dBm fallback, metre-vs-meter keys, ambiguous slot names)
+- YARRRML fixture hygiene (LinkML `dateTime` typo)
+- Six mocked `rosetta-translate` error-path tests (auth failure, quota exceeded, transient error, missing key + non-EN source, EN passthrough without key, empty schema)
+
+**Requirements:** REQ-TEST-ADVERSARIAL-01
+
+**Note:** Phase 18 is purely additive — no production code changes; runtime behavior is unaltered. Can be built after Phase 17 in any order with unrelated phases.
+
+
 

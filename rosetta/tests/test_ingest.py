@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from rosetta.cli.ingest import cli
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parent / "fixtures" / "nations"
 
 
 def test_ingest_json_schema_cli(tmp_path: Path) -> None:

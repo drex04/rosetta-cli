@@ -99,7 +99,7 @@ def _mkschema(
 
 
 # Fixture paths (repo-relative from cwd=project-root)
-_FIXTURES = Path("rosetta/tests/fixtures")
+_FIXTURES = Path("rosetta/tests/fixtures/nations")
 _NOR_SCHEMA = _FIXTURES / "nor_radar.linkml.yaml"
 _MC_SCHEMA = _FIXTURES / "master_cop.linkml.yaml"
 _NOR_SSSOM = _FIXTURES / "sssom_nor_approved.sssom.tsv"

@@ -36,7 +36,17 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --all-extras
-      - run: uv run pytest -m "not slow"
+      - run: uv run pytest
+
+  fast-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          python-version: "3.11"
+      - run: uv sync --all-extras
+      - run: uv run pytest -m "not slow and not e2e"
 
   analysis:
     runs-on: ubuntu-latest

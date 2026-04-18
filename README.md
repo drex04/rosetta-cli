@@ -51,10 +51,10 @@ Options:
 **Example:**
 
 ```bash
-uv run rosetta-ingest --input rosetta/tests/fixtures/nor_radar.csv --output nor_radar.linkml.yaml
-uv run rosetta-ingest --input rosetta/tests/fixtures/deu_patriot.json --output deu_patriot.linkml.yaml
-uv run rosetta-ingest --input rosetta/tests/fixtures/usa_c2.yaml --output usa_c2.linkml.yaml
-uv run rosetta-ingest --input rosetta/tests/fixtures/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/nor_radar.csv --output nor_radar.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/deu_patriot.json --output deu_patriot.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/usa_c2.yaml --output usa_c2.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
 ```
 
 **Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta-yarrrml-gen`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
@@ -96,14 +96,14 @@ Set `DEEPL_API_KEY` to your DeepL API key. For English-source schemas, use `--so
 **Pipeline example**
 
 ```bash
-uv run rosetta-ingest --input rosetta/tests/fixtures/nor_radar.csv --output nor_radar.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/nor_radar.csv --output nor_radar.linkml.yaml
 uv run rosetta-translate --input nor_radar.linkml.yaml --output nor_radar_en.linkml.yaml --source-lang auto
 // Norwegian embeddings
 uv run rosetta-embed --input nor_radar.linkml.yaml --output nor_radar_nb_embeddings.json
 // English embeddings
 uv run rosetta-embed --input nor_radar_en.linkml.yaml --output nor_radar_en_embeddings.json
 
-uv run rosetta-ingest --input rosetta/tests/fixtures/master_cop_ontology.ttl --format rdfs --output master_cop.linkml.yaml
+uv run rosetta-ingest --input rosetta/tests/fixtures/nations/master_cop_ontology.ttl --format rdfs --output master_cop.linkml.yaml
 uv run rosetta-translate --input master_cop.linkml.yaml --output master_cop_en.linkml.yaml --source-lang EN # translate with --source-lang EN should be a no-op
 uv run rosetta-embed --input master_cop_en.linkml.yaml --output master_cop_embeddings.json
 
@@ -776,7 +776,19 @@ The script uses the bundled fixture files in `rosetta/tests/fixtures/` and pause
 ## Running tests
 
 ```bash
-uv run pytest                  # all tests
-uv run pytest -m "not slow"    # skip model-download tests (~900 MB)
-uv run pytest -k test_lint     # run a specific module
+uv run pytest                               # full suite (default)
+uv run pytest -m "not slow"                 # fast feedback — skips slow and e2e
+uv run pytest -m "not slow and not e2e"     # CI fast-gate equivalent
+uv run pytest -m integration                # integration tests only
+uv run pytest -m e2e                        # end-to-end pipelines only
+uv run pytest -k test_lint                  # run a specific module
 ```
+
+Markers:
+
+- `integration` — multi-component in-process tests via `CliRunner`
+- `e2e` — full pipeline tests (usually also `slow`)
+- `slow` — wall-clock >1s; deselect for quick iteration
+
+CI runs the full suite on every push; a parallel `fast-gate` job runs
+`-m "not slow and not e2e"` for sub-minute PR feedback.
