@@ -56,3 +56,10 @@ repos:
         pass_filenames: false
         types: [python]
         stages: [pre-push]
+
+      - id: mkdocs-strict
+        name: mkdocs build --strict
+        language: system
+        entry: uv run mkdocs build --strict --site-dir /tmp/rosetta-mkdocs-precommit
+        pass_filenames: false
+        files: ^(docs/|mkdocs\.yml$|rosetta/cli/.*\.py$)

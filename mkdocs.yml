@@ -1,0 +1,79 @@
+site_name: rosetta-cli
+site_description: Composable CLI toolkit for semantic mapping between NATO defense schemas and a master ontology.
+site_url: https://drex04.github.io/rosetta-cli/
+repo_url: https://github.com/drex04/rosetta-cli
+repo_name: drex04/rosetta-cli
+edit_uri: edit/master/docs/
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - mkdocs-click
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Concepts:
+      - The pipeline: concepts/pipeline.md
+      - Accreditation workflow: concepts/accreditation.md
+  - CLI reference:
+      - Overview: cli/index.md
+      - rosetta-ingest: cli/ingest.md
+      - rosetta-translate: cli/translate.md
+      - rosetta-embed: cli/embed.md
+      - rosetta-suggest: cli/suggest.md
+      - rosetta-lint: cli/lint.md
+      - rosetta-accredit: cli/accredit.md
+      - rosetta-validate: cli/validate.md
+      - rosetta-yarrrml-gen: cli/yarrrml-gen.md
+      - rosetta-provenance: cli/provenance.md
+  - Configuration: configuration.md

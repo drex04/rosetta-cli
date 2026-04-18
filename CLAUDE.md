@@ -42,7 +42,8 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 
 ## Conventions
 
-- **Public API surface changes must update README.md** — any change to CLI commands, option names, option placement (e.g. group-level vs subcommand-level), output formats, or exit codes requires a matching update to the relevant tool section in `README.md` before the work is complete.
+- **Public API surface changes must update README.md _and_ `docs/`** — any change to CLI commands, option names, option placement (e.g. group-level vs subcommand-level), output formats, or exit codes requires matching updates in the README tool section *and* the corresponding `docs/cli/<tool>.md` narrative content. The `docs/cli/*.md` pages auto-render Click `--help` via `mkdocs-click`, so keep the `help=` strings and command docstrings current — they are the source of truth for options.
+- **Docs-as-code is CI-gated** — `uv run mkdocs build --strict` runs in the `docs` CI job and as a pre-commit hook. Broken nav, broken links, and `mkdocs-click` directive failures fail the build. Site deploys from `master` to `https://drex04.github.io/rosetta-cli/` via `.github/workflows/docs.yml`.
 - All tools: read from files or stdin, write to files or stdout (Unix-composable)
 - RDF serialization: Turtle (.ttl) for human artifacts, N-Triples for machine interchange
 - Exit code 0 = success/conformant, 1 = errors/violations (composable in shell scripts)
@@ -67,8 +68,9 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - `uv run vulture rosetta/ --exclude rosetta/tests --min-confidence 80` — dead code detection
 - `uv run bandit -r rosetta/ -x rosetta/tests -ll` — security scan
 - `uv run refurb rosetta/ rosetta/tests/` — Python modernization
+- `uv run mkdocs build --strict` — docs build (fails on broken nav, missing pages, `mkdocs-click` errors)
 
-CI enforces all eight on every push/PR (`.github/workflows/ci.yml`), including a dedicated `analysis` job for radon, vulture, and bandit.
+CI enforces all nine on every push/PR (`.github/workflows/ci.yml`), with dedicated jobs for `analysis` (radon, vulture, bandit) and `docs` (mkdocs).
 
 ### Type annotation rules
 

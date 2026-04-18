@@ -214,3 +214,5 @@ uv-*.lock
 # Rosetta runtime artifacts
 demo_out/
 store/audit-log.sssom.tsv
+# mkdocs build output
+site/

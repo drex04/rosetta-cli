@@ -1,6 +1,44 @@
 # rosetta-cli
 
-Composable CLI toolkit for semantic mapping between NATO defense schemas and a master ontology. Each tool reads from files or stdin and writes to files or stdout, chaining cleanly with Unix pipes.
+**Map partner-nation schemas to a shared ontology — systematically, transparently, and with auditable human review.**
+
+> Full documentation: **[drex04.github.io/rosetta-cli](https://drex04.github.io/rosetta-cli/)** — the CLI reference there is auto-rendered from the source on every push.
+
+Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot telemetry, US C2 feeds — each schema has its own language, units, field names, and structure. Making them interoperate is the difference between a commander seeing one coherent picture and juggling seven.
+
+`rosetta-cli` is a composable Unix toolkit that takes heterogeneous partner schemas and produces a materialised, standards-compliant RDF knowledge graph aligned to a master ontology. Every step is a discrete tool you can script, pipe, inspect, and audit.
+
+## What it does
+
+- **Ingests** schemas in seven formats (CSV, TSV, JSON Schema, OpenAPI, XSD, RDFS/OWL, JSON samples) and normalises them to [LinkML](https://linkml.io/).
+- **Translates** non-English titles via DeepL so multilingual schemas embed in a common semantic space — originals preserved as aliases.
+- **Embeds** every class and slot with multilingual sentence transformers, blending **lexical** and **structural** similarity.
+- **Suggests** candidate mappings ranked by cosine similarity, automatically boosted by prior approvals and deranked by prior rejections.
+- **Lints** analyst proposals against physical-unit dimensionality, datatype compatibility, and audit-log conflicts — *before* a human reviewer ever sees them.
+- **Records** every decision in an append-only [SSSOM](https://mapping-commons.github.io/sssom/) audit log that feeds straight back into the next `suggest` run.
+- **Generates** a [YARRRML](https://rml.io/yarrrml/) mapping from the approved log, compiles it, and materialises it against concrete source data via [morph-kgc](https://morph-kgc.readthedocs.io/) — producing JSON-LD framed against your master ontology's `@context`.
+- **Validates** the resulting RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes and stamps it with [PROV-O](https://www.w3.org/TR/prov-o/) provenance so every artifact is traceable to an agent, a timestamp, and a version.
+
+## Why this way
+
+**Standards, not reinvention.** LinkML, SSSOM, SKOS, OWL, SEMAPV, PROV-O, SHACL, RML/YARRRML, JSON-LD — every intermediate artifact is a W3C or OBO-community standard readable by tools other than `rosetta-cli`.
+
+**Unix philosophy, strictly.** Each of the nine commands does one thing, reads from files or stdin, writes to files or stdout, and returns meaningful exit codes. No orchestrator, no daemon — just binaries you pipe together.
+
+**Human-in-the-loop.** Similarity is a candidate generator, not a decider. A two-role state machine (Analyst proposes, Accreditor approves) is enforced through an append-only audit log. Every mapping in production traces back to a reviewer, a timestamp, and a justification.
+
+**Multilingual by construction.** Coalition schemas are not monolingual. Norwegian `breddegrad` should match English `latitude` on first pass — without hand-maintained alias tables.
+
+**Auditable, always.** The audit log is a 13-column SSSOM TSV you can `git diff`. No decisions live in someone's email.
+
+## Who it's for
+
+- Coalition data architects aligning partner-nation schemas to a shared operational picture.
+- Ontology engineers who need a repeatable, reviewable mapping pipeline — not a one-off notebook.
+- Defense integrators producing accreditable, provenance-stamped RDF for downstream C2, sensor-fusion, or intelligence systems.
+- Anyone who has tried to reconcile a dozen CSVs to one schema by hand and sworn *never again*.
+
+---
 
 ## Installation
 
