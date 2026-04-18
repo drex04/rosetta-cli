@@ -1,0 +1,9 @@
+﻿track_id,location,note,reading_mhz,radar type
+T1,"Oslo, Norway",simple,2850.5,S-band
+T2,"Bergen, Norway","multi
+line
+comment",,X-band
+T3,Stavanger,plain,1400.25,L-band
+T4,"Tromso, Norway","quoted, with comma",900.0,UHF
+T5,Trondheim,"line1
+line2",450.75,VHF

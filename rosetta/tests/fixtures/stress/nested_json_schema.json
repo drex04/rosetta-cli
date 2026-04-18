@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w3id.org/rosetta/stress/nested_json_schema",
+  "title": "NestedOperation",
+  "description": "Deeply nested JSON Schema stress fixture for ingest tests.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation_id", "operation", "tracks"],
+  "properties": {
+    "operation_id": {
+      "type": "string",
+      "description": "Unique operation identifier."
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "theater"],
+      "properties": {
+        "name": { "type": "string" },
+        "theater": {
+          "type": "object",
+          "properties": {
+            "region": { "type": "string" },
+            "zone": {
+              "type": "object",
+              "properties": {
+                "zone_code": { "type": "string" },
+                "sector": {
+                  "type": "object",
+                  "properties": {
+                    "sector_id": { "type": "string" },
+                    "grid_ref": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "primary_track": { "$ref": "#/definitions/Track" },
+    "tracks": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Track" }
+    },
+    "contact": { "$ref": "#/definitions/Contact" }
+  },
+  "definitions": {
+    "Track": {
+      "type": "object",
+      "required": ["track_id", "kind"],
+      "properties": {
+        "track_id": { "type": "string" },
+        "track_label": { "type": "string" },
+        "confidence": { "type": "number" },
+        "kind": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["radar_freq_mhz"],
+              "properties": {
+                "type": { "type": "string", "enum": ["radar"] },
+                "radar_freq_mhz": { "type": "number" }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["optical_band"],
+              "properties": {
+                "type": { "type": "string", "enum": ["optical"] },
+                "optical_band": { "type": "string" }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["emitter_id"],
+              "properties": {
+                "type": { "type": "string", "enum": ["emitter"] },
+                "emitter_id": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "reporter": { "$ref": "#/definitions/Contact" }
+      }
+    },
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "contact_name": { "type": "string" },
+        "contact_email": { "type": "string", "format": "email" },
+        "contact_phone": { "type": "string" },
+        "contact_role": { "type": "string" }
+      }
+    }
+  }
+}

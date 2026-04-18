@@ -1,0 +1,51 @@
+{
+  "operation_id": "OP-2026-001",
+  "operation": {
+    "name": "Arctic Watch",
+    "theater": {
+      "region": "Nordic",
+      "zone": {
+        "zone_code": "ZNO-3",
+        "sector": {
+          "sector_id": "S-14",
+          "grid_ref": "NQ 1234 5678"
+        }
+      }
+    }
+  },
+  "primary_track": {
+    "track_id": "TRK-001",
+    "track_label": "Alpha",
+    "confidence": 0.92,
+    "kind": {
+      "type": "radar",
+      "radar_freq_mhz": 2850.5
+    },
+    "reporter": {
+      "contact_name": "Lars Hansen",
+      "contact_email": "lars.hansen@example.mil"
+    }
+  },
+  "tracks": [
+    {
+      "track_id": "TRK-002",
+      "kind": {
+        "type": "optical",
+        "optical_band": "visible"
+      }
+    },
+    {
+      "track_id": "TRK-003",
+      "kind": {
+        "type": "emitter",
+        "emitter_id": "EMT-42"
+      }
+    }
+  ],
+  "contact": {
+    "contact_name": "Ingrid Berg",
+    "contact_email": "ingrid.berg@example.mil",
+    "contact_phone": "+47-22-000-000",
+    "contact_role": "Watch Officer"
+  }
+}

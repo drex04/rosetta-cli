@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tns:radarTrack xmlns:tns="https://w3id.org/rosetta/stress/tracks"
+                source="NOR-RADAR-01"
+                classification="UNCLASSIFIED"
+                bandCode="S">
+  <tns:trackId>TRK-XML-001</tns:trackId>
+  <tns:reportedAt>2026-04-18T12:00:00Z</tns:reportedAt>
+  <tns:freqMhz>2850.5</tns:freqMhz>
+  <tns:emitter>EMT-42</tns:emitter>
+</tns:radarTrack>

@@ -1,0 +1,70 @@
+name: linkml_inheritance
+id: https://w3id.org/rosetta/stress/linkml_inheritance
+description: >-
+  LinkML stress fixture exercising is_a inheritance, mixins, and slot_usage
+  range narrowing. Used by Phase 18 integration tests.
+imports:
+  - linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  stress:
+    prefix_prefix: stress
+    prefix_reference: https://w3id.org/rosetta/stress/linkml_inheritance/
+default_prefix: stress
+
+classes:
+  Identifiable:
+    description: Mixin granting an identifier slot.
+    mixin: true
+    slots:
+      - id
+
+  TrackBase:
+    description: Base track class with three slots.
+    slots:
+      - track_id
+      - reported_at
+      - source
+
+  RadarTrack:
+    description: Specialised radar track.
+    is_a: TrackBase
+    mixins:
+      - Identifiable
+    slots:
+      - freq_mhz
+      - band_code
+    slot_usage:
+      source:
+        range: SourceEnum
+        description: Narrowed to the SourceEnum enumeration.
+
+slots:
+  id:
+    identifier: true
+    range: string
+    description: Stable identifier supplied by the mixin.
+  track_id:
+    range: string
+    required: true
+  reported_at:
+    range: datetime
+  source:
+    range: string
+  freq_mhz:
+    range: float
+  band_code:
+    range: string
+
+enums:
+  SourceEnum:
+    description: Allowed track source codes.
+    permissible_values:
+      NOR-RADAR-01:
+        description: Norwegian radar station 01.
+      DEU-RADAR-02:
+        description: German radar station 02.
+      USA-C2:
+        description: US Command and Control feed.
