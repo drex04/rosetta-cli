@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 import numpy as np
@@ -137,8 +138,6 @@ def apply_sssom_feedback(
       OTHER candidates for that field (soft subject-breadth deranking).
     Returns a new list (does not mutate input).
     """
-    import copy
-
     result = copy.deepcopy(candidates)
 
     diff_from_object_ids = {

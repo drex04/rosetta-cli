@@ -16,6 +16,7 @@ from linkml_map.datamodel.transformer_model import (
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.utils.schemaview import SchemaView
 
+from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION
 from rosetta.core.models import CoverageReport, SSSOMRow
 from rosetta.core.unit_detect import detect_unit
 
@@ -43,8 +44,8 @@ _LINEAR_CONVERSION_PAIRS: frozenset[tuple[str, str]] = frozenset(
 
 _EXCLUDED_PREDICATE_OWL_DIFFERENT_FROM = "owl:differentFrom"
 _ACCEPTED_PREDICATES = frozenset({"skos:exactMatch", "skos:closeMatch"})
-_HC = "semapv:HumanCuration"
-_MMC = "semapv:ManualMappingCuration"
+_HC = HC_JUSTIFICATION
+_MMC = MMC_JUSTIFICATION
 
 
 def filter_rows(

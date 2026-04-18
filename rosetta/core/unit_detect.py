@@ -186,6 +186,10 @@ def _detect_from_nlp(description: str) -> str | None:
             key = str(parsed.units)
             if key in _PINT_TO_QUDT_IRI:
                 return _PINT_TO_QUDT_IRI[key]
-        except Exception:  # noqa: BLE001
+        except (ValueError, AttributeError, ArithmeticError, KeyError) as exc:
+            # pint raises UndefinedUnitError (ValueError subclass), DimensionalityError,
+            # and various parse failures. Log at debug so mis-mapped keys are diagnosable
+            # rather than silent (matches the quantulum3 log path above).
+            _log.debug("pint parse failed for %r: %s", qty.unit.name, exc)
             continue
     return None

@@ -5,10 +5,18 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, RootModel
 
+# review-2: ConfigDict(extra="forbid") on every user-facing model — the same
+# gotcha that bit SSSOMRow in 16-00. Catches field-name typos at construction
+# time (e.g. README/JSON doc drift against model field names).
+_STRICT: ConfigDict = ConfigDict(extra="forbid")
+
+
 # --- Lint ---
 
 
 class FnmlSuggestion(BaseModel):
+    model_config = _STRICT
+
     fnml_function: str
     label: str | None = None
     multiplier: float | None = None
@@ -22,6 +30,8 @@ class FnmlSuggestion(BaseModel):
 
 
 class LintFinding(BaseModel):
+    model_config = _STRICT
+
     rule: str
     severity: Literal["BLOCK", "WARNING", "INFO"]
     source_uri: str
@@ -31,12 +41,16 @@ class LintFinding(BaseModel):
 
 
 class LintSummary(BaseModel):
+    model_config = _STRICT
+
     block: int
     warning: int
     info: int
 
 
 class LintReport(BaseModel):
+    model_config = _STRICT
+
     findings: list[LintFinding]
     summary: LintSummary
 
@@ -45,6 +59,8 @@ class LintReport(BaseModel):
 
 
 class EmbeddingVectors(BaseModel):
+    model_config = _STRICT
+
     label: str = ""
     lexical: list[float]
     structural: list[float] = []
@@ -59,12 +75,16 @@ class EmbeddingReport(RootModel[dict[str, EmbeddingVectors]]):
 
 
 class Suggestion(BaseModel):
+    model_config = _STRICT
+
     target_uri: str
     label: str = ""
     score: float
 
 
 class FieldSuggestions(BaseModel):
+    model_config = _STRICT
+
     label: str = ""
     suggestions: list[Suggestion]
     anomaly: bool = False
@@ -78,6 +98,8 @@ class SuggestionReport(RootModel[dict[str, FieldSuggestions]]):
 
 
 class SSSOMRow(BaseModel):
+    model_config = _STRICT
+
     subject_id: str
     predicate_id: str
     object_id: str
@@ -99,6 +121,8 @@ class SSSOMRow(BaseModel):
 
 
 class ProvenanceRecord(BaseModel):
+    model_config = _STRICT
+
     activity_uri: str
     agent_uri: str
     label: str | None = None
@@ -111,6 +135,8 @@ class ProvenanceRecord(BaseModel):
 
 
 class ValidationFinding(BaseModel):
+    model_config = _STRICT
+
     focus_node: str
     severity: Literal["Violation", "Warning", "Info"]
     constraint: str
@@ -119,6 +145,8 @@ class ValidationFinding(BaseModel):
 
 
 class ValidationSummary(BaseModel):
+    model_config = _STRICT
+
     violation: int
     warning: int
     info: int
@@ -126,6 +154,8 @@ class ValidationSummary(BaseModel):
 
 
 class ValidationReport(BaseModel):
+    model_config = _STRICT
+
     findings: list[ValidationFinding]
     summary: ValidationSummary
 
@@ -134,6 +164,8 @@ class ValidationReport(BaseModel):
 
 
 class StatusEntry(BaseModel):
+    model_config = _STRICT
+
     subject_id: str
     object_id: str
     state: Literal["pending", "approved", "rejected"]
@@ -145,9 +177,7 @@ class StatusEntry(BaseModel):
 
 
 class CoverageReport(BaseModel):
-    # review-2: ConfigDict(extra="forbid") — same gotcha that bit SSSOMRow in 16-00.
-    # Catches field-name typos at construction time.
-    model_config = ConfigDict(extra="forbid")  # pyright: ignore[reportUnannotatedClassAttribute]
+    model_config = _STRICT
 
     source_schema_prefix: str
     master_schema_prefix: str

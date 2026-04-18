@@ -232,7 +232,8 @@ def cli(
     #     validated in step 0.
     if not run:
         sys.exit(0)
-    assert data is not None  # guaranteed by step 0
+    if data is None:  # belt-and-braces: step 0 already validated
+        raise click.ClickException("internal: --data required when --run is set")
     data_path = Path(data)
 
     # 13. Compile TransformSpec → YARRRML via forked linkml-map compiler.

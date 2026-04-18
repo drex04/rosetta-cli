@@ -5,9 +5,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
+from typing import cast as _cast
 
 import click
+from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
+from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
+from rosetta.core.config import get_config_value, load_config
 from rosetta.core.embedding import (
     EmbeddingModel,
     extract_text_inputs_linkml,
@@ -66,14 +71,6 @@ def cli(
 ) -> None:
     """Embed a LinkML schema using a sentence-transformer model."""
     try:
-        from typing import Any
-        from typing import cast as _cast
-
-        from linkml_runtime.linkml_model import SchemaDefinition
-        from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
-
-        from rosetta.core.config import get_config_value, load_config
-
         config = load_config(None)
         model_name: str = (
             model or get_config_value(config, "embed", "model") or "intfloat/e5-large-v2"

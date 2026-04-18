@@ -58,7 +58,7 @@ def _hoist_nested_objects(schema: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _detect_format(input_path: Path) -> str:
+def detect_format(input_path: Path) -> str:
     """Infer schema format from file extension.  Raises ValueError if unrecognised."""
     ext = input_path.suffix.lower()
     match ext:
@@ -236,7 +236,7 @@ def check_prefix_collision(output_path: Path, schema_def: SchemaDefinition) -> N
             )
 
 
-def _stamp_source_format(schema_def: SchemaDefinition, fmt: str) -> None:
+def stamp_source_format(schema_def: SchemaDefinition, fmt: str) -> None:
     """Set ``annotations.rosetta_source_format`` on the LinkML schema.
 
     ``fmt`` is the normalised CLI ``--format`` value mapped to the downstream
@@ -260,7 +260,7 @@ def _stamp_source_format(schema_def: SchemaDefinition, fmt: str) -> None:
     schema_def.annotations = existing  # pyright: ignore[reportAttributeAccessIssue]
 
 
-def _stamp_slot_paths(schema_def: SchemaDefinition, fmt: str) -> None:
+def stamp_slot_paths(schema_def: SchemaDefinition, fmt: str) -> None:
     """For every slot, attach the format-specific path hint annotation consumed by 16-02."""
     annotation_key: str | None = {
         "json": "rosetta_jsonpath",
@@ -305,7 +305,7 @@ def normalize_schema(
         ValueError: If the format cannot be inferred or is not supported.
     """
     name = schema_name or input_path.stem
-    resolved_fmt = fmt if fmt is not None else _detect_format(input_path)
+    resolved_fmt = fmt if fmt is not None else detect_format(input_path)
 
     # schema_automator/pydbml mutate pyparsing.ParserElement.DEFAULT_WHITE_CHARS
     # (strips '\n'), breaking rdflib's SPARQL parser in the same process.

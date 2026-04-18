@@ -789,3 +789,156 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     assert mapping_justification == "semapv:LexicalMatching", (
         f"structural_weight=0.0 must emit LexicalMatching, got: {mapping_justification}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Direct unit tests for _adjusted_score — covers all 4 branches
+# (review-2: previously only tested transitively via apply_sssom_feedback;
+# soft-derank 0.25 coefficient had no regression guard.)
+# ---------------------------------------------------------------------------
+
+
+def _hc_row(subject: str, obj: str, predicate: str = "skos:exactMatch"):
+    from rosetta.core.models import SSSOMRow
+
+    return SSSOMRow(
+        subject_id=subject,
+        predicate_id=predicate,
+        object_id=obj,
+        mapping_justification="semapv:HumanCuration",
+        confidence=1.0,
+    )
+
+
+class TestAdjustedScore:
+    """Exercise every branch of _adjusted_score with boundary values."""
+
+    def test_exact_differentfrom_match_subtracts_full_penalty(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        score = _adjusted_score(
+            cand_score=0.9,
+            obj_id="obj:X",
+            subject_id="subj:A",
+            diff_from_object_ids={"obj:X"},
+            has_diff_from=True,
+            approved_rows=[],
+            boost=0.1,
+            penalty=0.2,
+        )
+        assert score == pytest.approx(0.7)
+
+    def test_exact_differentfrom_match_floors_at_zero(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        score = _adjusted_score(
+            cand_score=0.1,
+            obj_id="obj:X",
+            subject_id="subj:A",
+            diff_from_object_ids={"obj:X"},
+            has_diff_from=True,
+            approved_rows=[],
+            boost=0.1,
+            penalty=0.5,
+        )
+        assert score == 0.0
+
+    def test_soft_derank_uses_quarter_penalty_coefficient(self) -> None:
+        """Regression guard for the 0.25 soft subject-breadth penalty coefficient.
+
+        If anyone changes 0.25, this test will fail — the value is a correctness
+        invariant of apply_sssom_feedback's derank design.
+        """
+        from rosetta.core.similarity import _adjusted_score
+
+        score = _adjusted_score(
+            cand_score=0.8,
+            obj_id="obj:OTHER",
+            subject_id="subj:A",
+            diff_from_object_ids={"obj:X"},  # subject has diffFrom, but not for obj:OTHER
+            has_diff_from=True,
+            approved_rows=[],
+            boost=0.1,
+            penalty=0.2,
+        )
+        # 0.8 - (0.2 * 0.25) = 0.8 - 0.05 = 0.75
+        assert score == pytest.approx(0.75)
+
+    def test_soft_derank_floors_at_zero(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        score = _adjusted_score(
+            cand_score=0.01,
+            obj_id="obj:OTHER",
+            subject_id="subj:A",
+            diff_from_object_ids={"obj:X"},
+            has_diff_from=True,
+            approved_rows=[],
+            boost=0.1,
+            penalty=1.0,  # 1.0 * 0.25 = 0.25; 0.01 - 0.25 → floor 0.0
+        )
+        assert score == 0.0
+
+    def test_boost_match_adds_boost_when_approved_row_matches(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        approved = [_hc_row("subj:A", "obj:X", "skos:exactMatch")]
+        score = _adjusted_score(
+            cand_score=0.7,
+            obj_id="obj:X",
+            subject_id="subj:A",
+            diff_from_object_ids=set(),
+            has_diff_from=False,
+            approved_rows=approved,
+            boost=0.1,
+            penalty=0.2,
+        )
+        assert score == pytest.approx(0.8)
+
+    def test_boost_match_caps_at_one(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        approved = [_hc_row("subj:A", "obj:X", "skos:closeMatch")]
+        score = _adjusted_score(
+            cand_score=0.95,
+            obj_id="obj:X",
+            subject_id="subj:A",
+            diff_from_object_ids=set(),
+            has_diff_from=False,
+            approved_rows=approved,
+            boost=0.3,
+            penalty=0.2,
+        )
+        assert score == 1.0
+
+    def test_boost_ignores_differentfrom_rows(self) -> None:
+        """owl:differentFrom rows in approved_rows must NOT trigger a boost."""
+        from rosetta.core.similarity import _adjusted_score
+
+        approved = [_hc_row("subj:A", "obj:X", "owl:differentFrom")]
+        score = _adjusted_score(
+            cand_score=0.5,
+            obj_id="obj:X",
+            subject_id="subj:A",
+            diff_from_object_ids=set(),  # caller didn't flag; check boost path only
+            has_diff_from=False,
+            approved_rows=approved,
+            boost=0.1,
+            penalty=0.2,
+        )
+        assert score == pytest.approx(0.5)  # passthrough, no boost
+
+    def test_passthrough_when_no_feedback_applies(self) -> None:
+        from rosetta.core.similarity import _adjusted_score
+
+        score = _adjusted_score(
+            cand_score=0.42,
+            obj_id="obj:UNSEEN",
+            subject_id="subj:A",
+            diff_from_object_ids=set(),
+            has_diff_from=False,
+            approved_rows=[],
+            boost=0.1,
+            penalty=0.2,
+        )
+        assert score == pytest.approx(0.42)

@@ -24,7 +24,7 @@ from rosetta.core.accredit import (
 )
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
-from rosetta.core.models import StatusEntry
+from rosetta.core.models import SSSOMRow, StatusEntry
 
 
 @click.group()
@@ -39,13 +39,28 @@ def cli(ctx: click.Context, log: str | None, config: str | None) -> None:
     ctx.obj["log"] = Path(log_path_str)
 
 
-def _write_sssom_tsv(rows: list[dict[str, str]], out: IO[str]) -> None:
+def _row_to_tsv_cell(row: SSSOMRow, col: str) -> str:
+    """Serialise a single SSSOMRow field to its TSV cell representation.
+
+    Mirrors the column-driven serialisation used by core.accredit.append_log so
+    review/dump emit values for every AUDIT_LOG_COLUMNS entry, not just the
+    first nine.
+    """
+    if col == "mapping_date":
+        return row.mapping_date.isoformat() if row.mapping_date else ""
+    if col == "confidence":
+        return str(row.confidence)
+    value = getattr(row, col, None)
+    return "" if value is None else str(value)
+
+
+def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
     """Write SSSOM header block + column header + rows to out."""
     out.write(SSSOM_HEADER)
     writer = csv.writer(out, delimiter="\t", lineterminator="\n")
     writer.writerow(AUDIT_LOG_COLUMNS)
     for row in rows:
-        writer.writerow([row.get(col, "") for col in AUDIT_LOG_COLUMNS])
+        writer.writerow([_row_to_tsv_cell(row, col) for col in AUDIT_LOG_COLUMNS])
 
 
 @cli.command("ingest")
@@ -118,23 +133,8 @@ def review(ctx: click.Context, output: str | None) -> None:
     log = load_log(log_path)
     pending = query_pending(log)
 
-    rows = [
-        {
-            "subject_id": row.subject_id,
-            "predicate_id": row.predicate_id,
-            "object_id": row.object_id,
-            "mapping_justification": row.mapping_justification,
-            "confidence": str(row.confidence),
-            "subject_label": row.subject_label,
-            "object_label": row.object_label,
-            "mapping_date": row.mapping_date.isoformat() if row.mapping_date else "",
-            "record_id": row.record_id or "",
-        }
-        for row in pending
-    ]
-
     with open_output(output) as out:
-        _write_sssom_tsv(rows, out)
+        _write_sssom_tsv(pending, out)
 
 
 @cli.command("status")
@@ -195,7 +195,7 @@ def dump(ctx: click.Context, output: str | None) -> None:
     log_path: Path = ctx.obj["log"]
     log = load_log(log_path)
 
-    rows: list[dict[str, str]] = []
+    rows: list[SSSOMRow] = []
 
     if log:
         pairs: set[tuple[str, str]] = {(r.subject_id, r.object_id) for r in log}
@@ -206,19 +206,7 @@ def dump(ctx: click.Context, output: str | None) -> None:
             # Only emit rows where the latest decision is HumanCuration
             if latest.mapping_justification != HC_JUSTIFICATION:
                 continue
-            rows.append(
-                {
-                    "subject_id": latest.subject_id,
-                    "predicate_id": latest.predicate_id,
-                    "object_id": latest.object_id,
-                    "mapping_justification": latest.mapping_justification,
-                    "confidence": str(latest.confidence),
-                    "subject_label": latest.subject_label,
-                    "object_label": latest.object_label,
-                    "mapping_date": latest.mapping_date.isoformat() if latest.mapping_date else "",
-                    "record_id": latest.record_id or "",
-                }
-            )
+            rows.append(latest)
 
     with open_output(output) as out:
         _write_sssom_tsv(rows, out)
