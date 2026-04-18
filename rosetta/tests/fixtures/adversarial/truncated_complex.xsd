@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="https://w3id.org/rosetta/stress/tracks"
+           xmlns:common="https://w3id.org/rosetta/stress/common"
+           targetNamespace="https://w3id.org/rosetta/stress/tracks"
+           elementFormDefault="qualified">
+
+  <xs:complexType name="TrackBase">
+    <xs:sequence>
+      <xs:element name="trackId" type="xs:string"/>
+      <xs:element name="reportedAt" type="xs:dateTime"/>
+    </xs:sequence>
+    <xs:attribute name="source" type="xs:string" use="required"/>
+    <xs:attribute name="classification" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="RadarTrack">
+    <xs:complexContent>
+      <xs:extension base="tns:TrackBase">
+        <xs:sequence>
+          <xs:element name="freqMhz" type="xs:decimal"/>
+          <xs:choice>
+            <xs:element name="emitter" type="xs:string"/>

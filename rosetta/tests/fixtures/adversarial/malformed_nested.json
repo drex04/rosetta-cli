@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://w3id.org/rosetta/adversarial/malformed_nested",
+  "title": "MalformedNested",
+  "description": "Deeply nested JSON Schema with a trailing comma injected after a third-level $ref property.",
+  "type": "object",
+  "required": ["operation_id", "tracks"],
+  "properties": {
+    "operation_id": { "type": "string" },
+    "tracks": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/Track" }
+    }
+  },
+  "definitions": {
+    "Track": {
+      "type": "object",
+      "properties": {
+        "track_id": { "type": "string" },
+        "reporter": { "$ref": "#/definitions/Contact" },
+      }
+    },
+    "Contact": {
+      "type": "object",
+      "properties": {
+        "contact_name": { "type": "string" }
+      }
+    }
+  }
+}
