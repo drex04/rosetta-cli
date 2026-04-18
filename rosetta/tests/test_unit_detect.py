@@ -256,3 +256,31 @@ def test_detect_unit_nlp_pint_rejection_continues(
     result = unit_detect._detect_from_nlp("100 widgets and 500 grams")
     assert result == "unit:GM"
     assert calls["n"] >= 2, "parse_expression should be called more than once"
+
+
+# ---------------------------------------------------------------------------
+# CamelCase boundary handling — trailing-unit tokens after lowercase letters
+# are detected without requiring an explicit underscore (e.g. hasAltitudeFt).
+# ---------------------------------------------------------------------------
+
+
+def test_detect_unit_camelcase_trailing_ft() -> None:
+    """hasAltitudeFt is snake-cased internally so (?:^|_)ft$ matches."""
+    from rosetta.core.unit_detect import detect_unit
+
+    assert detect_unit("hasAltitudeFt", "") == "unit:FT"
+
+
+def test_detect_unit_camelcase_trailing_mph() -> None:
+    """Compound units still match across CamelCase boundaries."""
+    from rosetta.core.unit_detect import detect_unit
+
+    assert detect_unit("hasSpeedMph", "") == "unit:MI-PER-HR"
+
+
+def test_detect_unit_camelcase_preserves_negative_cases() -> None:
+    """Words that end in unit-like letters but are not units stay None."""
+    from rosetta.core.unit_detect import detect_unit
+
+    assert detect_unit("program", "") is None
+    assert detect_unit("name", "") is None

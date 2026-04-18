@@ -334,6 +334,41 @@ def test_build_spec_class_derivations_is_list() -> None:
     assert isinstance(spec.class_derivations, list)
 
 
+def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
+    """hoyde_m (meter) → hasAltitudeFt (foot) must produce UnitConversionConfiguration.
+
+    Regression guard: Phase 17's migration of detect_unit() to QUDT IRIs
+    broke the pair-table lookup in build_slot_derivation (pairs were still
+    keyed on "meter"/"foot") AND detect_unit() failed to match CamelCase
+    trailing tokens like ``Ft``. The E2E test_yarrrml_run_e2e surfaces the
+    runtime symptom; this unit test locks in the root-cause fix.
+    """
+    from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
+
+    from rosetta.core.accredit import parse_sssom_tsv
+
+    rows = parse_sssom_tsv(_NOR_SSSOM)
+    src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
+    mst = cast(SchemaDefinition, yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
+    spec, _cov = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=str(_NOR_SCHEMA.resolve()),
+        target_schema_path=str(_MC_SCHEMA.resolve()),
+        force=True,
+    )
+    track = next(cd for cd in spec.class_derivations if cd.name == "Track")  # pyright: ignore[reportOptionalIterable]
+    alt = track.slot_derivations["hasAltitudeFt"]  # pyright: ignore[reportOptionalSubscript]
+    assert alt.unit_conversion is not None, (  # pyright: ignore[reportAttributeAccessIssue]
+        "hoyde_m → hasAltitudeFt must emit UnitConversionConfiguration; "
+        "the fork's YarrrmlCompiler looks up (source_unit, target_unit) in "
+        "LINEAR_CONVERSION_FUN_IDS using the short-name strings."
+    )
+    assert alt.unit_conversion.source_unit == "meter"  # pyright: ignore[reportAttributeAccessIssue]
+    assert alt.unit_conversion.target_unit == "foot"  # pyright: ignore[reportAttributeAccessIssue]
+
+
 def test_build_spec_errors_on_unresolvable_without_force(
     dummy_schema_paths: tuple[Path, Path],
 ) -> None:

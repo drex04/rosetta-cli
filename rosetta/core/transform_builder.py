@@ -20,13 +20,20 @@ from rosetta.core.models import CoverageReport, SSSOMRow
 from rosetta.core.unit_detect import detect_unit
 
 # Linear unit-conversion pairs supported by the forked YarrrmlCompiler's
-# LINEAR_GREL_CONVERSIONS table (compiler/yarrrml_compiler.py). Only pairs in
-# this set trigger UnitConversionConfiguration emission; unknown pairs fall
-# through to passthrough references. Keep in sync with the fork.
+# LINEAR_CONVERSION_FUN_IDS table (compiler/yarrrml_compiler.py). Only pairs
+# in this set trigger UnitConversionConfiguration emission; unknown pairs
+# fall through to passthrough references. Keep in sync with the fork.
+#
+# Keys are QUDT IRIs (the output of detect_unit() since Phase 17). Values
+# are the short-name strings the fork uses to look up UDFs.
+_QUDT_TO_FORK_UNIT: dict[str, str] = {
+    "unit:M": "meter",
+    "unit:FT": "foot",
+}
 _LINEAR_CONVERSION_PAIRS: frozenset[tuple[str, str]] = frozenset(
     {
-        ("meter", "foot"),
-        ("foot", "meter"),
+        ("unit:M", "unit:FT"),
+        ("unit:FT", "unit:M"),
     }
 )
 
@@ -264,8 +271,8 @@ def build_slot_derivation(m: _SlotMapping) -> SlotDerivation:
         and (m.source_unit, m.target_unit) in _LINEAR_CONVERSION_PAIRS
     ):
         unit_conv = UnitConversionConfiguration(
-            source_unit=m.source_unit,
-            target_unit=m.target_unit,
+            source_unit=_QUDT_TO_FORK_UNIT[m.source_unit],
+            target_unit=_QUDT_TO_FORK_UNIT[m.target_unit],
         )
     dtype_range: str | None = None
     if m.row.subject_datatype and m.row.object_datatype:

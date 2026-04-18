@@ -114,6 +114,19 @@ _PINT_TO_QUDT_IRI: dict[str, str | None] = {
 _ureg: UnitRegistry | None = None  # pyright: ignore[reportMissingTypeArgument]
 
 
+_CAMEL_BOUNDARY: re.Pattern[str] = re.compile(r"(?<=[a-z])(?=[A-Z])")
+
+
+def _snake_case(name: str) -> str:
+    """Insert underscores at lowercase→uppercase CamelCase boundaries.
+
+    ``hasAltitudeFt`` → ``has_Altitude_Ft`` so a trailing-unit regex like
+    ``(?:^|_)ft$`` can match across CamelCase without growing every pattern
+    with a CamelCase alternative.
+    """
+    return _CAMEL_BOUNDARY.sub("_", name)
+
+
 def detect_unit(name: str, description: str) -> str | None:
     """Return the QUDT unit IRI for a field, or None if not detected.
 
@@ -121,8 +134,9 @@ def detect_unit(name: str, description: str) -> str | None:
     description. Returns None both when no unit is detected and when the
     detected unit has no QUDT IRI (e.g. dBm).
     """
+    normalized = _snake_case(name)
     for pattern, iri in _NAME_PATTERNS:
-        if pattern.search(name):
+        if pattern.search(normalized):
             return iri
 
     for pattern, iri in _DESC_PATTERNS:
@@ -138,8 +152,9 @@ def recognized_unit_without_iri(name: str, description: str) -> bool:
     Lets callers distinguish "known unit with no QUDT IRI" (e.g. dBm) from
     "no unit detected at all" — both cases make detect_unit() return None.
     """
+    normalized = _snake_case(name)
     for pattern, iri in _NAME_PATTERNS:
-        if pattern.search(name):
+        if pattern.search(normalized):
             return iri is None
     for pattern, iri in _DESC_PATTERNS:
         if pattern.search(description):
