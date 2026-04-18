@@ -162,6 +162,8 @@ def _check_units(
         return
 
     compat = units_compatible(src_iri, tgt_iri, qudt_graph)
+    src_label = src_iri.removeprefix("unit:")
+    tgt_label = tgt_iri.removeprefix("unit:")
 
     if compat is False:
         findings.append(
@@ -170,7 +172,7 @@ def _check_units(
                 severity="BLOCK",
                 source_uri=row.subject_id,
                 target_uri=row.object_id,
-                message=f"Incompatible unit dimensions: {src_iri} vs {tgt_iri}",
+                message=f"Incompatible unit dimensions: {src_label} vs {tgt_label}",
             )
         )
     elif compat is True:
@@ -181,7 +183,7 @@ def _check_units(
                     severity="WARNING",
                     source_uri=row.subject_id,
                     target_uri=row.object_id,
-                    message=f"Same dimension, different units: {src_iri} vs {tgt_iri}",
+                    message=f"Same dimension, different units: {src_label} vs {tgt_label}",
                     fnml_suggestion=suggest_fnml(src_iri, tgt_iri, qudt_graph),
                 )
             )

@@ -51,6 +51,17 @@ def test_build_ini_has_configuration_and_datasource_sections(tmp_path: Path) -> 
     assert f"mappings={mapping.resolve()}" in ini
 
 
+def test_build_ini_with_udf_path_includes_udfs_line(tmp_path: Path) -> None:
+    """When udf_path is supplied, the INI must contain a udfs= line."""
+    mapping = tmp_path / "mapping.yml"
+    mapping.write_text("sources: {}\n", encoding="utf-8")
+    udf = tmp_path / "rosetta_udfs.py"
+    udf.write_text("# udfs\n", encoding="utf-8")
+    ini = _build_ini(mapping, udf_path=udf)
+    assert f"udfs={udf.resolve()}" in ini
+    assert "[CONFIGURATION]" in ini
+
+
 # ---------------------------------------------------------------------------
 # JSON-LD context generation
 # ---------------------------------------------------------------------------

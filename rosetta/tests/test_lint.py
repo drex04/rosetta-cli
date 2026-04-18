@@ -454,8 +454,7 @@ def test_lint_sssom_unit_detected_from_prose_label(tmp_path: Path) -> None:
     # Prose labels drive detection: metre + foot share dimension → WARNING
     warnings = [f for f in data["findings"] if f["rule"] == "unit_conversion_required"]
     assert warnings, "Expected unit_conversion_required finding driven by prose labels"
-    assert "unit:M" in warnings[0]["message"]
-    assert "unit:FT" in warnings[0]["message"]
+    assert "M vs FT" in warnings[0]["message"]
 
 
 def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:

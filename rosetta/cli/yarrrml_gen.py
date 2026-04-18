@@ -210,11 +210,10 @@ def cli(
             click.echo(f"Error writing coverage report {coverage_report}: {exc}", err=True)
             sys.exit(1)
 
-    # 11. If --run not set, stop here (behavior preserved from 16-02).
+    # 11. Validate --run args before any I/O.
     if not run:
         sys.exit(0)
 
-    # 12. --run requires --data.
     if not data:
         click.echo("Error: --run requires --data", err=True)
         sys.exit(1)

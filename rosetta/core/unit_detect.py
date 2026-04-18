@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING, Any
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from pint import UnitRegistry
@@ -158,7 +161,8 @@ def _detect_from_nlp(description: str) -> str | None:
 
     try:
         candidates: list[Any] = list(q3.parse(description))
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("quantulum3 parse failed: %s", exc)
         return None
 
     for qty in candidates:

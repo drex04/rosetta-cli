@@ -55,10 +55,7 @@ def _copy_and_patch_schemas(dst_dir: Path) -> tuple[Path, Path, Path, Path]:
     shutil.copy(_NOR_SSSOM_SRC, sssom_dst)
     shutil.copy(_NOR_CSV_SRC, csv_dst)
 
-    mc_dst.write_text(
-        _MC_SCHEMA_SRC.read_text(encoding="utf-8").replace("range: dateTime", "range: datetime"),
-        encoding="utf-8",
-    )
+    shutil.copy(_MC_SCHEMA_SRC, mc_dst)
 
     return nor_dst, mc_dst, sssom_dst, csv_dst
 

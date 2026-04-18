@@ -1153,6 +1153,14 @@ def _base_run_args(tmp_path: Path, data_path: Path | None = None) -> list[str]:
     return args
 
 
+def test_run_with_nonexistent_data_file_exits_1(tmp_path: Path) -> None:
+    """--run with a --data path that does not exist exits 1."""
+    bogus = tmp_path / "no_such_file.csv"
+    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_path=bogus))
+    assert result.exit_code == 1
+    assert "does not exist" in result.stderr
+
+
 def test_run_without_data_flag_exits_1(tmp_path: Path) -> None:
     """--run without --data exits 1 with stderr error mentioning --data."""
     result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_path=None))

@@ -175,7 +175,7 @@ slots:
     name: hasTimestamp
     description: UTC timestamp of the last update to this entity.
     slot_uri: mc:hasTimestamp
-    range: dateTime
+    range: datetime
   hasNATOStockNumber:
     name: hasNATOStockNumber
     description: NATO Stock Number (NSN) identifying the weapon type in the NATO supply
