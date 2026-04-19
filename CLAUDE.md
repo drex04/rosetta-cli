@@ -4,6 +4,15 @@
 
 Be concise. State what changed and what's next; skip narration and recap. One or two sentences per update is almost always enough.
 
+## Feature Coverage Requirements
+
+Whenever a feature is added or modified:
+
+1. **Tests** — cover it with integration tests (invoking the CLI end-to-end via `CliRunner` or subprocess) and e2e tests (real files in/out, checking exit codes and output content). Unit tests alone are not sufficient for CLI-surface changes.
+2. **Docs** — update `README.md` and the corresponding `docs/cli/<tool>.md` to reflect any changed behavior, options, or output. See also the "Public API surface changes" convention below.
+
+These are mandatory, not optional. A feature is not done until both tests and docs are current.
+
 ## Fix-on-Sight
 
 If you find bugs or code quality issues during review, investigation, or any other work, **fix them immediately in the same change**. Do not file follow-up tickets, deferred-items lists, or "revisit later" notes. Every issue surfaced in review must be addressed before the work is considered done.

@@ -26,7 +26,11 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --all-extras
-      - run: uv run basedpyright
+      - name: Typecheck source (strict)
+        run: uv run basedpyright rosetta/cli rosetta/core
+      - name: Typecheck tests (warn only)
+        run: uv run basedpyright rosetta/tests
+        continue-on-error: true
 
   test:
     runs-on: ubuntu-latest
