@@ -98,3 +98,43 @@ def test_validate_accredited_output(tmp_path: Path) -> None:
     # Behavioural invariant: at least one recorded finding at Violation severity.
     assert bad_report.summary.violation >= 1
     assert any(f.severity == "Violation" for f in bad_report.findings)
+
+
+def test_validate_shapes_dir_end_to_end(tmp_path: Path) -> None:
+    """`--shapes-dir` walks the directory recursively and applies all shapes.
+
+    Complements the single-file `--shapes` path covered above. The directory
+    contains one shape file plus a nested subdir with another shape; both must
+    be merged and applied against the data graph.
+    """
+    shapes_dir = tmp_path / "shapes"
+    shapes_dir.mkdir()
+    (shapes_dir / "person.ttl").write_text(_SHAPES_TTL, encoding="utf-8")
+
+    nested = shapes_dir / "nested"
+    nested.mkdir()
+    (nested / "extra.ttl").write_text(
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix ex: <http://example.org/> .\n"
+        "ex:ExtraShape a sh:NodeShape ; sh:targetClass ex:Extra .\n",
+        encoding="utf-8",
+    )
+
+    data = tmp_path / "data.ttl"
+    data.write_text(_CONFORMANT_TTL, encoding="utf-8")
+    out = tmp_path / "report.json"
+
+    result = CliRunner(mix_stderr=False).invoke(
+        validate_cli,
+        [
+            "--data",
+            str(data),
+            "--shapes-dir",
+            str(shapes_dir),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"expected conforming exit 0; stderr={result.stderr}"
+    report = ValidationReport.model_validate_json(out.read_text(encoding="utf-8"))
+    assert report.summary.conforms is True

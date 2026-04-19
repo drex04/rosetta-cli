@@ -250,6 +250,61 @@ def test_stdout_collision_jsonld_validate_report(
     )
 
 
+def test_stdout_collision_implicit_jsonld_with_validate_report(
+    tmp_path: Path,
+    sssom_nor_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    nor_csv_sample_path: Path,
+) -> None:
+    """`--run` + `--validate-report -` with no explicit `--jsonld-output` also
+    collides: JSON-LD defaults to stdout (documented in `--output` help text),
+    so the validate-report stream and the materialized JSON-LD would interleave.
+    Guard must catch the implicit default, not only explicit ``"-"``."""
+    shapes_dir = _shapes_dir(tmp_path)
+    workdir = tmp_path / "wd"
+    spec_out = tmp_path / "spec.transform.yaml"  # sink TransformSpec to a file
+
+    result = CliRunner(mix_stderr=False).invoke(
+        yarrrml_gen_cli,
+        [
+            "--sssom",
+            str(sssom_nor_path),
+            "--source-schema",
+            str(nor_linkml_path),
+            "--master-schema",
+            str(master_schema_path),
+            "--source-format",
+            "csv",
+            "--output",
+            str(spec_out),  # not stdout
+            # --jsonld-output intentionally omitted → implicit stdout
+            "--validate-report",
+            "-",
+            "--validate",
+            "--run",
+            "--data",
+            str(nor_csv_sample_path),
+            "--shapes-dir",
+            str(shapes_dir),
+            "--workdir",
+            str(workdir),
+        ],
+    )
+
+    # 1. Exit code — UsageError convention.
+    assert result.exit_code == 2, (
+        f"expected exit 2 from implicit-stdout collision; got {result.exit_code}: "
+        f"stderr={result.stderr!r}"
+    )
+    # 2. Stderr cites both colliding streams + stdout.
+    assert "stdout" in result.stderr.lower()
+    assert "--jsonld-output" in result.stderr and "--validate-report" in result.stderr
+    # 3. Behavioural invariant: no workdir, no spec file (step 0 rejects before step 6).
+    assert not workdir.exists()
+    assert not spec_out.exists()
+
+
 # ---------------------------------------------------------------------------
 # No-partial-output invariant (full-chain materialization)
 # ---------------------------------------------------------------------------

@@ -584,9 +584,9 @@ Auto-generates SHACL shapes from a master LinkML schema. Defaults to closed-worl
 Usage: rosetta-shacl-gen [OPTIONS]
 
 Options:
-  --input PATH       Master LinkML schema YAML  [required]
-  --output PATH      Output SHACL Turtle file (default: stdout)
-  --open             Emit open-world shapes (skip sh:closed and sh:ignoredProperties)
+  --input PATH         Master LinkML schema YAML  [required]
+  -o, --output PATH    Output SHACL Turtle file (default: stdout)
+  --open               Emit open-world shapes (skip sh:closed and sh:ignoredProperties)
 ```
 
 **Example:**

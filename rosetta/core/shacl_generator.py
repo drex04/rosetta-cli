@@ -164,6 +164,30 @@ def _emit_unit_shapes(g: Graph, sv: SchemaView) -> None:
             g.add((prop_node, SH.hasValue, unit_iri))
 
 
+def _strip_abstract_mixin_shapes(g: Graph, sv: SchemaView) -> None:
+    """Remove NodeShape triples for ``abstract`` and ``mixin`` LinkML classes.
+
+    Abstract/mixin classes exist for schema composition (inheritance and
+    trait-reuse) and have no instantiable RDF individuals. A closed-world
+    shape on them would cause spurious validation failures — every concrete
+    subclass would inherit an unsatisfiable closed shape from its abstract
+    parent. We therefore strip the direct shape triples (the orphan BNode
+    property-shape subtrees under them are inert because pyshacl only walks
+    reachable ``sh:NodeShape`` subjects).
+    """
+    all_classes_obj: Any = sv.all_classes(imports=False)
+    for class_name in all_classes_obj:
+        class_def: Any = all_classes_obj[class_name]
+        if not (getattr(class_def, "abstract", False) or getattr(class_def, "mixin", False)):
+            continue
+        class_uri_str: Any = sv.get_uri(class_def, expand=True)
+        if not class_uri_str:
+            continue
+        shape_subject = URIRef(str(class_uri_str))
+        for triple in list(g.triples((shape_subject, None, None))):
+            g.remove(triple)
+
+
 def _bind_prefixes(g: Graph) -> None:
     g.bind("qudt", QUDT)
     g.bind("prov", PROV)
@@ -190,10 +214,14 @@ def generate_shacl(linkml_path: str | Path, *, closed: bool = True) -> str:
     schema_path = str(linkml_path)
     g: Graph = ShaclGenerator(schema_path, closed=closed).as_graph()
 
+    sv = SchemaView(schema_path)
+    # Strip abstract/mixin shapes BEFORE the ignored-properties rebuild so we
+    # don't waste work extending lists we're about to delete.
+    _strip_abstract_mixin_shapes(g, sv)
+
     if closed:
         _rebuild_ignored_properties(g)
 
-    sv = SchemaView(schema_path)
     _emit_unit_shapes(g, sv)
 
     _bind_prefixes(g)

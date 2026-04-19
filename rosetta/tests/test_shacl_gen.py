@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pyshacl
+import pytest
 from click.testing import CliRunner
 from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.collection import Collection
@@ -16,6 +16,7 @@ from rdflib.namespace import DCTERMS, SH
 
 from rosetta.cli.shacl_gen import cli
 from rosetta.core.shacl_generator import generate_shacl
+from rosetta.core.shacl_validate import validate_graph
 
 PROV = Namespace("http://www.w3.org/ns/prov#")
 QUDT = Namespace("http://qudt.org/schema/qudt/")
@@ -184,25 +185,21 @@ classes:
     ok = Graph()
     ok.add((EX.widget1, RDF.type, EX.Widget))
     ok.add((EX.widget1, EX.hasName, Literal("ok")))
-    conforms_ok, _, _ = pyshacl.validate(
-        data_graph=ok, shacl_graph=shapes_g, inference="none", advanced=False
-    )
-    assert conforms_ok, "conformant Widget graph should validate"
+    report_ok = validate_graph(ok, shapes_g)
+    assert report_ok.summary.conforms, "conformant Widget graph should validate"
 
     # --- 3. Non-conformant: typo'd predicate (closed-world violation) -----
     bad = Graph()
     bad.add((EX.widget1, RDF.type, EX.Widget))
     bad.add((EX.widget1, EX.hasName, Literal("ok")))
     bad.add((EX.widget1, EX.hasNaem, Literal("typo")))  # not declared
-    conforms_bad, report_g, _ = pyshacl.validate(
-        data_graph=bad, shacl_graph=shapes_g, inference="none", advanced=False
+    report_bad = validate_graph(bad, shapes_g)
+    assert not report_bad.summary.conforms, (
+        "graph with undeclared predicate should fail closed shape"
     )
-    assert not conforms_bad, "graph with undeclared predicate should fail closed shape"
-    assert isinstance(report_g, Graph), "pyshacl should return a Graph as the report"
-
-    sources = {str(o) for _, _, o in report_g.triples((None, SH.sourceConstraintComponent, None))}
-    assert any("Closed" in src for src in sources), (
-        f"expected a sh:ClosedConstraintComponent violation; got sources={sources!r}"
+    constraints = {f.constraint for f in report_bad.findings}
+    assert any("Closed" in c for c in constraints), (
+        f"expected a sh:ClosedConstraintComponent violation; got constraints={constraints!r}"
     )
 
 
@@ -222,3 +219,108 @@ def test_cli_writes_output_file(master_schema_path: Path, tmp_path: Path) -> Non
     assert out_path.exists(), "expected --output file to be written"
     g = _parse_turtle(out_path.read_text(encoding="utf-8"))
     assert _node_shapes(g), "CLI-emitted Turtle has no NodeShape triples"
+
+
+def test_cli_malformed_yaml_exits_nonzero(tmp_path: Path) -> None:
+    """Adversarial: syntactically broken LinkML YAML surfaces a non-zero exit
+    with a non-empty stderr — not an unhandled traceback."""
+    bad = tmp_path / "broken.linkml.yaml"
+    bad.write_text("this: : is : not valid yaml\n  - [:\n", encoding="utf-8")
+    out_path = tmp_path / "shapes.ttl"
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        ["--input", str(bad), "--output", str(out_path)],
+    )
+    assert result.exit_code != 0, "malformed YAML should surface non-zero exit"
+    assert result.stderr, "malformed YAML should emit a non-empty stderr message"
+    assert not out_path.exists(), "no shapes file should be written on parse failure"
+
+
+def test_curie_to_unit_iri_rejects_non_curie(
+    monkeypatch: pytest.MonkeyPatch, master_schema_path: Path
+) -> None:
+    """``_curie_to_unit_iri`` must raise ValueError if ``detect_unit`` ever
+    returns a bare string (defensive contract — keeps a regression here loud)."""
+    from rosetta.core import shacl_generator as sg
+    from rosetta.core import unit_detect
+
+    def fake_detect_unit(name: str, desc: str = "") -> str | None:
+        return "kilonewton"  # bare string, not a CURIE like "unit:KN"
+
+    monkeypatch.setattr(unit_detect, "detect_unit", fake_detect_unit)
+    monkeypatch.setattr(sg, "detect_unit", fake_detect_unit)
+
+    with pytest.raises(ValueError, match="non-CURIE"):
+        sg._curie_to_unit_iri("kilonewton")
+
+
+def test_validate_graph_wraps_pyshacl_engine_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``validate_graph`` must surface a clear ``pyshacl engine error:`` message
+    when the underlying engine raises (malformed shapes, internal bug, …)."""
+    from rosetta.core import shacl_validate as sv
+
+    def boom(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("simulated engine failure")
+
+    monkeypatch.setattr(sv.pyshacl, "validate", boom)
+
+    with pytest.raises(RuntimeError, match="pyshacl engine error"):
+        sv.validate_graph(Graph(), Graph())
+
+
+def test_abstract_and_mixin_classes_are_ignored(tmp_path: Path) -> None:
+    """Abstract and mixin LinkML classes must not receive a ``sh:NodeShape``.
+
+    They exist for schema composition (inheritance / trait-mixins) and do not
+    correspond to instantiable RDF individuals, so emitting shapes for them
+    would produce spurious closed-world violations on every concrete subclass.
+    """
+    schema_yaml = """\
+name: mixins
+id: https://example.org/mixins#
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  ex:
+    prefix_prefix: ex
+    prefix_reference: https://example.org/mixins#
+default_prefix: ex
+default_range: string
+slots:
+  hasName:
+    name: hasName
+    slot_uri: ex:hasName
+classes:
+  AbstractBase:
+    name: AbstractBase
+    class_uri: ex:AbstractBase
+    abstract: true
+    slots:
+    - hasName
+  TraitMixin:
+    name: TraitMixin
+    class_uri: ex:TraitMixin
+    mixin: true
+    slots:
+    - hasName
+  Concrete:
+    name: Concrete
+    class_uri: ex:Concrete
+    is_a: AbstractBase
+    mixins:
+    - TraitMixin
+"""
+    schema_path = tmp_path / "mixins.linkml.yaml"
+    schema_path.write_text(schema_yaml, encoding="utf-8")
+
+    g = _parse_turtle(generate_shacl(schema_path))
+    EX = Namespace("https://example.org/mixins#")
+    shape_iris = {str(s) for s in _node_shapes(g) if isinstance(s, URIRef)}
+    assert str(EX.Concrete) in shape_iris, "concrete class must emit a NodeShape"
+    assert str(EX.AbstractBase) not in shape_iris, "abstract class must not emit a NodeShape"
+    assert str(EX.TraitMixin) not in shape_iris, "mixin class must not emit a NodeShape"

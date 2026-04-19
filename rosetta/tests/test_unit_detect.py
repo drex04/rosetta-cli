@@ -322,3 +322,21 @@ def test_detect_vertical_rate_without_fpm_description_returns_none() -> None:
     """Vertical-rate without an fpm/ft-min description token returns None
     (description-disambiguated; avoids matching every "rate" slot)."""
     assert detect_unit("hasVerticalRate", "") is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "hasBearing",
+        "HasBearing",
+        "has_bearing",
+        "HAS_BEARING",
+    ],
+)
+def test_detect_bearing_case_variants(name: str) -> None:
+    """``detect_unit`` is case/underscore-insensitive for the name-suffix
+    patterns: the ``_snake_case`` preprocessor normalises camelCase / upper
+    case into lowercase_snake_case, after which the ``(?:^|_)bearing$`` regex
+    fires. An underscore (or string start) is still required before the suffix
+    so that names like ``overbearing`` do NOT mis-match."""
+    assert detect_unit(name, "") == "unit:DEG"

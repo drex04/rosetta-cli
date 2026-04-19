@@ -169,6 +169,17 @@ def cli(
             f"Multiple options target stdout ({', '.join(stdout_collisions)}); "
             "use a file path for all but one."
         )
+    # 0a-bis. Implicit-stdout collision: when --run materializes JSON-LD, a
+    #     missing --jsonld-output defaults to stdout (documented in the
+    #     --output help text). --validate-report "-" would then interleave
+    #     with the JSON-LD stream on the same FD, which the pairwise guard
+    #     above does not catch. Require an explicit --jsonld-output FILE.
+    if run and validate_report == "-" and jsonld_output is None:
+        raise click.UsageError(
+            "--validate-report - collides with the default --jsonld-output "
+            "stdout stream under --run; pass --jsonld-output FILE or use a "
+            "file path for --validate-report."
+        )
     # 0b. --validate flag dependencies.
     if validate and not run:
         raise click.UsageError("--validate requires --run.")
@@ -282,7 +293,7 @@ def cli(
         raise click.ClickException("internal: --data required when --run is set")
     data_path = Path(data)
 
-    # 13. Compile TransformSpec → YARRRML via forked linkml-map compiler.
+    # 12. Compile TransformSpec → YARRRML via forked linkml-map compiler.
     try:
         from linkml_map.compiler.yarrrml_compiler import (
             YarrrmlCompiler,  # type: ignore[import-untyped]
@@ -300,7 +311,7 @@ def cli(
         click.echo(f"Error compiling YARRRML: {exc}", err=True)
         sys.exit(1)
 
-    # 14. Resolve workdir with writability probe.
+    # 13. Resolve workdir with writability probe.
     resolved_workdir: Path | None
     if workdir:
         resolved_workdir = Path(workdir).resolve()
@@ -315,7 +326,7 @@ def cli(
     else:
         resolved_workdir = None
 
-    # 15. Materialize + (optionally validate) + frame as JSON-LD.
+    # 14. Materialize + (optionally validate) + frame as JSON-LD.
     context_out_path = Path(context_output).resolve() if context_output else None
     try:
         with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
@@ -324,14 +335,20 @@ def cli(
                     "Warning: materialization produced 0 triples; check data file and mappings",
                     err=True,
                 )
-            # 15a. Optional SHACL validation BEFORE JSON-LD framing/emission so
+            # 14a. Optional SHACL validation BEFORE JSON-LD framing/emission so
             #      a violation aborts with no partial output written anywhere.
             if validate:
                 from rosetta.core.shacl_validate import validate_graph
                 from rosetta.core.shapes_loader import load_shapes_from_dir
 
-                assert shapes_dir is not None  # step-0 guard ensures this
-                shapes_g = load_shapes_from_dir(Path(shapes_dir))
+                if shapes_dir is None:  # belt-and-braces: step 0 already validated
+                    raise click.ClickException(
+                        "internal: --shapes-dir required when --validate is set"
+                    )
+                try:
+                    shapes_g = load_shapes_from_dir(Path(shapes_dir))
+                except ValueError as exc:
+                    raise click.UsageError(str(exc)) from exc
                 report = validate_graph(graph, shapes_g)
                 if not report.summary.conforms:
                     report_json = report.model_dump_json(indent=2)
@@ -370,7 +387,7 @@ def cli(
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
 
-    # 16. Write JSON-LD to file or stdout.
+    # 15. Write JSON-LD to file or stdout.
     if jsonld_output:
         try:
             Path(jsonld_output).write_bytes(jsonld_bytes)

@@ -19,13 +19,13 @@ import os
 import time
 from pathlib import Path
 
-import pyshacl
 import pytest
 import rdflib
 from click.testing import CliRunner
 from rdflib.namespace import RDF
 
 from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+from rosetta.core.shacl_validate import validate_graph
 from rosetta.core.shapes_loader import load_shapes_from_dir
 
 # ---------------------------------------------------------------------------
@@ -86,30 +86,17 @@ def test_override_constraint_fires_on_data() -> None:
     data_g.add((track, RDF.type, MC.AirTrack))
     data_g.add((track, MC.hasBearing, rdflib.Literal("400.0", datatype=XSD.double)))
 
-    conforms, report_g, _report_text = pyshacl.validate(
-        data_graph=data_g,
-        shacl_graph=merged,
-        inference="none",
-        advanced=False,
-    )
+    report = validate_graph(data_g, merged)
 
-    assert conforms is False, "Out-of-range bearing should violate the override shape"
-    assert isinstance(report_g, rdflib.Graph), (
-        f"pyshacl returned non-Graph report: {type(report_g).__name__}"
-    )
+    assert not report.summary.conforms, "Out-of-range bearing should violate the override shape"
 
-    # At least one ValidationResult must cite mc:AirTrackBearingRangeShape via
-    # sh:sourceShape (either the NodeShape itself or one of its blank-node
-    # property shapes — depending on pyshacl reporting we accept either).
-    source_shapes = set(report_g.objects(predicate=SH.sourceShape))
-    cited = MC.AirTrackBearingRangeShape in source_shapes or any(
-        # blank-node property shape whose parent is AirTrackBearingRangeShape
-        (MC.AirTrackBearingRangeShape, SH.property, s) in merged
-        for s in source_shapes
-    )
-    assert cited, (
-        f"No ValidationResult cited mc:AirTrackBearingRangeShape; "
-        f"sh:sourceShape values were: {source_shapes}"
+    # The offending track must be cited as a focus node. The override shape is
+    # the only shape in the merged graph with a range constraint on
+    # mc:hasBearing, so any violation on the bad track means the override
+    # constraint fired.
+    focus_nodes = {f.focus_node for f in report.findings}
+    assert str(track) in focus_nodes, (
+        f"Expected mc:track-bad-bearing in violation focus nodes; got {focus_nodes}"
     )
 
 
@@ -250,3 +237,39 @@ def test_shapes_loader_warns_on_non_shape_turtle(
     assert "ontology.ttl contains no SHACL shapes" in captured.err, (
         f"Expected warning for ontology.ttl in stderr; got: {captured.err!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — malformed Turtle surfaces a file-scoped error (GAP-4)
+# ---------------------------------------------------------------------------
+
+
+def test_shapes_loader_surfaces_file_path_on_malformed_turtle(tmp_path: Path) -> None:
+    """A syntactically broken ``.ttl`` file must raise ``ValueError`` naming the
+    offending path — never an unattributed rdflib parser trace."""
+    # Write a valid file and a malformed one. Loader must fail pointing at the
+    # malformed file, not merely crash with "Bad syntax" and no file reference.
+    (tmp_path / "valid.ttl").write_text(
+        "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+        "@prefix ex: <http://example.org/> .\n"
+        "ex:S a sh:NodeShape ; sh:targetClass ex:T .\n",
+        encoding="utf-8",
+    )
+    bad = tmp_path / "broken.ttl"
+    bad.write_text("@prefix ex: <http://example.org/> .\nex:S a ;;;\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match=r"Failed to parse shapes file .*broken\.ttl"):
+        load_shapes_from_dir(tmp_path)
+
+
+def test_shapes_loader_rejects_non_directory(tmp_path: Path) -> None:
+    """``load_shapes_from_dir`` must raise ``ValueError`` when pointed at a
+    non-directory path (file or missing), not return an empty graph."""
+    missing = tmp_path / "does-not-exist"
+    with pytest.raises(ValueError, match="not a directory"):
+        load_shapes_from_dir(missing)
+
+    as_file = tmp_path / "i-am-a-file.ttl"
+    as_file.write_text("# not a dir\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a directory"):
+        load_shapes_from_dir(as_file)

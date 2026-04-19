@@ -18,6 +18,9 @@ uv run rosetta-shacl-gen \
   --input rosetta/tests/fixtures/nations/master_cop.linkml.yaml \
   --output master.shacl.ttl
 
+# Short-flag equivalent for --output
+uv run rosetta-shacl-gen --input master.linkml.yaml -o master.shacl.ttl
+
 # Open-world shapes (no sh:closed true, no sh:ignoredProperties from rosetta)
 uv run rosetta-shacl-gen \
   --input master.linkml.yaml \

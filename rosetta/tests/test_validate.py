@@ -323,3 +323,62 @@ def test_validate_data_format_unknown_raises(tmp_files: dict[str, Path]) -> None
     assert result.exit_code == 2, (
         f"expected Click Choice-violation exit 2; got {result.exit_code}: {result.output!r}"
     )
+
+
+def test_validate_hyphenated_jsonld_suffix_autodetect(
+    tmp_files: dict[str, Path], tmp_path: Path
+) -> None:
+    """`.json-ld` (hyphenated) is an accepted variant alongside `.jsonld` / `.json`.
+
+    Pins the suffix list in ``_resolve_data_format`` so a future edit cannot
+    silently drop the hyphen form.
+    """
+    data = tmp_path / "person.json-ld"
+    data.write_text(_CONFORMANT_JSONLD, encoding="utf-8")
+    out = tmp_path / "report.json"
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"unexpected exit; output={result.output!r}"
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["summary"]["conforms"] is True
+
+
+def test_validate_jsonld_missing_context_surfaces_clean_error(
+    tmp_files: dict[str, Path], tmp_path: Path
+) -> None:
+    """JSON-LD lacking an ``@context`` either parses as an empty graph (producing
+    a conformant report because no triples → no violations) *or* surfaces a
+    non-zero exit with a clear error — what it must NOT do is hang on a network
+    fetch or crash with an unattributed traceback."""
+    data = tmp_path / "no_context.jsonld"
+    data.write_text(
+        '{"@id": "http://example.org/alice", "@type": "http://example.org/Person"}\n',
+        encoding="utf-8",
+    )
+    out = tmp_path / "report.json"
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    # Acceptable outcomes: exit 0 (empty/unresolved graph) or exit 1 (clean
+    # rdflib/jsonld error surfaced as "Error: ..."). Any other exit suggests
+    # an unhandled traceback.
+    assert result.exit_code in (0, 1), (
+        f"unexpected exit {result.exit_code}; output={result.output!r}"
+    )

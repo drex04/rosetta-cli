@@ -8,6 +8,8 @@ Be concise. State what changed and what's next; skip narration and recap. One or
 
 If you find bugs or code quality issues during review, investigation, or any other work, **fix them immediately in the same change**. Do not file follow-up tickets, deferred-items lists, or "revisit later" notes. Every issue surfaced in review must be addressed before the work is considered done.
 
+**This applies to every severity — Critical, Important, Minor, and Nitpick.** Never defer. Never split minor findings into a "later" pass. If a review surfaces a missing test, a doc drift, a stale comment, or a one-line cleanup, fold it into the same commit as the bigger fixes. The cost of opening the file again later is always higher than fixing it now.
+
 ## Code Exploration
 
 Use claude-mem smart tools as the primary tools for understanding code:

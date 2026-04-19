@@ -93,7 +93,10 @@ def cli(
         if shapes is not None:
             shapes_g.parse(shapes, format="turtle")
         if shapes_dir is not None:
-            shapes_g += load_shapes_from_dir(Path(shapes_dir))
+            try:
+                shapes_g += load_shapes_from_dir(Path(shapes_dir))
+            except ValueError as exc:
+                raise click.UsageError(str(exc)) from exc
 
         # Run SHACL via shared helper
         report = validate_graph(data_g, shapes_g)

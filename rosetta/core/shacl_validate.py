@@ -61,13 +61,20 @@ def validate_graph(
         Pydantic model with ``findings`` list + ``summary`` (counts + conforms).
     """
     # pyshacl stubs do not reflect the tuple return type
-    pyshacl_result: tuple[bool, rdflib.Graph, str] = pyshacl.validate(  # pyright: ignore[reportAssignmentType]
-        data_graph,
-        shacl_graph=shapes_graph,
-        inference=inference,
-        do_owl_imports=False,
-        meta_shacl=False,
-    )
+    try:
+        pyshacl_result: tuple[bool, rdflib.Graph, str] = pyshacl.validate(  # pyright: ignore[reportAssignmentType]
+            data_graph,
+            shacl_graph=shapes_graph,
+            inference=inference,
+            do_owl_imports=False,
+            meta_shacl=False,
+        )
+    except Exception as exc:
+        # pyshacl can raise on malformed shapes (valid Turtle but nonsensical
+        # SHACL), on internal engine bugs, or on unexpected input types. Wrap
+        # so callers see "pyshacl engine error: ..." instead of an unattributed
+        # ReportableRuntimeError.
+        raise RuntimeError(f"pyshacl engine error: {exc}") from exc
     conforms, results_graph, _ = pyshacl_result
 
     # Parse findings via SPARQL

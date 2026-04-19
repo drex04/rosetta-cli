@@ -20,7 +20,15 @@ uv run rosetta-validate \
   --data mapping.rml.ttl \
   --shapes-dir rosetta/policies/shacl/ \
   -o validation.json
+
+# Or point at a single shapes file (e.g. a one-off or third-party shape set)
+uv run rosetta-validate \
+  --data mapping.rml.ttl \
+  --shapes my-shapes.ttl \
+  -o validation.json
 ```
+
+`--shapes` and `--shapes-dir` can also be combined — the directory is walked recursively and merged on top of the single-file shapes into one graph before validation.
 
 ## JSON-LD input
 
