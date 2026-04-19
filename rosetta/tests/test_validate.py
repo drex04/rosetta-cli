@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -12,38 +11,53 @@ from click.testing import CliRunner
 from rosetta.cli.validate import cli
 from rosetta.core.models import ValidationReport
 
-SHAPES_FILE = Path(__file__).parent.parent / "policies" / "mapping.shacl.ttl"
+# Inline SHACL fixture (D-19-13): keeps the test self-contained and removes the
+# legacy dependency on the retired v1 policies file. Modeled after the pattern
+# in rosetta/tests/integration/test_validate_pipeline.py.
+_SHAPES_TTL = """\
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix ex:   <http://example.org/> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+ex:PersonShape a sh:NodeShape ;
+    sh:targetClass ex:Person ;
+    sh:property [
+        sh:path ex:age ;
+        sh:datatype xsd:integer ;
+        sh:minCount 1 ;
+    ] .
+"""
 
 CONFORMANT_TTL = """\
-@prefix rose: <http://rosetta.interop/ns/> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-<http://example.org/f1> a rose:Field ;
-    rdfs:label "Field One"^^xsd:string ;
-    rose:dataType xsd:integer .
+@prefix ex:  <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:alice a ex:Person ;
+    ex:age "30"^^xsd:integer .
 """
 
 VIOLATING_TTL = """\
-@prefix rose: <http://rosetta.interop/ns/> .
-@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-<http://example.org/f2> a rose:Field ;
-    rose:dataType xsd:integer .
+@prefix ex:  <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:bob a ex:Person ;
+    ex:age "not-a-number"^^xsd:string .
 """
 
 # Shape with minCount 1 but NO sh:message (tests that violations without
 # sh:resultMessage are not silently dropped)
 SHAPE_NO_MESSAGE_TTL = """\
 @prefix sh:   <http://www.w3.org/ns/shacl#> .
-@prefix rose: <http://rosetta.interop/ns/> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix ex:   <http://example.org/> .
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
-rose:FieldShapeNoMsg
+
+ex:PersonShapeNoMsg
     a sh:NodeShape ;
-    sh:targetClass rose:Field ;
+    sh:targetClass ex:Person ;
     sh:property [
-        sh:path rdfs:label ;
+        sh:path ex:age ;
         sh:minCount 1 ;
-        sh:datatype xsd:string ;
+        sh:datatype xsd:integer ;
     ] .
 """
 
@@ -51,6 +65,9 @@ rose:FieldShapeNoMsg
 @pytest.fixture(scope="module")
 def tmp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     base: Path = tmp_path_factory.mktemp("validate_fixtures")
+
+    shapes = base / "shapes.ttl"
+    shapes.write_text(_SHAPES_TTL, encoding="utf-8")
 
     conformant = base / "conformant_data.ttl"
     conformant.write_text(CONFORMANT_TTL, encoding="utf-8")
@@ -61,16 +78,17 @@ def tmp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
     shape_no_msg = base / "shape_no_message.ttl"
     shape_no_msg.write_text(SHAPE_NO_MESSAGE_TTL, encoding="utf-8")
 
-    # shapes-dir with a copy of the main shapes file
+    # shapes-dir with the inline shapes file
     shapes_dir = base / "shapes_dir"
     shapes_dir.mkdir()
-    shutil.copy(SHAPES_FILE, shapes_dir / "mapping.shacl.ttl")
+    (shapes_dir / "shapes.ttl").write_text(_SHAPES_TTL, encoding="utf-8")
 
     # empty shapes-dir for UsageError test
     empty_shapes_dir = base / "empty_shapes_dir"
     empty_shapes_dir.mkdir()
 
     return {
+        "shapes": shapes,
         "conformant": conformant,
         "violating": violating,
         "shape_no_msg": shape_no_msg,
@@ -83,7 +101,7 @@ def tmp_files(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
 def test_validate_conformant(tmp_files: dict[str, Path]) -> None:
     result = CliRunner().invoke(
         cli,
-        ["--data", str(tmp_files["conformant"]), "--shapes", str(SHAPES_FILE)],
+        ["--data", str(tmp_files["conformant"]), "--shapes", str(tmp_files["shapes"])],
     )
     assert result.exit_code == 0
     report = json.loads(result.output)
@@ -94,7 +112,7 @@ def test_validate_conformant(tmp_files: dict[str, Path]) -> None:
 def test_validate_violation(tmp_files: dict[str, Path]) -> None:
     result = CliRunner().invoke(
         cli,
-        ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
+        ["--data", str(tmp_files["violating"]), "--shapes", str(tmp_files["shapes"])],
     )
     assert result.exit_code == 1
     report = json.loads(result.output)
@@ -131,7 +149,7 @@ def test_validate_output_file(tmp_files: dict[str, Path]) -> None:
             "--data",
             str(tmp_files["conformant"]),
             "--shapes",
-            str(SHAPES_FILE),
+            str(tmp_files["shapes"]),
             "--output",
             str(out_file),
         ],
@@ -146,7 +164,7 @@ def test_validate_output_file(tmp_files: dict[str, Path]) -> None:
 def test_validate_report_schema(tmp_files: dict[str, Path]) -> None:
     result = CliRunner().invoke(
         cli,
-        ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
+        ["--data", str(tmp_files["violating"]), "--shapes", str(tmp_files["shapes"])],
     )
     assert result.exit_code == 1
     data = json.loads(result.output)
@@ -157,7 +175,7 @@ def test_validate_report_schema(tmp_files: dict[str, Path]) -> None:
 def test_validate_finding_fields(tmp_files: dict[str, Path]) -> None:
     result = CliRunner().invoke(
         cli,
-        ["--data", str(tmp_files["violating"]), "--shapes", str(SHAPES_FILE)],
+        ["--data", str(tmp_files["violating"]), "--shapes", str(tmp_files["shapes"])],
     )
     assert result.exit_code == 1
     report = json.loads(result.output)

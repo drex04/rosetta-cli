@@ -13,6 +13,7 @@ import rdflib.query
 
 from rosetta.core.io import open_output
 from rosetta.core.models import ValidationFinding, ValidationReport, ValidationSummary
+from rosetta.core.shapes_loader import load_shapes_from_dir
 
 _SHACL_NS = "http://www.w3.org/ns/shacl#"
 
@@ -84,13 +85,7 @@ def cli(
         if shapes is not None:
             shapes_g.parse(shapes, format="turtle")
         if shapes_dir is not None:
-            ttl_files = list(Path(shapes_dir).glob("*.ttl"))
-            for ttl_file in ttl_files:
-                g = rdflib.Graph()
-                g.parse(str(ttl_file), format="turtle")
-                shapes_g += g
-            if len(shapes_g) == 0:
-                raise click.UsageError("--shapes-dir contained no .ttl files")
+            shapes_g += load_shapes_from_dir(Path(shapes_dir))
 
         # Run pySHACL — pyshacl stubs do not reflect the tuple return type
         pyshacl_result: tuple[bool, rdflib.Graph, str] = pyshacl.validate(  # pyright: ignore[reportAssignmentType]

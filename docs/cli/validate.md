@@ -15,16 +15,10 @@ At least one of `--shapes` or `--shapes-dir` must be provided.
 ## Examples
 
 ```bash
-# Single shapes file
+# Load all *.ttl shapes (generated + hand-authored overrides) from a directory
 uv run rosetta-validate \
   --data mapping.rml.ttl \
-  --shapes rosetta/policies/mapping.shacl.ttl \
-  -o validation.json
-
-# Load all *.ttl shapes from a directory
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes-dir rosetta/policies/ \
+  --shapes-dir rosetta/policies/shacl/ \
   -o validation.json
 ```
 

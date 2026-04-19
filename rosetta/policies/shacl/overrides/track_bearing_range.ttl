@@ -1,0 +1,14 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix mc: <https://ontology.nato.int/core/MasterCOP#> .
+
+mc:AirTrackBearingRangeShape
+    a sh:NodeShape ;
+    sh:targetClass mc:AirTrack ;
+    sh:property [
+        sh:path mc:hasBearing ;
+        sh:datatype xsd:double ;
+        sh:minInclusive 0 ;
+        sh:maxExclusive 360 ;
+        sh:message "mc:hasBearing must be a double in [0, 360)." ;
+    ] .

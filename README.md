@@ -565,15 +565,10 @@ Options:
 **Example:**
 
 ```bash
+# Load all shapes (generated + hand-authored overrides) from the policies dir
 uv run rosetta-validate \
   --data mapping.rml.ttl \
-  --shapes rosetta/policies/mapping.shacl.ttl \
-  -o validation.json
-
-# Load all shapes from a directory
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes-dir rosetta/policies/ \
+  --shapes-dir rosetta/policies/shacl/ \
   -o validation.json
 ```
 

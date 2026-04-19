@@ -7,17 +7,17 @@ last_updated: "2026-04-18T19:45:00.000Z"
 progress:
   total_phases: 19
   completed_phases: 18
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 27
+  completed_plans: 26
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 19 (SHACL validation refactor) — planning in progress
-- **Plan:** 19-01 (rosetta-shacl-gen generator) — design phase
-- **Status:** v2.0 milestone closed (18 phases, 431 tests). Phase 19 added 2026-04-18 to refit `rosetta-validate` to the v2 pipeline: auto-generate SHACL from master LinkML, override workflow for hand edits, wire `--validate` into `rosetta-yarrrml-gen --run` against in-memory triples. Three plans: 19-01 (generator), 19-02 (override workflow), 19-03 (pipeline wiring + JSON-LD input).
+- **Phase:** 19 (SHACL validation refactor) — Plans 19-01 + 19-02 complete; 19-03 next
+- **Plan:** 19-03 (`--validate` wiring + JSON-LD input) — ready to build
+- **Status:** Plans 19-01 + 19-02 shipped 2026-04-19. 449/449 tests pass (+17 new across both plans). New module `rosetta/core/shapes_loader.py` provides symlink-safe + non-shape-warned shapes-dir walker (shared by future 19-03 wiring). Legacy `mapping.shacl.ttl` retired; `test_validate.py` migrated to inline `_SHAPES_TTL`. Override workflow live with worked example.
 
 ## Phase Progress
 
@@ -227,4 +227,34 @@ Additionally, `conftest.py` now preloads rdflib's SPARQL parser grammar so schem
 
 ## Next Action
 
-Phase 19 planning in progress. Brainstorm + design plan 19-01 (`rosetta-shacl-gen`) per plan-work flow. CONTEXT.md to be created next.
+Plan 19-02 complete. Next: `/fh:build 19-03` (`--validate` flag on `rosetta-yarrrml-gen`, JSON-LD input for `rosetta-validate`, shared `shacl_validate.py` helper, stdout-collision guard).
+
+## Phase 19 Plan 19-02 Completion
+
+- **Plan:** `.planning/phases/19-shacl-validation/19-02-PLAN.md`
+- **Tests:** 449/449 passing (+6 new in `test_shacl_overrides.py`; +0 net change in `test_validate.py` — same 9 tests, inline shapes)
+- **Completed:** 2026-04-19
+- **Key changes:**
+  - `rosetta/policies/shacl/{generated,overrides}/` dir convention live with READMEs
+  - `rosetta/policies/shacl/generated/master.shacl.ttl` regenerable artifact (130KB, 43 NodeShapes)
+  - Worked-example override: `track_bearing_range.ttl` (`mc:hasBearing` ∈ [0, 360))
+  - Legacy `rosetta/policies/mapping.shacl.ttl` deleted; 0 grep hits remaining
+  - `test_validate.py` migrated to inline `_SHAPES_TTL` (D-19-13)
+  - New `rosetta/core/shapes_loader.py` — recursive walker; `os.walk(followlinks=False)` for symlink-loop safety; warns + merges non-shape Turtle (D-19-16, D-19-17)
+  - `rosetta/cli/validate.py` `--shapes-dir` collapsed to single `load_shapes_from_dir` call
+  - Fix-on-sight: same pyshacl Union-narrowing + CliRunner-chain patterns as Plan 19-01
+
+## Phase 19 Plan 19-01 Completion
+
+- **Plan:** `.planning/phases/19-shacl-validation/19-01-PLAN.md`
+- **Commit:** `6946a29`
+- **Tests:** 443/443 passing (+11 new: 7 `test_shacl_gen` + 4 `test_unit_detect`)
+- **Completed:** 2026-04-19
+- **Key changes:**
+  - New `rosetta-shacl-gen` CLI wraps `linkml.generators.shaclgen.ShaclGenerator`
+  - Closed-world default with `sh:ignoredProperties` for `prov:*` / `dcterms:*` / `rdf:type`; `--open` flag for open-world
+  - Unit-aware shapes via `detect_unit` → `qudt:hasUnit` constraints; 5/6 master COP unit-bearing slots covered
+  - Spike (D-19-14) chose wrapper over subclass
+  - `rosetta/core/unit_detect.py` extended with `_knots?$` / `_degrees?$` / `_bearing$` patterns + `_VERTICAL_RATE_NAME` description-disambiguated check + `unit:FT-PER-MIN` mapping
+  - Documentation: `docs/cli/shacl-gen.md` (mkdocs-click), `README.md`, `mkdocs.yml` nav
+  - Fix-on-sight: corrected `CLAUDE.md` refurb command + 4 refurb findings in new code
