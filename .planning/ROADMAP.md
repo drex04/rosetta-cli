@@ -344,5 +344,41 @@ consolidate fixture paths into `conftest.py` so tests stop re-declaring `_FIXTUR
 
 **Note:** Phase 18 is purely additive — no production code changes; runtime behavior is unaltered. Can be built after Phase 17 in any order with unrelated phases.
 
+---
+
+## Phase 19: SHACL validation refactor for v2 pipeline
+**Goal:** Refit `rosetta-validate` to the v2.0 pipeline. Auto-generate SHACL shapes from the master LinkML schema, give the user a clean override workflow for hand edits, and wire validation into `rosetta-yarrrml-gen --run` against the in-memory materialized graph (blocking JSON-LD emission on violation). Standalone `rosetta-validate` accepts JSON-LD as data input.
+
+**Delivers (split across 3 plans):**
+
+### 19-01: `rosetta-shacl-gen` generator
+- New `rosetta/cli/shacl_gen.py` CLI — wraps `linkml.generators.shaclgen.ShaclGenerator`
+- Reads master LinkML YAML; emits `master.shacl.ttl` (Turtle)
+- Closed-shape default with `sh:ignoredProperties` baked in for `prov:*`, `dcterms:*`, `rdf:type`; `--open` flag for open-world output
+- Round-trips master prefixes; preserves slot URIs from `slot_uri`
+- Pydantic model for any structured output (none expected — Turtle is the artifact)
+- Tests: generator output validates a hand-written conformant graph
+
+**Requirements:** REQ-V2-VALIDATE-01
+
+### 19-02: User-edit override workflow
+- Convention: `rosetta/policies/shacl/generated/` (regen output, never hand-edited) + `rosetta/policies/shacl/overrides/` (user shapes, regen-safe)
+- Drop legacy `rosetta/policies/mapping.shacl.ttl` (v1 `rose:Field`/`rose:Mapping` — obsolete)
+- One worked-example override committed (e.g., `mc:Track` minimum-bearing-bound)
+- README + `docs/cli/shacl-gen.md` + `docs/cli/validate.md` document the dir layout, regen safety, merge order
+- `--shapes-dir` already supports recursive merge — verify and test that ordering of generated/ vs overrides/ doesn't matter for SHACL semantics
+
+**Requirements:** REQ-V2-VALIDATE-02
+
+### 19-03: Pipeline wiring (`--validate` flag + JSON-LD input)
+- `rosetta/cli/yarrrml_gen.py` adds `--validate` (boolean) + `--shapes-dir` flags; on materialized `rdflib.Graph`, runs pySHACL in-process before `graph_to_jsonld`; on violation, writes structured report to stderr (or `--validate-report` path) and exits 1 with no JSON-LD emitted
+- `rosetta/core/rml_runner.run_materialize` keeps yielding the graph (no signature change); a new `rosetta/core/shacl_validate.py` exposes a reusable `validate_graph(graph, shapes_graph) -> ValidationReport` so both `rosetta-validate` and `rosetta-yarrrml-gen` share one path
+- `rosetta/cli/validate.py` extended: `--data` accepts `.jsonld` / `.json` (rdflib JSON-LD parser) in addition to Turtle, autodetected by suffix or explicit `--data-format`
+- Integration test: NOR CSV → suggest → yarrrml-gen --run --validate against generated shapes → JSON-LD emitted on conformant data; second test asserts violation blocks emission with exit 1
+
+**Requirements:** REQ-V2-VALIDATE-03
+
+**Note:** Phase 19 builds on the v2 pipeline (Phases 12–18) but is independent of any future milestone. The legacy `mapping.shacl.ttl` is retired in 19-02.
+
 
 

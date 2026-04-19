@@ -30,9 +30,12 @@ _NAME_PATTERNS: list[tuple[re.Pattern[str], str | None]] = [
     (re.compile(r"(?:^|_)ft$", re.IGNORECASE), "unit:FT"),
     (re.compile(r"(?:^|_)nmi$", re.IGNORECASE), "unit:NauticalMile"),
     (re.compile(r"(?:^|_)kts$", re.IGNORECASE), "unit:KN"),
+    (re.compile(r"(?:^|_)knots?$", re.IGNORECASE), "unit:KN"),
     # Angle — mrad before rad, deg/grad separated from rad/radians
     (re.compile(r"(?:^|_)mrad$", re.IGNORECASE), "unit:MilliRAD"),
     (re.compile(r"(?:^|_)(?:deg|grad|grader)$", re.IGNORECASE), "unit:DEG"),
+    (re.compile(r"(?:^|_)degrees?$", re.IGNORECASE), "unit:DEG"),
+    (re.compile(r"(?:^|_)bearing$", re.IGNORECASE), "unit:DEG"),
     (re.compile(r"(?:^|_)(?:rad|radians?)$", re.IGNORECASE), "unit:RAD"),
     # Power / signal — dBm has no QUDT IRI; short-circuit with None
     (re.compile(r"(?:^|_)dbm$", re.IGNORECASE), None),
@@ -88,6 +91,7 @@ _PINT_TO_QUDT_IRI: dict[str, str | None] = {
     "kilometer": "unit:KiloM",
     "kilometer / hour": "unit:KiloM-PER-HR",
     "foot": "unit:FT",
+    "foot / minute": "unit:FT-PER-MIN",
     "knot": "unit:KN",
     "degree": "unit:DEG",
     "nautical_mile": "unit:NauticalMile",
@@ -110,6 +114,17 @@ _PINT_TO_QUDT_IRI: dict[str, str | None] = {
     "megahertz": "unit:MegaHZ",
     "gigahertz": "unit:GigaHZ",
 }
+
+# ---------------------------------------------------------------------------
+# Description-disambiguated name patterns — name match alone is ambiguous
+# (e.g. "verticalRate" could be ft/min, m/s, or km/h), so we require BOTH a
+# name suffix AND a description token to commit to a specific unit IRI.
+# ---------------------------------------------------------------------------
+
+_VERTICAL_RATE_NAME: re.Pattern[str] = re.compile(r"(?:^|_)vertical_rate$", re.IGNORECASE)
+_FPM_DESC: re.Pattern[str] = re.compile(
+    r"\bfeet\s+per\s+minute\b|\bft/min\b|\bfpm\b", re.IGNORECASE
+)
 
 _ureg: UnitRegistry | None = None  # pyright: ignore[reportMissingTypeArgument]
 
@@ -135,6 +150,12 @@ def detect_unit(name: str, description: str) -> str | None:
     detected unit has no QUDT IRI (e.g. dBm).
     """
     normalized = _snake_case(name)
+
+    # Description-disambiguated names: require BOTH name suffix AND description
+    # token before committing. Avoids matching every "rate" slot as ft/min.
+    if _VERTICAL_RATE_NAME.search(normalized) and _FPM_DESC.search(description):
+        return "unit:FT-PER-MIN"
+
     for pattern, iri in _NAME_PATTERNS:
         if pattern.search(normalized):
             return iri

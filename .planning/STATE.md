@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: LinkML + SSSOM migration
+milestone: v2.1
+milestone_name: SHACL validation refactor
 status: in_progress
-last_updated: "2026-04-18T12:40:00.000Z"
+last_updated: "2026-04-18T19:45:00.000Z"
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 18
-  total_plans: 21
+  total_plans: 24
   completed_plans: 24
 ---
 
@@ -15,9 +15,9 @@ progress:
 
 ## Current Position
 
-- **Phase:** 18 (Integration & E2E Test Hardening) complete — all v2.0 phases closed
-- **Plan:** 18-03 (Adversarial & negative-input stress tests) complete
-- **Status:** Phase 18 complete on 2026-04-18; 431/431 tests passing (all green, no xfails). 60 integration + 4 e2e tests collected. Plans 18-01 (infrastructure), 18-02 (positive-path coverage), 18-03 (adversarial) all shipped in a single day. 8/8 quality gates clean throughout. Mid-phase fix `3fc820b` closed a pre-existing unit-conversion regression surfaced during 18-01 verification.
+- **Phase:** 19 (SHACL validation refactor) — planning in progress
+- **Plan:** 19-01 (rosetta-shacl-gen generator) — design phase
+- **Status:** v2.0 milestone closed (18 phases, 431 tests). Phase 19 added 2026-04-18 to refit `rosetta-validate` to the v2 pipeline: auto-generate SHACL from master LinkML, override workflow for hand edits, wire `--validate` into `rosetta-yarrrml-gen --run` against in-memory triples. Three plans: 19-01 (generator), 19-02 (override workflow), 19-03 (pipeline wiring + JSON-LD input).
 
 ## Phase Progress
 
@@ -41,6 +41,7 @@ progress:
 | 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
 | 18 | Integration & E2E Test Hardening | Complete |
+| 19 | SHACL validation refactor | In Progress |
 
 ## Phase 1 Completion
 
@@ -226,4 +227,4 @@ Additionally, `conftest.py` now preloads rdflib's SPARQL parser grammar so schem
 
 ## Next Action
 
-Milestone v2.0 complete. Next roadmap item per `.planning/ROADMAP.md`.
+Phase 19 planning in progress. Brainstorm + design plan 19-01 (`rosetta-shacl-gen`) per plan-work flow. CONTEXT.md to be created next.

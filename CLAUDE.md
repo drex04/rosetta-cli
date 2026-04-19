@@ -67,7 +67,7 @@ Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `ro
 - `uv run radon cc rosetta/core/ -n C -s` — complexity check (core only; fails on grade C+)
 - `uv run vulture rosetta/ --exclude rosetta/tests --min-confidence 80` — dead code detection
 - `uv run bandit -r rosetta/ -x rosetta/tests -ll` — security scan
-- `uv run refurb rosetta/ rosetta/tests/` — Python modernization
+- `uv run refurb rosetta/` — Python modernization (single arg avoids mypy duplicate-module path collision; `rosetta/tests/` is already covered by the recursive walk)
 - `uv run mkdocs build --strict` — docs build (fails on broken nav, missing pages, `mkdocs-click` errors)
 
 CI enforces all nine on every push/PR (`.github/workflows/ci.yml`), with dedicated jobs for `analysis` (radon, vulture, bandit) and `docs` (mkdocs).

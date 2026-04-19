@@ -74,6 +74,7 @@ nav:
       - rosetta-lint: cli/lint.md
       - rosetta-accredit: cli/accredit.md
       - rosetta-validate: cli/validate.md
+      - rosetta-shacl-gen: cli/shacl-gen.md
       - rosetta-yarrrml-gen: cli/yarrrml-gen.md
       - rosetta-provenance: cli/provenance.md
   - Configuration: configuration.md

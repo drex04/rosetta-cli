@@ -33,6 +33,7 @@ rosetta-yarrrml-gen = "rosetta.cli.yarrrml_gen:cli"
 rosetta-provenance = "rosetta.cli.provenance:cli"
 rosetta-accredit   = "rosetta.cli.accredit:cli"
 rosetta-translate  = "rosetta.cli.translate:cli"
+rosetta-shacl-gen  = "rosetta.cli.shacl_gen:cli"
 
 [project.optional-dependencies]
 dev = [

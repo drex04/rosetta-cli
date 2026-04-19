@@ -1,0 +1,201 @@
+"""Rosetta SHACL generator — wrapper around ``linkml.generators.shaclgen.ShaclGenerator``.
+
+Phase 19 / Plan 19-01 / Task 1 (D-19-11, D-19-14).
+
+Spike outcome (D-19-14):
+    The upstream ``ShaclGenerator`` is a ``@dataclass`` whose
+    ``closed: bool = True`` field is settable directly via constructor.
+    ``as_graph() -> rdflib.Graph`` is the most direct entry point —
+    ``serialize()`` just wraps it. The generator already attaches an
+    ``sh:ignoredProperties`` rdf:List to every NodeShape (containing
+    child-class slot URIs + ``rdf:type``). Our prov/dcterms additions
+    therefore fit cleanly as a single ``as_graph()`` post-walk: append
+    items to the existing list (or rebuild a fresh ``Collection`` and
+    rewire the ``sh:ignoredProperties`` predicate). No ``ShaclGenerator``
+    behaviour needs to change beyond what the constructor already
+    exposes, so a thin wrapper module is sufficient — no subclass.
+
+    Settable via constructor (kwargs), confirmed:
+        closed, suffix, include_annotations, exclude_imports,
+        use_class_uri_names, expand_subproperty_of
+
+    Requires post-walk on the returned ``rdflib.Graph``:
+        - extending ``sh:ignoredProperties`` with prov/dcterms IRIs
+        - emitting unit-aware ``sh:property`` blocks per slot
+
+Public API:
+    ``generate_shacl(linkml_path, *, closed=True) -> str``  (Turtle)
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from linkml.generators.shaclgen import ShaclGenerator
+from linkml_runtime.utils.schemaview import SchemaView
+from rdflib import BNode, Graph, Namespace, URIRef
+from rdflib.collection import Collection
+from rdflib.namespace import DCTERMS, RDF, SH
+
+from rosetta.core.unit_detect import detect_unit
+
+if TYPE_CHECKING:
+    from linkml_runtime.linkml_model import SlotDefinition
+
+PROV: Namespace = Namespace("http://www.w3.org/ns/prov#")
+QUDT: Namespace = Namespace("http://qudt.org/schema/qudt/")
+UNIT: Namespace = Namespace("http://qudt.org/vocab/unit/")
+
+# Properties that are universally permitted on every closed-world shape:
+# provenance metadata + ``rdf:type`` (the upstream generator already includes
+# ``rdf:type`` but we re-add for clarity / idempotency).
+_BAKED_IN_IGNORED: tuple[URIRef, ...] = (
+    PROV.wasGeneratedBy,
+    PROV.wasAttributedTo,
+    DCTERMS.created,
+    DCTERMS.source,
+    RDF.type,
+)
+
+
+def _curie_to_unit_iri(curie: str) -> URIRef:
+    """Expand a ``unit:XXX`` CURIE from ``detect_unit`` into a full QUDT URIRef.
+
+    ``detect_unit`` always returns the ``unit:`` prefix form (e.g. ``"unit:M"``);
+    we never ask it to resolve via a SchemaView, so we expand against the
+    canonical QUDT namespace ourselves.
+    """
+    if ":" not in curie:
+        raise ValueError(f"detect_unit returned non-CURIE value: {curie!r}")
+    prefix, local = curie.split(":", 1)
+    if prefix != "unit":
+        raise ValueError(f"unexpected prefix in unit CURIE: {curie!r}")
+    return UNIT[local]
+
+
+def _rebuild_ignored_properties(g: Graph) -> None:
+    """Append baked-in prov/dcterms IRIs to every ``sh:ignoredProperties`` list.
+
+    The upstream generator builds an rdf:List Collection of child-class slot
+    URIs + ``rdf:type``. We extend each list in place by collecting its current
+    members, removing the old list triples, and writing a fresh Collection
+    from the union (deduped). This is simpler — and easier to reason about —
+    than splicing a new tail onto the existing rdf:List.
+    """
+    # Snapshot pairs first; we'll mutate the graph mid-iteration otherwise.
+    pairs: list[tuple[URIRef | BNode, BNode]] = [
+        (shape, list_head)
+        for shape, _, list_head in g.triples((None, SH.ignoredProperties, None))
+        if isinstance(shape, (URIRef, BNode)) and isinstance(list_head, BNode)
+    ]
+
+    for shape, list_head in pairs:
+        existing = list(Collection(g, list_head))
+        # Delete old list nodes (rdf:first / rdf:rest) and the predicate triple.
+        _delete_rdf_list(g, list_head)
+        g.remove((shape, SH.ignoredProperties, list_head))
+
+        # Dedupe while preserving order: existing first, then any baked-ins
+        # not already present.
+        seen: set[URIRef] = set()
+        merged: list[URIRef] = []
+        for item in existing:
+            if isinstance(item, URIRef) and item not in seen:
+                seen.add(item)
+                merged.append(item)
+        for item in _BAKED_IN_IGNORED:
+            if item not in seen:
+                seen.add(item)
+                merged.append(item)
+
+        new_head = BNode()
+        # Collection() needs list[Node]; merged.copy() narrows to list[URIRef].
+        Collection(g, new_head, list(merged))  # noqa: FURB123
+        g.add((shape, SH.ignoredProperties, new_head))
+
+
+def _delete_rdf_list(g: Graph, head: BNode) -> None:
+    """Remove all rdf:first / rdf:rest triples for the rdf:List rooted at ``head``."""
+    node: URIRef | BNode = head
+    while node != RDF.nil:
+        # Capture rest before we delete the triples.
+        rest_obj: Any = g.value(subject=node, predicate=RDF.rest)
+        for triple in list(g.triples((node, None, None))):
+            g.remove(triple)
+        if not isinstance(rest_obj, (URIRef, BNode)):
+            break
+        node = rest_obj
+
+
+def _emit_unit_shapes(g: Graph, sv: SchemaView) -> None:
+    """For each slot whose name/description maps to a QUDT unit, attach a
+    ``sh:property`` block (``sh:path qudt:hasUnit ; sh:hasValue unit:XXX``) to
+    every parent class shape that uses that slot.
+
+    Parent class shape IRI = the class_uri (same URI the upstream generator
+    uses as both ``sh:targetClass`` and shape subject when
+    ``use_class_uri_names=True``, which is the default).
+    """
+    all_classes_obj: Any = sv.all_classes(imports=False)
+    for class_name in all_classes_obj:
+        class_name_str = str(class_name)
+        induced_obj: Any = sv.class_induced_slots(class_name_str)
+        induced: list[SlotDefinition] = list(induced_obj)
+        if not induced:
+            continue
+        class_def: Any = all_classes_obj[class_name]
+        class_uri_str: Any = sv.get_uri(class_def, expand=True)
+        if not class_uri_str:
+            continue
+        shape_subject = URIRef(str(class_uri_str))
+        for slot in induced:
+            slot_name = slot.name or ""
+            slot_desc = slot.description or ""
+            if not slot_name:
+                continue
+            unit_curie = detect_unit(slot_name, slot_desc)
+            if unit_curie is None:
+                continue
+            unit_iri = _curie_to_unit_iri(unit_curie)
+            prop_node = BNode()
+            g.add((shape_subject, SH.property, prop_node))
+            g.add((prop_node, SH.path, QUDT.hasUnit))
+            g.add((prop_node, SH.hasValue, unit_iri))
+
+
+def _bind_prefixes(g: Graph) -> None:
+    g.bind("qudt", QUDT)
+    g.bind("prov", PROV)
+    g.bind("dcterms", DCTERMS)
+    g.bind("unit", UNIT)
+
+
+def generate_shacl(linkml_path: str | Path, *, closed: bool = True) -> str:
+    """Generate Rosetta SHACL Turtle from a LinkML schema.
+
+    Wraps ``linkml.generators.shaclgen.ShaclGenerator`` with two Rosetta-specific
+    post-walk passes (D-19-10, D-19-11):
+
+    * Closed-world default — ``sh:closed true`` (set via constructor) and
+      ``sh:ignoredProperties`` extended to permit ``prov:wasGeneratedBy``,
+      ``prov:wasAttributedTo``, ``dcterms:created``, ``dcterms:source``,
+      ``rdf:type``. Pass ``closed=False`` to emit open-world shapes (no
+      ignored-properties extension is performed in that mode — the upstream
+      generator emits ``sh:closed false`` and our extension would be inert).
+    * Unit-aware shapes — for every slot whose name/description ``detect_unit``
+      maps to a QUDT unit IRI, attach a ``sh:property`` block of the form
+      ``sh:path qudt:hasUnit ; sh:hasValue unit:XXX`` to the parent class shape.
+    """
+    schema_path = str(linkml_path)
+    g: Graph = ShaclGenerator(schema_path, closed=closed).as_graph()
+
+    if closed:
+        _rebuild_ignored_properties(g)
+
+    sv = SchemaView(schema_path)
+    _emit_unit_shapes(g, sv)
+
+    _bind_prefixes(g)
+    serialized: Any = g.serialize(format="turtle")
+    return str(serialized)

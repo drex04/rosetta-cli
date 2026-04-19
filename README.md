@@ -581,6 +581,41 @@ uv run rosetta-validate \
 
 ---
 
+### rosetta-shacl-gen
+
+Auto-generates SHACL shapes from a master LinkML schema. Defaults to closed-world shapes (`sh:closed true` + `sh:ignoredProperties` for PROV-O / dcterms / rdf:type) and emits QUDT unit-aware value shapes for slots whose names map to QUDT IRIs via `detect_unit`.
+
+```
+Usage: rosetta-shacl-gen [OPTIONS]
+
+Options:
+  --input PATH       Master LinkML schema YAML  [required]
+  --output PATH      Output SHACL Turtle file (default: stdout)
+  --open             Emit open-world shapes (skip sh:closed and sh:ignoredProperties)
+```
+
+**Example:**
+
+```bash
+# Default closed-world shapes
+uv run rosetta-shacl-gen \
+  --input rosetta/tests/fixtures/nations/master_cop.linkml.yaml \
+  --output master.shacl.ttl
+
+# Plug straight into rosetta-validate
+uv run rosetta-validate \
+  --data mapping.rml.ttl \
+  --shapes master.shacl.ttl \
+  -o validation.json
+
+# Open-world shapes for intentionally extensible master schemas
+uv run rosetta-shacl-gen --input master.linkml.yaml --open --output master.open.shacl.ttl
+```
+
+**Exit codes:** 0 on success, 1 on generation error, 2 on Click usage error.
+
+---
+
 ### rosetta-yarrrml-gen
 
 Generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas. With `--run`, the same invocation compiles the spec to YARRRML (via the forked `linkml_map.compiler.yarrrml_compiler.YarrrmlCompiler`), materializes it against a concrete data file via [morph-kgc](https://morph-kgc.readthedocs.io/), and frames the resulting RDF as JSON-LD using a `@context` derived from the master LinkML schema.

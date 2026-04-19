@@ -291,3 +291,34 @@ def test_detect_unit_camelcase_trailing_ft_after_digits() -> None:
     from rosetta.core.unit_detect import detect_unit
 
     assert detect_unit("alt123Ft", "") == "unit:FT"
+
+
+# ---------------------------------------------------------------------------
+# Master COP slot patterns — Phase 19 / Plan 19-01 Task 0 (D-19-12).
+# Extends detect_unit so closed-shape unit constraints fire on the master
+# schema's actual slot names: hasSpeedKnots, hasBearing, hasVerticalRate.
+# ---------------------------------------------------------------------------
+
+
+def test_detect_knots_suffix() -> None:
+    """``hasSpeedKnots`` snake-cases to ``has_Speed_Knots`` and matches ``_knots$``."""
+    assert detect_unit("hasSpeedKnots", "") == "unit:KN"
+
+
+def test_detect_bearing_pattern() -> None:
+    """``hasBearing`` matches the ``_bearing$`` name pattern → unit:DEG."""
+    assert detect_unit("hasBearing", "Bearing in degrees true") == "unit:DEG"
+
+
+def test_detect_vertical_rate_with_fpm_description() -> None:
+    """``hasVerticalRate`` + 'feet per minute' description → unit:FT-PER-MIN."""
+    assert (
+        detect_unit("hasVerticalRate", "Rate of climb or descent in feet per minute")
+        == "unit:FT-PER-MIN"
+    )
+
+
+def test_detect_vertical_rate_without_fpm_description_returns_none() -> None:
+    """Vertical-rate without an fpm/ft-min description token returns None
+    (description-disambiguated; avoids matching every "rate" slot)."""
+    assert detect_unit("hasVerticalRate", "") is None
