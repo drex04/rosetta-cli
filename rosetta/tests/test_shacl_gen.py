@@ -96,6 +96,61 @@ def test_closed_default_adds_ignored_properties(master_schema_path: Path) -> Non
         )
 
 
+def test_open_flag_behaviorally_permits_extra_predicates(tmp_path: Path) -> None:
+    """Behavioral proof of ``--open``: a graph that fails under closed-world
+    shapes (a typo'd predicate that is not declared on the class) must PASS
+    under open-world shapes from the same schema.
+
+    The mirror of ``test_validates_conformant_graph_and_rejects_typo`` — where
+    the typo triggers ``sh:ClosedConstraintComponent`` under closed-world —
+    pinned from the open-world direction. Without this test, ``--open`` was
+    only checked structurally (absence of ``sh:closed true`` triples) and not
+    behaviorally.
+    """
+    schema_yaml = """\
+name: tiny-open
+id: https://example.org/tiny-open#
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  ex:
+    prefix_prefix: ex
+    prefix_reference: https://example.org/tiny-open#
+default_prefix: ex
+default_range: string
+slots:
+  hasName:
+    name: hasName
+    slot_uri: ex:hasName
+    range: string
+classes:
+  Widget:
+    name: Widget
+    class_uri: ex:Widget
+    slots:
+    - hasName
+"""
+    schema_path = tmp_path / "tiny_open.linkml.yaml"
+    schema_path.write_text(schema_yaml, encoding="utf-8")
+
+    open_shapes_g = _parse_turtle(generate_shacl(schema_path, closed=False))
+
+    EX = Namespace("https://example.org/tiny-open#")
+    typo_graph = Graph()
+    typo_graph.add((EX.widget1, RDF.type, EX.Widget))
+    typo_graph.add((EX.widget1, EX.hasName, Literal("ok")))
+    typo_graph.add((EX.widget1, EX.hasNaem, Literal("typo")))  # NOT declared
+
+    report = validate_graph(typo_graph, open_shapes_g)
+    assert report.summary.conforms, (
+        f"open-world shapes must permit undeclared predicates; "
+        f"got violations={report.summary.violation} findings={report.findings!r}"
+    )
+
+
 def test_open_flag_omits_closed_and_ignored(master_schema_path: Path) -> None:
     """With closed=False: no `sh:closed true` triples, and no Phase-19 ignored entries.
 
@@ -122,8 +177,13 @@ def test_open_flag_omits_closed_and_ignored(master_schema_path: Path) -> None:
 
 
 def test_unit_aware_shape_emitted_for_qudt_slot(master_schema_path: Path) -> None:
-    """At least one sh:property block has sh:path qudt:hasUnit and sh:hasValue
-    pointing to a recognised QUDT unit IRI from the master schema's slots."""
+    """At least one sh:property block has sh:path qudt:hasUnit and an sh:in
+    rdf:List containing recognised QUDT unit IRIs from the master schema.
+
+    The generator emits one consolidated ``sh:in`` constraint per class
+    (covering every unit its slots map to). This test walks those lists and
+    asserts at least one expected unit appears across the schema.
+    """
     g = _parse_turtle(generate_shacl(master_schema_path))
     expected_units: set[URIRef] = {
         UNIT.KN,
@@ -132,14 +192,16 @@ def test_unit_aware_shape_emitted_for_qudt_slot(master_schema_path: Path) -> Non
         UNIT.FT,
     }
     found: set[URIRef] = set()
-    # Every property shape with sh:path qudt:hasUnit should carry sh:hasValue.
     for prop_node in g.subjects(SH.path, QUDT.hasUnit):
-        for value in g.objects(prop_node, SH.hasValue):
-            if isinstance(value, URIRef):
-                found.add(value)
+        for list_head in g.objects(prop_node, SH["in"]):
+            if not isinstance(list_head, BNode):
+                continue
+            for member in Collection(g, list_head):
+                if isinstance(member, URIRef):
+                    found.add(member)
     overlap = found & expected_units
     assert overlap, (
-        f"expected at least one of {expected_units!r} as a sh:hasValue on a "
+        f"expected at least one of {expected_units!r} in an sh:in list on a "
         f"qudt:hasUnit property shape; found {found!r}"
     )
 

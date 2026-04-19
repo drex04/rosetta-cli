@@ -38,6 +38,9 @@ uv run rosetta-validate \
 - `.jsonld`, `.json`, `.json-ld` → JSON-LD
 - Anything else → fallback to Turtle
 
+!!! warning "Autodetect surprise"
+    Files with an unrecognized suffix (e.g. `.txt`, `.data`) are parsed as **Turtle** under `--data-format=auto`. A JSON-LD payload in a file named `tracks.data` will therefore produce an rdflib Turtle parse error, not a JSON-LD parse. Pass `--data-format json-ld` explicitly for any non-standard suffix, or rename the file to one of the recognized extensions.
+
 Pass `--data-format {turtle,json-ld,auto}` to override. Example:
 
 ```bash
@@ -58,3 +61,8 @@ uv run rosetta-validate \
 
 - `0` — RDF conforms to the shapes.
 - `1` — SHACL violations found (non-empty `sh:ValidationReport`).
+
+## See also
+
+- [`rosetta-shacl-gen`](shacl-gen.md) — auto-generate the `--shapes` / `--shapes-dir` input from a master LinkML schema; documents the `generated/` + `overrides/` directory convention.
+- [`rosetta-yarrrml-gen`](yarrrml-gen.md) — chain materialization and validation in one step via `--validate --shapes-dir`.

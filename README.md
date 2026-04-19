@@ -553,11 +553,17 @@ Validates an RDF Turtle file against SHACL shape constraints using pySHACL.
 Usage: rosetta-validate [OPTIONS]
 
 Options:
-  --data PATH        RDF Turtle file to validate  [required]
-  --shapes PATH      Single SHACL shapes Turtle file
-  --shapes-dir PATH  Directory — loads all *.ttl files as shapes
-  -o, --output PATH  Output file  (default: stdout)
-  -c, --config PATH  Path to rosetta.toml
+  --data PATH                        RDF data file (Turtle or JSON-LD) [required]
+  --data-format [turtle|json-ld|auto]
+                                     Input format. 'auto' picks by suffix
+                                     (.ttl → turtle; .jsonld/.json/.json-ld
+                                     → json-ld; any other extension falls
+                                     back to turtle). Default: auto.
+  --shapes PATH                      Single SHACL shapes Turtle file
+  --shapes-dir PATH                  Directory — recursively loads all *.ttl
+                                     files (merged with --shapes if both set)
+  -o, --output PATH                  Output file  (default: stdout)
+  -c, --config PATH                  Path to rosetta.toml
 ```
 
 > At least one of `--shapes` or `--shapes-dir` must be provided.
@@ -578,7 +584,7 @@ uv run rosetta-validate \
 
 ### rosetta-shacl-gen
 
-Auto-generates SHACL shapes from a master LinkML schema. Defaults to closed-world shapes (`sh:closed true` + `sh:ignoredProperties` for PROV-O / dcterms / rdf:type) and emits QUDT unit-aware value shapes for slots whose names map to QUDT IRIs via `detect_unit`.
+Auto-generates SHACL shapes from a master LinkML schema. Defaults to closed-world shapes (`sh:closed true` + `sh:ignoredProperties` for PROV-O / dcterms / rdf:type / qudt:hasUnit) and emits per-class `sh:in` constraints on `qudt:hasUnit` for slots whose names map to QUDT IRIs via `detect_unit`.
 
 ```
 Usage: rosetta-shacl-gen [OPTIONS]
@@ -597,10 +603,12 @@ uv run rosetta-shacl-gen \
   --input rosetta/tests/fixtures/nations/master_cop.linkml.yaml \
   --output master.shacl.ttl
 
-# Plug straight into rosetta-validate
+# Plug straight into rosetta-validate — use --shapes-dir for the canonical
+# generated/+overrides/ layout; --shapes single-file remains supported for
+# one-off shape sets.
 uv run rosetta-validate \
   --data mapping.rml.ttl \
-  --shapes master.shacl.ttl \
+  --shapes-dir rosetta/policies/shacl/ \
   -o validation.json
 
 # Open-world shapes for intentionally extensible master schemas
@@ -650,6 +658,18 @@ Materialization options (Phase 16-03):
                          intermediates) for debugging. Ephemeral tempdir if
                          omitted; caller-supplied dirs are never cleaned up.
   --context-output PATH  Optional JSON-LD @context dump path.
+
+Inline-validation options (Phase 19-03):
+  --validate             Validate the materialized graph against SHACL shapes
+                         BEFORE emitting JSON-LD. On violation: exit 1, write
+                         the validation report (to stderr or --validate-report),
+                         and suppress JSON-LD emission entirely (no partial
+                         output). Requires --run AND --shapes-dir.
+  --shapes-dir PATH      Directory of SHACL shape .ttl files (recursive walk,
+                         symlink-safe; non-shape Turtle files emit a stderr
+                         warning and are still merged). Required with --validate.
+  --validate-report PATH Write the SHACL ValidationReport JSON to this path.
+                         Use "-" for stdout. Defaults to stderr on violation.
 ```
 
 **Behavioral matrix (stdout)**

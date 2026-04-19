@@ -325,6 +325,50 @@ def test_validate_data_format_unknown_raises(tmp_files: dict[str, Path]) -> None
     )
 
 
+_VIOLATING_JSONLD = """\
+{
+  "@context": {
+    "ex": "http://example.org/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@id": "ex:bob",
+  "@type": "ex:Person",
+  "ex:age": {"@value": "not-a-number", "@type": "xsd:string"}
+}
+"""
+
+
+def test_validate_jsonld_input_violation_path(tmp_files: dict[str, Path], tmp_path: Path) -> None:
+    """JSON-LD input with a shape violation → exit 1 + Violation finding.
+
+    All other JSON-LD input tests use conformant payloads; this pins the
+    violation-path behavior so the JSON-LD parser → SHACL → exit-code chain
+    has full coverage for both outcomes.
+    """
+    data = tmp_path / "bob.jsonld"
+    data.write_text(_VIOLATING_JSONLD, encoding="utf-8")
+    out = tmp_path / "report.json"
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 1, (
+        f"expected violation exit 1 for non-integer age; got {result.exit_code}: "
+        f"output={result.output!r}"
+    )
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["summary"]["conforms"] is False
+    assert report["summary"]["violation"] >= 1
+    assert any(f["severity"] == "Violation" for f in report["findings"])
+
+
 def test_validate_hyphenated_jsonld_suffix_autodetect(
     tmp_files: dict[str, Path], tmp_path: Path
 ) -> None:

@@ -230,3 +230,160 @@ def test_yarrrml_run_validate_violation_blocks_emission(
     assert report["summary"]["violation"] >= 1, (
         f"expected >=1 violation in report; got {report['summary']!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Post-review: yarrrml-gen --run → disk JSON-LD → rosetta-validate chain
+# and the real-policy-shapes round-trip.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow
+def test_yarrrml_run_then_validate_jsonld_file_chain(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+    nor_csv_sample_path: Path,
+) -> None:
+    """Two-stage chain: ``yarrrml-gen --run`` writes JSON-LD to disk; a second
+    ``rosetta-validate --data <jsonld>`` invocation reads that file and
+    validates it against a separate shapes dir.
+
+    Covers the wiring that ``rosetta-validate`` can consume materialized
+    pipeline output as an independent step — useful when JSON-LD is archived
+    and validated later, rather than inline via ``--validate``.
+    """
+    from rosetta.cli.validate import cli as validate_cli
+
+    nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(
+        tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
+    )
+
+    jsonld_out = tmp_path / "pipeline-out.jsonld"
+    spec_out = tmp_path / "spec.transform.yaml"
+    workdir = tmp_path / "wd"
+
+    # Stage 1: materialize without inline --validate (write JSON-LD to disk).
+    gen_result = CliRunner(mix_stderr=False).invoke(
+        yarrrml_gen_cli,
+        [
+            "--sssom",
+            str(sssom),
+            "--source-schema",
+            str(nor_schema),
+            "--master-schema",
+            str(mc_schema),
+            "--output",
+            str(spec_out),
+            "--force",
+            "--run",
+            "--data",
+            str(csv),
+            "--jsonld-output",
+            str(jsonld_out),
+            "--workdir",
+            str(workdir),
+        ],
+    )
+    assert gen_result.exit_code == 0, (
+        f"yarrrml-gen --run failed: exit={gen_result.exit_code} stderr={gen_result.stderr!r}"
+    )
+    assert jsonld_out.exists() and jsonld_out.stat().st_size > 0, "no JSON-LD bytes"
+
+    # Stage 2: validate the JSON-LD against a permissive shape dir.
+    shapes_dir = tmp_path / "shapes"
+    shapes_dir.mkdir()
+    (shapes_dir / "permissive.shacl.ttl").write_text(_PERMISSIVE_SHAPE_TTL, encoding="utf-8")
+    report_out = tmp_path / "report.json"
+
+    val_result = CliRunner(mix_stderr=False).invoke(
+        validate_cli,
+        [
+            "--data",
+            str(jsonld_out),
+            "--shapes-dir",
+            str(shapes_dir),
+            "--output",
+            str(report_out),
+        ],
+    )
+    assert val_result.exit_code == 0, (
+        f"permissive shape should pass JSON-LD output; "
+        f"exit={val_result.exit_code} stderr={val_result.stderr!r}"
+    )
+    report = json.loads(report_out.read_text(encoding="utf-8"))
+    assert report["summary"]["conforms"] is True
+
+
+@pytest.mark.slow
+def test_yarrrml_run_validate_with_committed_policy_shapes(
+    tmp_path: Path,
+    nor_linkml_path: Path,
+    master_schema_path: Path,
+    sssom_nor_path: Path,
+    nor_csv_sample_path: Path,
+) -> None:
+    """`--validate --shapes-dir rosetta/policies/shacl/` on the real committed
+    policy shapes. Pins the wiring against actual production shapes; does NOT
+    assert conformance because the closed-world shapes are stricter than the
+    NOR sample data populates — only that the CLI completes cleanly and
+    produces a well-formed report, and preserves the no-partial-output
+    invariant on violation.
+    """
+    nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(
+        tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
+    )
+
+    repo_root = Path(__file__).resolve().parents[3]
+    policy_shapes = repo_root / "rosetta" / "policies" / "shacl"
+    assert policy_shapes.is_dir(), f"expected committed shapes dir at {policy_shapes}"
+
+    spec_out = tmp_path / "spec.transform.yaml"
+    jsonld_out = tmp_path / "out.jsonld"
+    report_out = tmp_path / "validate-report.json"
+    workdir = tmp_path / "wd"
+
+    result = CliRunner(mix_stderr=False).invoke(
+        yarrrml_gen_cli,
+        [
+            "--sssom",
+            str(sssom),
+            "--source-schema",
+            str(nor_schema),
+            "--master-schema",
+            str(mc_schema),
+            "--output",
+            str(spec_out),
+            "--force",
+            "--run",
+            "--data",
+            str(csv),
+            "--jsonld-output",
+            str(jsonld_out),
+            "--validate",
+            "--shapes-dir",
+            str(policy_shapes),
+            "--validate-report",
+            str(report_out),
+            "--workdir",
+            str(workdir),
+        ],
+    )
+
+    # Wiring invariants: exit 0 or 1 (conformance depends on how thoroughly
+    # the sample CSV populates closed-world slots), never 2 (usage error)
+    # or any other code.
+    assert result.exit_code in (0, 1), (
+        f"unexpected exit {result.exit_code}; "
+        f"stderr={result.stderr!r} exception={result.exception!r}"
+    )
+    # Report must exist and parse as a ValidationReport regardless of outcome.
+    assert report_out.exists(), "--validate-report not written"
+    report = json.loads(report_out.read_text(encoding="utf-8"))
+    assert "summary" in report and "conforms" in report["summary"]
+    # If we got exit 1, JSON-LD must NOT have been emitted (no-partial invariant).
+    if result.exit_code == 1:
+        assert not jsonld_out.exists() or jsonld_out.stat().st_size == 0, (
+            "JSON-LD must not land on violation"
+        )

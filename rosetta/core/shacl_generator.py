@@ -48,14 +48,16 @@ QUDT: Namespace = Namespace("http://qudt.org/schema/qudt/")
 UNIT: Namespace = Namespace("http://qudt.org/vocab/unit/")
 
 # Properties that are universally permitted on every closed-world shape:
-# provenance metadata + ``rdf:type`` (the upstream generator already includes
-# ``rdf:type`` but we re-add for clarity / idempotency).
+# provenance metadata + ``rdf:type`` + ``qudt:hasUnit`` (optional unit-dimension
+# marker emitted by the ``_emit_unit_shapes`` pass; must be whitelisted so
+# ``sh:closed true`` does not reject data that declares its unit).
 _BAKED_IN_IGNORED: tuple[URIRef, ...] = (
     PROV.wasGeneratedBy,
     PROV.wasAttributedTo,
     DCTERMS.created,
     DCTERMS.source,
     RDF.type,
+    QUDT.hasUnit,
 )
 
 
@@ -128,10 +130,51 @@ def _delete_rdf_list(g: Graph, head: BNode) -> None:
         node = rest_obj
 
 
+def _collect_unit_iris(induced: list[SlotDefinition]) -> list[URIRef]:
+    """Return the de-duplicated QUDT unit IRIs detected across a class's slots."""
+    unit_iris: list[URIRef] = []
+    seen: set[URIRef] = set()
+    for slot in induced:
+        slot_name = slot.name or ""
+        if not slot_name:
+            continue
+        unit_curie = detect_unit(slot_name, slot.description or "")
+        if unit_curie is None:
+            continue
+        unit_iri = _curie_to_unit_iri(unit_curie)
+        if unit_iri in seen:
+            continue
+        seen.add(unit_iri)
+        unit_iris.append(unit_iri)
+    return unit_iris
+
+
+def _attach_unit_in_shape(g: Graph, class_uri: URIRef, unit_iris: list[URIRef]) -> None:
+    """Attach one ``sh:property [sh:path qudt:hasUnit ; sh:in (…)]`` to ``class_uri``."""
+    prop_node = BNode()
+    g.add((class_uri, SH.property, prop_node))
+    g.add((prop_node, SH.path, QUDT.hasUnit))
+    in_list_head = BNode()
+    # Collection() needs list[Node]; unit_iris narrows to list[URIRef].
+    Collection(g, in_list_head, list(unit_iris))  # noqa: FURB123
+    g.add((prop_node, SH["in"], in_list_head))
+
+
 def _emit_unit_shapes(g: Graph, sv: SchemaView) -> None:
-    """For each slot whose name/description maps to a QUDT unit, attach a
-    ``sh:property`` block (``sh:path qudt:hasUnit ; sh:hasValue unit:XXX``) to
-    every parent class shape that uses that slot.
+    """For each class whose slots map to one or more QUDT units, attach a
+    single ``sh:property`` block constraining ``qudt:hasUnit`` values to the
+    set of detected unit IRIs (``sh:path qudt:hasUnit ; sh:in (unit:A unit:B …)``).
+
+    Design rationale (Phase 19 follow-up):
+        An earlier iteration emitted one ``sh:hasValue unit:X`` shape per
+        unit-mapped slot on the same class. ``sh:hasValue`` requires the
+        specific value to be present, so a class with several unit-mapped
+        slots (e.g. AirTrack's Bearing/Speed/Altitude) received mutually
+        unsatisfiable constraints (each demanding its own unit). Switching
+        to a single deduplicated ``sh:in`` set means: "IF this instance
+        declares ``qudt:hasUnit``, that unit must be one the schema
+        recognises for this class" — vacuously true when no
+        ``qudt:hasUnit`` triples exist, validation otherwise.
 
     Parent class shape IRI = the class_uri (same URI the upstream generator
     uses as both ``sh:targetClass`` and shape subject when
@@ -139,29 +182,17 @@ def _emit_unit_shapes(g: Graph, sv: SchemaView) -> None:
     """
     all_classes_obj: Any = sv.all_classes(imports=False)
     for class_name in all_classes_obj:
-        class_name_str = str(class_name)
-        induced_obj: Any = sv.class_induced_slots(class_name_str)
-        induced: list[SlotDefinition] = list(induced_obj)
+        induced: list[SlotDefinition] = list(sv.class_induced_slots(str(class_name)))
         if not induced:
             continue
         class_def: Any = all_classes_obj[class_name]
         class_uri_str: Any = sv.get_uri(class_def, expand=True)
         if not class_uri_str:
             continue
-        shape_subject = URIRef(str(class_uri_str))
-        for slot in induced:
-            slot_name = slot.name or ""
-            slot_desc = slot.description or ""
-            if not slot_name:
-                continue
-            unit_curie = detect_unit(slot_name, slot_desc)
-            if unit_curie is None:
-                continue
-            unit_iri = _curie_to_unit_iri(unit_curie)
-            prop_node = BNode()
-            g.add((shape_subject, SH.property, prop_node))
-            g.add((prop_node, SH.path, QUDT.hasUnit))
-            g.add((prop_node, SH.hasValue, unit_iri))
+        unit_iris = _collect_unit_iris(induced)
+        if not unit_iris:
+            continue
+        _attach_unit_in_shape(g, URIRef(str(class_uri_str)), unit_iris)
 
 
 def _strip_abstract_mixin_shapes(g: Graph, sv: SchemaView) -> None:

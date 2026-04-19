@@ -129,6 +129,8 @@ On a SHACL violation:
 
 Three flags can be set to `-` to write to stdout: `--output -`, `--jsonld-output -`, `--validate-report -`. Setting any two simultaneously is a `UsageError` (exit 2) — caught at step 0 before materialization.
 
+Additionally, `--validate-report -` combined with `--run` **without an explicit `--jsonld-output FILE`** is also rejected: under `--run`, `--jsonld-output` defaults to stdout, so the validation-report bytes would interleave with the materialized JSON-LD stream on the same FD.
+
 ### Exit codes
 
 - `0` — TransformSpec generated; if `--run --validate`, validation passed and JSON-LD was emitted.
@@ -144,3 +146,8 @@ When `--coverage-report` is provided, a JSON file matching the `CoverageReport` 
 - `0` — success. TransformSpec written; JSON-LD emitted if `--run`. Empty materialised graph (0 triples) is *not* an error — a warning prints to stderr and empty-graph JSON-LD is emitted with exit `0`.
 - `1` — any of: malformed input file; unresolvable CURIEs (without `--force`); mixed-kind mapping; missing class-level mapping for a mapped slot; inconsistent `composition_expr`; empty filtered SSSOM (without `--allow-empty`); source schema has no `default_prefix`; `--source-format` omitted with no `annotations.rosetta_source_format`; `--run` without `--data`; `--workdir` not writable; YARRRML compilation error; morph-kgc materialisation error; `@context` generation error; JSON-LD serialisation error; `$(DATA_FILE)` placeholder missing from compiled YARRRML; write error on `--jsonld-output` or `--context-output`.
 - `2` — Click validation error (missing required option).
+
+## See also
+
+- [`rosetta-shacl-gen`](shacl-gen.md) — generate the `--shapes-dir` contents (the canonical `generated/` + `overrides/` layout).
+- [`rosetta-validate`](validate.md) — standalone validator; consumes the same `--shapes` / `--shapes-dir` inputs and can validate JSON-LD pipeline output offline.
