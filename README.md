@@ -719,6 +719,20 @@ JSON-LD output (excerpt):
 }
 ```
 
+**Example — end-to-end with inline SHACL validation**
+
+```bash
+# End-to-end with inline SHACL validation
+uv run rosetta-yarrrml-gen \
+  --sssom approved.sssom.tsv \
+  --master-schema master.linkml.yaml \
+  --source-schema nor.linkml.yaml \
+  --run --data nor.csv \
+  --output transform.yaml --jsonld-output out.jsonld \
+  --validate --shapes-dir rosetta/policies/shacl/
+# JSON-LD only emitted if SHACL validation passes; otherwise exit 1.
+```
+
 **Exit codes**
 
 - `0` — success (TransformSpec written; JSON-LD emitted if `--run`).

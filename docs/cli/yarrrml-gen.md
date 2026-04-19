@@ -94,6 +94,47 @@ JSON-LD output (excerpt):
 }
 ```
 
+## Inline SHACL validation
+
+When combined with `--run`, the `--validate` flag runs SHACL validation against the in-memory materialized graph BEFORE emitting JSON-LD. On any violation, JSON-LD emission is blocked, the validation report is written to stderr (or `--validate-report PATH`), and the process exits 1.
+
+```bash
+uv run rosetta-yarrrml-gen \
+  --sssom approved.sssom.tsv \
+  --master-schema master.linkml.yaml \
+  --source-schema nor.linkml.yaml \
+  --run \
+  --data nor.csv \
+  --output transform.yaml \
+  --jsonld-output out.jsonld \
+  --validate \
+  --shapes-dir rosetta/policies/shacl/ \
+  --validate-report report.json
+```
+
+### Requirements
+
+`--validate` requires both `--run` AND `--shapes-dir`. Either alone (or `--validate` alone) raises a Click `UsageError` (exit 2).
+
+### Failure-mode contract
+
+On a SHACL violation:
+
+- **No JSON-LD bytes are written** to `--jsonld-output` (file is not created or truncated).
+- The `ValidationReport` JSON is written to stderr by default, or to `--validate-report PATH` when supplied.
+- A summary line `"SHACL validation failed: N violation(s), M warning(s). JSON-LD emission blocked."` is written to stderr.
+- Exit code is `1`.
+
+### Stdout collision guard
+
+Three flags can be set to `-` to write to stdout: `--output -`, `--jsonld-output -`, `--validate-report -`. Setting any two simultaneously is a `UsageError` (exit 2) — caught at step 0 before materialization.
+
+### Exit codes
+
+- `0` — TransformSpec generated; if `--run --validate`, validation passed and JSON-LD was emitted.
+- `1` — `--validate` violation or generic runtime error.
+- `2` — Click usage error (missing/conflicting flags).
+
 ## Coverage report
 
 When `--coverage-report` is provided, a JSON file matching the `CoverageReport` Pydantic model is written. Fields include: row-stage counts, resolved and unresolved class/slot mappings, datatype mismatches, composite-group resolution status, and required master slots that remain unmapped.

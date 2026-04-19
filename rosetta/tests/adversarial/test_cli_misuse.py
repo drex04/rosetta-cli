@@ -110,11 +110,13 @@ def test_yarrrml_gen_stdout_and_file_collision(
     master_schema_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """`--output -` + `--jsonld-output -` under `--run` → exit 1, clear diagnostic.
+    """`--output -` + `--jsonld-output -` under `--run` → exit 2, clear diagnostic.
 
     Both values target stdout; merging the TransformSpec YAML and the JSON-LD
     bytes into a single stream would produce a malformed document. The step-0
-    guard rejects the combination before any write.
+    guard rejects the combination before any write. Plan 19-03 Task 3 unified
+    the stdout-collision guard onto ``click.UsageError`` (exit 2) so all
+    flag-combination misuse exits with the Click usage convention.
     """
     result = CliRunner(mix_stderr=False).invoke(
         yarrrml_gen_cli,
@@ -137,10 +139,10 @@ def test_yarrrml_gen_stdout_and_file_collision(
         ],
     )
 
-    # 1. Exit code — guard-rejected.
-    assert result.exit_code == 1, (
-        f"expected exit 1 when --output and --jsonld-output both target stdout; "
-        f"got {result.exit_code}"
+    # 1. Exit code — UsageError convention (Plan 19-03 Task 3).
+    assert result.exit_code == 2, (
+        f"expected exit 2 (Click UsageError) when --output and --jsonld-output "
+        f"both target stdout; got {result.exit_code}"
     )
     # 2. Stderr substring — names both flags + 'stdout'.
     assert "stdout" in result.stderr

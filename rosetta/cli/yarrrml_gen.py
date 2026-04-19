@@ -102,6 +102,37 @@ def _resolve_source_format(cli_flag: str | None, source_def: SchemaDefinition) -
     default=None,
     help="Optional JSON-LD @context dump path.",
 )
+@click.option(
+    "--validate",
+    is_flag=True,
+    default=False,
+    help=(
+        "After --run materialization, validate the in-memory graph against "
+        "SHACL shapes from --shapes-dir before emitting JSON-LD. On any "
+        "violation: write the validation report (stderr or --validate-report), "
+        "exit 1, and emit no JSON-LD. Requires --run AND --shapes-dir."
+    ),
+)
+@click.option(
+    "--shapes-dir",
+    type=click.Path(exists=True, file_okay=False),
+    default=None,
+    help=(
+        "Directory containing SHACL shape .ttl files (recursive walk via "
+        "rosetta.core.shapes_loader; symlink-safe; non-shape files trigger "
+        "stderr warning but are still merged). Required when --validate is set."
+    ),
+)
+@click.option(
+    "--validate-report",
+    type=click.Path(dir_okay=False),
+    default=None,
+    help=(
+        "Path to write the SHACL validation report JSON. If '-', writes to "
+        "stdout (mutually exclusive with other stdout outputs). If omitted, "
+        "the report is written to stderr on violation."
+    ),
+)
 def cli(
     sssom: str,
     source_schema: str,
@@ -117,10 +148,32 @@ def cli(
     jsonld_output: str | None,
     workdir: str | None,
     context_output: str | None,
+    validate: bool,
+    shapes_dir: str | None,
+    validate_report: str | None,
 ) -> None:
     """Generate a linkml-map TransformSpec from an approved SSSOM audit log."""
     # 0. Validate flag combinations before any I/O so no partial artifact lands
     #    on a guard failure.
+    # 0a. Pairwise stdout-collision guard (D-19-15): reject any two outputs
+    #     simultaneously targeting "-". Applies regardless of --run, since
+    #     --output and --validate-report can be combined without --run too.
+    stdout_targets = [
+        ("--output", output),
+        ("--jsonld-output", jsonld_output),
+        ("--validate-report", validate_report),
+    ]
+    stdout_collisions = [name for name, val in stdout_targets if val == "-"]
+    if len(stdout_collisions) > 1:
+        raise click.UsageError(
+            f"Multiple options target stdout ({', '.join(stdout_collisions)}); "
+            "use a file path for all but one."
+        )
+    # 0b. --validate flag dependencies.
+    if validate and not run:
+        raise click.UsageError("--validate requires --run.")
+    if validate and not shapes_dir:
+        raise click.UsageError("--validate requires --shapes-dir.")
     if run:
         if not data:
             click.echo("Error: --run requires --data", err=True)
@@ -128,13 +181,6 @@ def cli(
         data_path = Path(data)
         if not data_path.is_file():
             click.echo(f"Error: --data path does not exist or is not a file: {data}", err=True)
-            sys.exit(1)
-        if output == "-" == jsonld_output:
-            click.echo(
-                "Error: --output - and --jsonld-output - both target stdout; "
-                "use a file path for at least one.",
-                err=True,
-            )
             sys.exit(1)
 
     # 1. Parse SSSOM audit log
@@ -269,7 +315,7 @@ def cli(
     else:
         resolved_workdir = None
 
-    # 15. Materialize + frame as JSON-LD.
+    # 15. Materialize + (optionally validate) + frame as JSON-LD.
     context_out_path = Path(context_output).resolve() if context_output else None
     try:
         with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
@@ -278,9 +324,36 @@ def cli(
                     "Warning: materialization produced 0 triples; check data file and mappings",
                     err=True,
                 )
+            # 15a. Optional SHACL validation BEFORE JSON-LD framing/emission so
+            #      a violation aborts with no partial output written anywhere.
+            if validate:
+                from rosetta.core.shacl_validate import validate_graph
+                from rosetta.core.shapes_loader import load_shapes_from_dir
+
+                assert shapes_dir is not None  # step-0 guard ensures this
+                shapes_g = load_shapes_from_dir(Path(shapes_dir))
+                report = validate_graph(graph, shapes_g)
+                if not report.summary.conforms:
+                    report_json = report.model_dump_json(indent=2)
+                    if validate_report is not None:
+                        with open_output(validate_report) as fh:
+                            fh.write(report_json)
+                            fh.write("\n")
+                    else:
+                        click.echo(report_json, err=True)
+                    click.echo(
+                        f"SHACL validation failed: "
+                        f"{report.summary.violation} violation(s), "
+                        f"{report.summary.warning} warning(s). "
+                        f"JSON-LD emission blocked.",
+                        err=True,
+                    )
+                    sys.exit(1)
             jsonld_bytes = graph_to_jsonld(
                 graph, Path(master_schema), context_output=context_out_path
             )
+    except SystemExit:
+        raise
     except (
         OSError,
         PermissionError,

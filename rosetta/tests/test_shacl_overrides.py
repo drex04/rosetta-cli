@@ -118,28 +118,37 @@ def test_override_constraint_fires_on_data() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_override_survives_regen() -> None:
-    """Re-running ``rosetta-shacl-gen`` overwrites generated/ but not overrides/."""
+def test_override_survives_regen(tmp_path: Path) -> None:
+    """Re-running ``rosetta-shacl-gen`` writes to ``--output`` and never touches overrides/.
+
+    Output is directed at a tmp_path file rather than the committed
+    ``generated/master.shacl.ttl`` because rdflib serialization is not
+    byte-deterministic — writing to the canonical path would churn the
+    working tree on every test run. The override-preservation assertion
+    is independent of where regen output lands.
+    """
     pre_bytes = OVERRIDE_FILE.read_bytes()
     pre_hash = hashlib.sha256(pre_bytes).hexdigest()
 
+    regen_output = tmp_path / "regen.shacl.ttl"
     result = CliRunner().invoke(
         shacl_gen_cli,
         [
             "--input",
             str(MASTER_SCHEMA),
             "--output",
-            str(GENERATED_FILE),
+            str(regen_output),
         ],
     )
     assert result.exit_code == 0, (
         f"shacl-gen failed: exit={result.exit_code} output={result.output!r} "
         f"exception={result.exception!r}"
     )
+    assert regen_output.exists(), "regen --output file was not written"
 
     post_hash = hashlib.sha256(OVERRIDE_FILE.read_bytes()).hexdigest()
     assert pre_hash == post_hash, (
-        "Overrides directory was modified by rosetta-shacl-gen — regen must only touch generated/."
+        "Overrides directory was modified by rosetta-shacl-gen — regen must only touch --output."
     )
 
 

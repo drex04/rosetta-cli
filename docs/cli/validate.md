@@ -22,6 +22,30 @@ uv run rosetta-validate \
   -o validation.json
 ```
 
+## JSON-LD input
+
+`rosetta-validate` accepts JSON-LD as data input — useful for validating output from `rosetta-yarrrml-gen --run`. Format is autodetected by suffix:
+
+- `.ttl` → Turtle
+- `.jsonld`, `.json`, `.json-ld` → JSON-LD
+- Anything else → fallback to Turtle
+
+Pass `--data-format {turtle,json-ld,auto}` to override. Example:
+
+```bash
+# Validate JSON-LD output from yarrrml-gen --run
+uv run rosetta-validate \
+  --data out.jsonld \
+  --shapes-dir rosetta/policies/shacl/ \
+  -o validation.json
+
+# Force JSON-LD parser on a non-standard suffix
+uv run rosetta-validate \
+  --data data.txt \
+  --data-format json-ld \
+  --shapes my-shapes.ttl
+```
+
 ## Exit codes
 
 - `0` — RDF conforms to the shapes.

@@ -220,3 +220,106 @@ def test_validate_finding_message_none(tmp_files: dict[str, Path]) -> None:
     # Violation must be present (not dropped by OPTIONAL sh:resultMessage binding)
     finding = report["findings"][0]
     assert "message" in finding  # field exists; may be str or None per model
+
+
+# ---------------------------------------------------------------------------
+# Plan 19-03 Task 4 — JSON-LD input + --data-format wiring tests
+# ---------------------------------------------------------------------------
+
+# Conformant data expressed as JSON-LD (matches the ex:PersonShape constraint:
+# ex:Person with ex:age xsd:integer, minCount 1).
+_CONFORMANT_JSONLD = """\
+{
+  "@context": {
+    "ex": "http://example.org/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#"
+  },
+  "@id": "ex:alice",
+  "@type": "ex:Person",
+  "ex:age": {"@value": "30", "@type": "xsd:integer"}
+}
+"""
+
+
+def test_validate_jsonld_input_autodetect(tmp_files: dict[str, Path], tmp_path: Path) -> None:
+    """`.jsonld` suffix triggers JSON-LD parsing under default --data-format=auto."""
+    data = tmp_path / "person.jsonld"
+    data.write_text(_CONFORMANT_JSONLD, encoding="utf-8")
+    out = tmp_path / "report.json"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"unexpected exit; stderr/output={result.output!r}"
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["summary"]["conforms"] is True
+
+
+def test_validate_json_input_autodetect(tmp_files: dict[str, Path], tmp_path: Path) -> None:
+    """`.json` suffix is treated as JSON-LD by the auto-resolver."""
+    data = tmp_path / "person.json"
+    data.write_text(_CONFORMANT_JSONLD, encoding="utf-8")
+    out = tmp_path / "report.json"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"unexpected exit; stderr/output={result.output!r}"
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["summary"]["conforms"] is True
+
+
+def test_validate_data_format_override(tmp_files: dict[str, Path], tmp_path: Path) -> None:
+    """`--data-format json-ld` forces JSON-LD parsing despite a non-matching suffix."""
+    data = tmp_path / "person.txt"
+    data.write_text(_CONFORMANT_JSONLD, encoding="utf-8")
+    out = tmp_path / "report.json"
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(data),
+            "--data-format",
+            "json-ld",
+            "--shapes",
+            str(tmp_files["shapes"]),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"unexpected exit; stderr/output={result.output!r}"
+
+
+def test_validate_data_format_unknown_raises(tmp_files: dict[str, Path]) -> None:
+    """Click's `Choice` rejects unknown formats with usage-error exit code 2."""
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--data",
+            str(tmp_files["conformant"]),
+            "--data-format",
+            "xml",
+            "--shapes",
+            str(tmp_files["shapes"]),
+        ],
+    )
+    assert result.exit_code == 2, (
+        f"expected Click Choice-violation exit 2; got {result.exit_code}: {result.output!r}"
+    )

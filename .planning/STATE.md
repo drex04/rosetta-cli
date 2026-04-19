@@ -2,22 +2,22 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: SHACL validation refactor
-status: in_progress
+status: complete
 last_updated: "2026-04-18T19:45:00.000Z"
 progress:
   total_phases: 19
-  completed_phases: 18
+  completed_phases: 19
   total_plans: 27
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 19 (SHACL validation refactor) — Plans 19-01 + 19-02 complete; 19-03 next
-- **Plan:** 19-03 (`--validate` wiring + JSON-LD input) — ready to build
-- **Status:** Plans 19-01 + 19-02 shipped 2026-04-19. 449/449 tests pass (+17 new across both plans). New module `rosetta/core/shapes_loader.py` provides symlink-safe + non-shape-warned shapes-dir walker (shared by future 19-03 wiring). Legacy `mapping.shacl.ttl` retired; `test_validate.py` migrated to inline `_SHAPES_TTL`. Override workflow live with worked example.
+- **Phase:** 19 (SHACL validation refactor) — **complete**
+- **Plan:** 19-03 (`--validate` wiring + JSON-LD input) — complete
+- **Status:** All 3 plans shipped 2026-04-19. 457/457 fast tests pass (+28 new across the phase). v2 SHACL pipeline live end-to-end: auto-generate shapes from master LinkML, hand-edit overrides in `policies/shacl/overrides/`, validate JSON-LD output of `rosetta-validate`, OR validate in-memory graph inline via `rosetta-yarrrml-gen --run --validate`. All deferred-risk failure modes hardened in-plan (no follow-ups outstanding).
 
 ## Phase Progress
 
@@ -41,7 +41,7 @@ progress:
 | 16 | rml-gen v2 (SSSOM → YARRRML → JSON-LD) | Complete |
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
 | 18 | Integration & E2E Test Hardening | Complete |
-| 19 | SHACL validation refactor | In Progress |
+| 19 | SHACL validation refactor | Complete |
 
 ## Phase 1 Completion
 
@@ -227,7 +227,25 @@ Additionally, `conftest.py` now preloads rdflib's SPARQL parser grammar so schem
 
 ## Next Action
 
-Plan 19-02 complete. Next: `/fh:build 19-03` (`--validate` flag on `rosetta-yarrrml-gen`, JSON-LD input for `rosetta-validate`, shared `shacl_validate.py` helper, stdout-collision guard).
+Phase 19 complete. Next milestone item per `.planning/ROADMAP.md` (or new feature work).
+
+## Phase 19 Plan 19-03 Completion
+
+- **Plan:** `.planning/phases/19-shacl-validation/19-03-PLAN.md`
+- **Tests:** 457/457 fast passing (+11 new: 4 `test_validate` JSON-LD + 2 integration + 5 adversarial)
+- **Completed:** 2026-04-19
+- **Key changes:**
+  - New `rosetta/core/shacl_validate.py` — shared `validate_graph(data, shapes, *, inference)` helper used by both `rosetta-validate` and `rosetta-yarrrml-gen --validate` (single pyshacl invocation site, no drift)
+  - `rosetta/cli/validate.py` refactored — calls shared helper; new `--data-format {turtle,json-ld,auto}` flag with suffix autodetection (`.ttl` → turtle; `.jsonld`/`.json`/`.json-ld` → json-ld)
+  - `rosetta/cli/yarrrml_gen.py` extended with `--validate`, `--shapes-dir`, `--validate-report` flags. Validates the in-memory `rdflib.Graph` from `run_materialize` BEFORE `graph_to_jsonld`; on violation blocks emission, writes report to stderr or `--validate-report` path, exits 1. Step-0 collision guard rejects all 3 pairwise `-`-on-stdout combinations.
+  - Fix-on-sight: Phase-18 `test_yarrrml_gen_stdout_and_file_collision` updated for unified `UsageError` (exit 2); `pytest.mark.adversarial` declared in pyproject.
+
+## Phase 19 Summary
+
+- **Tests added:** 11 (T0/T4) + 6 (T4) + 11 (T4) = ~28 new tests across all three plans. Total fast suite: 431 → 457 (+26 net; some overlap from refactors).
+- **New modules:** `rosetta/core/shacl_generator.py`, `rosetta/core/shapes_loader.py`, `rosetta/core/shacl_validate.py`, `rosetta/cli/shacl_gen.py`. New CLI tool: `rosetta-shacl-gen`.
+- **Retirements:** `rosetta/policies/mapping.shacl.ttl` (v1 vocab) deleted.
+- **Quality:** 0 basedpyright errors in any Phase 19 file. All 9 mandatory checks clean throughout. 6 fix-on-sight items closed in the same commits.
 
 ## Phase 19 Plan 19-02 Completion
 
