@@ -160,13 +160,16 @@ confirm "Done editing? (yes to continue, skip to proceed without edits)" \
 info "Step 5 — Lint SSSOM proposals"
 
 while true; do
-    if run_cmd uv run rosetta-lint --sssom "$OUT/candidates.sssom.tsv"; then
+    if run_cmd uv run rosetta-lint --sssom "$OUT/candidates.sssom.tsv" \
+        --source-schema "$OUT/nor_radar_en.linkml.yaml" \
+        --master-schema "$OUT/master_cop_en.linkml.yaml"; then
         ok "Lint passed — no errors."
         break
     fi
 
     box "LINT ERRORS — Fix $OUT/candidates.sssom.tsv then re-run" \
         "Common fixes:" \
+        "  slot_class_unreachable    Map the source class to the correct target class (one that owns the slot)" \
         "  MaxOneMmcPerPair          Remove duplicate ManualMappingCuration rows for the same pair" \
         "  NoHumanCurationReproposal Pair already has a final decision — remove the row" \
         "  ValidPredicate            Use a recognised skos: or owl: predicate"
