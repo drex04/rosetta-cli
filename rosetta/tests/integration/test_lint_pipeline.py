@@ -14,27 +14,46 @@ from rosetta.core.models import LintReport
 pytestmark = [pytest.mark.integration]
 
 _MMC = "semapv:ManualMappingCuration"
-_SSSOM_HEADER = "# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n"
-_SSSOM_COLS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
 
 
-def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
-    with path.open("w") as f:
-        f.write(_SSSOM_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLS, delimiter="\t", extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
+def _cell(row: object, col: str) -> str:
+    if col == "confidence":
+        return str(getattr(row, col))
+    if col == "mapping_date":
+        d = getattr(row, col, None)
+        return d.isoformat() if d else ""
+    val = getattr(row, col, None)
+    return "" if val is None else str(val)
+
+
+def _write_sssom(path: Path, rows: list[dict[str, object]]) -> None:
+    """Write SSSOM TSV using real SSSOMRow models for format consistency."""
+    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
+    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+    from rosetta.core.models import SSSOMRow
+
+    built: list[SSSOMRow] = []
+    for r in rows:
+        defaults: dict[str, object] = {
+            "predicate_id": "skos:exactMatch",
+            "mapping_justification": _MMC,
+            "confidence": 0.9,
+            "subject_label": "",
+            "object_label": "",
+            "subject_type": None,
+            "object_type": None,
+            "mapping_group_id": None,
+            "composition_expr": None,
+        }
+        defaults.update(r)
+        built.append(SSSOMRow(**defaults))  # pyright: ignore[reportArgumentType]
+
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(_HEADER)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        writer.writerow(AUDIT_LOG_COLUMNS)
+        for row in built:
+            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
 
 
 def _no_accredit_toml(tmp_path: Path) -> Path:

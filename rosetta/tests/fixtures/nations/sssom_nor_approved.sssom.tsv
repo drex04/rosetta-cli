@@ -12,7 +12,7 @@ subject_id	predicate_id	object_id	mapping_justification	confidence	subject_label
 nor_radar:Observation	skos:exactMatch	mc:Track	semapv:HumanCuration	0.9		Track	2026-04-16	r001				
 nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r002				
 nor_radar:lengdegrad	skos:exactMatch	mc:hasLongitude	semapv:HumanCuration	0.9		hasLongitude	2026-04-16	r003				
-nor_radar:hoyde_m	skos:exactMatch	mc:hasAltitudeFt	semapv:HumanCuration	0.9		hasAltitudeFt	2026-04-16	r004
+nor_radar:hoyde_m	skos:exactMatch	mc:hasAltitudeFt	semapv:HumanCuration	0.9		hasAltitudeFt	2026-04-16	r004				
 nor_radar:hastighet_kmh	skos:exactMatch	mc:hasSpeed	semapv:HumanCuration	0.9		hasSpeed	2026-04-16	r005				
 nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006a	composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]
 nor_radar:lengdegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006b	composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]

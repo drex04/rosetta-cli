@@ -135,7 +135,7 @@ def test_embed_linkml_base() -> None:
     results = extract_text_inputs_linkml(schema)
     assert len(results) == 1
     node_id, label, text = results[0]
-    assert node_id == "test_schema/speed"
+    assert node_id == "test_schema:speed"
     assert label == "Speed"
     assert text == "Speed"
 
@@ -177,7 +177,7 @@ def test_embed_linkml_ancestors() -> None:
         }
     )
     results = extract_text_inputs_linkml(schema, include_ancestors=True)
-    child_result = next(r for r in results if "/child" in r[0])
+    child_result = next(r for r in results if ":child" in r[0])
     assert "Parent" in child_result[2]
     assert "Grandparent" in child_result[2]
 
@@ -193,7 +193,7 @@ def test_embed_linkml_children() -> None:
         }
     )
     results = extract_text_inputs_linkml(schema, include_children=True)
-    parent_result = next(r for r in results if "/vehicle" in r[0])
+    parent_result = next(r for r in results if ":vehicle" in r[0])
     assert "Car" in parent_result[2]
 
 
@@ -211,7 +211,7 @@ def test_embed_linkml_ancestors_supersedes_parents() -> None:
     results_ancestors = extract_text_inputs_linkml(
         schema, include_ancestors=True, include_parents=True
     )
-    child_result = next(r for r in results_ancestors if "/c" in r[0])
+    child_result = next(r for r in results_ancestors if ":c" in r[0])
     # Both Grandparent and Parent should appear (ancestors is strict superset)
     assert "Grandparent" in child_result[2]
     assert "Parent" in child_result[2]
@@ -229,7 +229,7 @@ def test_embed_linkml_children_and_ancestors() -> None:
         }
     )
     results = extract_text_inputs_linkml(schema, include_ancestors=True, include_children=True)
-    mid_result = next(r for r in results if "/mid" in r[0])
+    mid_result = next(r for r in results if ":mid" in r[0])
     assert "Root" in mid_result[2]  # ancestor
     assert "Leaf" in mid_result[2]  # child
 

@@ -54,12 +54,12 @@ def test_structural_features_classes_and_slots() -> None:
     assert len(result) == 5
 
     for cls_name in ("ClassA", "ClassB"):
-        node_id = f"test_schema/{cls_name}"
+        node_id = f"test_schema:{cls_name}"
         assert node_id in result
         assert result[node_id][0] == 1.0, f"{node_id} f0 should be 1.0 (is_class)"
 
     for slot_name in ("slot1", "slot2", "slot3"):
-        node_id = f"test_schema/{slot_name}"
+        node_id = f"test_schema:{slot_name}"
         assert node_id in result
         assert result[node_id][0] == 0.0, f"{node_id} f0 should be 0.0 (is_slot)"
 
@@ -79,9 +79,9 @@ def test_structural_features_hierarchy_depth() -> None:
 
     assert len(result) == 3
     # max depth = 2; A=0→0.0, B=1→0.5, C=2→1.0
-    assert result["test_schema/A"][1] == pytest.approx(0.0)
-    assert result["test_schema/B"][1] == pytest.approx(0.5)
-    assert result["test_schema/C"][1] == pytest.approx(1.0)
+    assert result["test_schema:A"][1] == pytest.approx(0.0)
+    assert result["test_schema:B"][1] == pytest.approx(0.5)
+    assert result["test_schema:C"][1] == pytest.approx(1.0)
 
 
 def test_structural_features_required_multivalued() -> None:
@@ -93,7 +93,7 @@ def test_structural_features_required_multivalued() -> None:
     )
     result = extract_structural_features_linkml(schema)
 
-    node_id = "test_schema/my_slot"
+    node_id = "test_schema:my_slot"
     assert node_id in result
     assert result[node_id][2] == pytest.approx(1.0), "f2 should be 1.0 (required)"
     assert result[node_id][3] == pytest.approx(1.0), "f3 should be 1.0 (multivalued)"
@@ -114,7 +114,7 @@ def test_structural_features_slot_usage_count() -> None:
     )
     result = extract_structural_features_linkml(schema)
 
-    node_id = "test_schema/my_slot"
+    node_id = "test_schema:my_slot"
     assert node_id in result
     assert result[node_id][4] == pytest.approx(0.5), "f4 should be 2/4 = 0.5"
 

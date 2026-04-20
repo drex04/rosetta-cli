@@ -128,37 +128,42 @@ def test_full_chain_json_to_lint(
 # ---------------------------------------------------------------------------
 
 
-_YG_SSSOM_HEADER = (
-    "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
-    "# mapping_set_id: http://rosetta.interop/full-chain-test\n"
-    "# curie_map:\n"
-    "#   semapv: https://w3id.org/semapv/vocab/\n"
-    "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-    "#   owl: http://www.w3.org/2002/07/owl#\n"
-)
-
-_YG_SSSOM_COLUMNS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
+def _cell(row: Any, col: str) -> str:
+    if col == "confidence":
+        return str(row.confidence)
+    if col == "mapping_date":
+        return row.mapping_date.isoformat() if row.mapping_date else ""
+    val = getattr(row, col, None)
+    return "" if val is None else str(val)
 
 
-def _write_sssom_approved(path: Path, rows: list[dict[str, str]]) -> Path:
-    with path.open("w", encoding="utf-8") as f:
-        f.write(_YG_SSSOM_HEADER)
-        writer = csv.DictWriter(
-            f, fieldnames=_YG_SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore"
-        )
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({c: r.get(c, "") for c in _YG_SSSOM_COLUMNS})
+def _write_sssom_approved(path: Path, rows: list[dict[str, object]]) -> Path:
+    """Write SSSOM TSV using real SSSOMRow models for format consistency."""
+    from rosetta.core.accredit import AUDIT_LOG_COLUMNS, SSSOM_HEADER
+    from rosetta.core.models import SSSOMRow
+
+    built: list[SSSOMRow] = []
+    for r in rows:
+        defaults: dict[str, object] = {
+            "predicate_id": "skos:exactMatch",
+            "mapping_justification": "semapv:HumanCuration",
+            "confidence": 1.0,
+            "subject_label": "",
+            "object_label": "",
+            "subject_type": None,
+            "object_type": None,
+            "mapping_group_id": None,
+            "composition_expr": None,
+        }
+        defaults.update(r)
+        built.append(SSSOMRow(**defaults))  # pyright: ignore[reportArgumentType]
+
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(SSSOM_HEADER)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        writer.writerow(AUDIT_LOG_COLUMNS)
+        for row in built:
+            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
     return path
 
 

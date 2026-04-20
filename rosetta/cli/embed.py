@@ -96,7 +96,7 @@ def cli(
         schema_name: str = schema.name or "schema"
         slots = _cast("dict[str, Any]", schema.slots)
         datatype_map: dict[str, str | None] = {
-            f"{schema_name}/{name}": (str(slot.range) if slot.range else None)  # pyright: ignore[reportUnknownMemberType]
+            f"{schema_name}:{name}": (str(slot.range) if slot.range else None)  # pyright: ignore[reportUnknownMemberType]
             for name, slot in slots.items()
         }
 

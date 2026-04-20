@@ -17,41 +17,52 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.accredit import cli as accredit_cli
-from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, load_log
+from rosetta.core.accredit import (
+    AUDIT_LOG_COLUMNS,
+    HC_JUSTIFICATION,
+    MMC_JUSTIFICATION,
+    SSSOM_HEADER,
+    load_log,
+)
+from rosetta.core.models import SSSOMRow
 
 pytestmark = [pytest.mark.integration]
 
 
-_SSSOM_COLUMNS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
-
-_SSSOM_FILE_HEADER = (
-    "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
-    "# mapping_set_id: http://rosetta.interop/test-ingest\n"
-    "# curie_map:\n"
-    "#   semapv: https://w3id.org/semapv/vocab/\n"
-    "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-    "#   owl: http://www.w3.org/2002/07/owl#\n"
-)
+def _build_row(overrides: dict[str, object]) -> SSSOMRow:
+    defaults: dict[str, object] = {
+        "predicate_id": "skos:exactMatch",
+        "mapping_justification": MMC_JUSTIFICATION,
+        "confidence": 0.9,
+        "subject_label": "",
+        "object_label": "",
+        "subject_type": None,
+        "object_type": None,
+        "mapping_group_id": None,
+        "composition_expr": None,
+    }
+    defaults.update(overrides)
+    return SSSOMRow(**defaults)  # pyright: ignore[reportArgumentType]
 
 
-def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
+def _cell(row: SSSOMRow, col: str) -> str:
+    if col == "confidence":
+        return str(row.confidence)
+    if col == "mapping_date":
+        return row.mapping_date.isoformat() if row.mapping_date else ""
+    val = getattr(row, col, None)
+    return "" if val is None else str(val)
+
+
+def _write_sssom(tmp_path: Path, rows: list[dict[str, object]], name: str) -> Path:
+    built = [_build_row(r) for r in rows]
     path = tmp_path / name
-    with path.open("w", encoding="utf-8") as f:
-        f.write(_SSSOM_FILE_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore")
-        writer.writeheader()
-        for r in rows:
-            writer.writerow({c: r.get(c, "") for c in _SSSOM_COLUMNS})
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(SSSOM_HEADER)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        writer.writerow(AUDIT_LOG_COLUMNS)
+        for row in built:
+            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
     return path
 
 
