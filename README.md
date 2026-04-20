@@ -298,7 +298,8 @@ Options:
 | `unit_not_detected` | INFO | No recognizable unit in field name, or unit has no QUDT IRI mapping |
 | `unit_vector_missing` | INFO | QUDT dimension vector missing for a recognized unit |
 | `datatype_mismatch` | WARNING | Subject/object differ in numeric vs string datatype |
-| `max_one_mmc_per_pair` | BLOCK | More than one ManualMappingCuration row for the same pair |
+| `max_one_mmc_per_pair` | BLOCK | More than one ManualMappingCuration row for the same (subject, object) pair |
+| `max_one_mmc_per_subject` | BLOCK | Same subject has multiple confirmed mappings to different objects |
 | `reproposal_of_approved` | BLOCK | Pair already has an approved HumanCuration decision in the audit log |
 | `reproposal_of_rejected` | BLOCK | Pair already has a rejected HumanCuration decision in the audit log |
 | `invalid_predicate` | BLOCK | Predicate is not one of the allowed SKOS/OWL predicates |
@@ -387,6 +388,7 @@ rosetta-suggest → candidates.sssom.tsv
 | Rule                                                                                            | Enforced by                                        |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Max 1 `ManualMappingCuration` per (subject_id, object_id)                                       | `rosetta-lint --sssom`                             |
+| Max 1 confirmed mapping per subject (no subject maps to multiple targets)                       | `rosetta-lint --sssom`                             |
 | Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected)             | `rosetta-accredit ingest` + `rosetta-lint --sssom` |
 | `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists            | `rosetta-accredit ingest`                          |
 | Once rejected, only the Accreditor can un-reject (by ingesting a corrected `HumanCuration` row) | Workflow convention                                |

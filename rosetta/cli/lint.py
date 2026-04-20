@@ -70,7 +70,26 @@ def check_sssom_proposals(
                 )
             )
 
-    # 2. NoHumanCurationReproposal
+    # 2. MaxOneMmcPerSubject
+    subject_counts: dict[str, list[str]] = {}
+    for r in mmc_rows:
+        subject_counts.setdefault(r.subject_id, []).append(r.object_id)
+    for subject_id, objects in subject_counts.items():
+        if len(objects) > 1:
+            findings.append(
+                LintFinding(
+                    rule="max_one_mmc_per_subject",
+                    severity="BLOCK",
+                    source_uri=subject_id,
+                    target_uri=objects[0],
+                    message=(
+                        f"MaxOneMmcPerSubject: {subject_id} has {len(objects)} confirmed "
+                        f"mappings ({', '.join(objects)}); only one is allowed"
+                    ),
+                )
+            )
+
+    # 3. NoHumanCurationReproposal
     if log:
         approved_pairs: set[tuple[str, str]] = set()
         rejected_pairs: set[tuple[str, str]] = set()
@@ -105,7 +124,7 @@ def check_sssom_proposals(
                     )
                 )
 
-    # 3. ValidPredicate
+    # 4. ValidPredicate
     for r in mmc_rows:
         if r.predicate_id not in _VALID_PREDICATES:
             findings.append(

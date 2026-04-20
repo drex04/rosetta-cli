@@ -170,6 +170,39 @@ def test_lint_sssom_max_one_mmc_per_pair_fails(tmp_path: Path) -> None:
     assert result.exit_code == 1
 
 
+def test_lint_sssom_max_one_mmc_per_subject_fails(tmp_path: Path) -> None:
+    """Same subject confirmed-mapped to two different objects → BLOCK."""
+    sssom = tmp_path / "dup_subject.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "c",
+                "mapping_justification": _MMC,
+                "confidence": "0.8",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    subject_findings = [f for f in data["findings"] if f["rule"] == "max_one_mmc_per_subject"]
+    assert len(subject_findings) == 1
+    assert "a" in subject_findings[0]["message"]
+    assert "b" in subject_findings[0]["message"]
+    assert "c" in subject_findings[0]["message"]
+
+
 def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow

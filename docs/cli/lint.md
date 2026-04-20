@@ -20,7 +20,8 @@ Validates analyst-proposed SSSOM TSV files *before* they are staged for accredit
 | `unit_not_detected` | INFO | No recognisable unit in field name, or unit has no QUDT IRI mapping |
 | `unit_vector_missing` | INFO | QUDT dimension vector missing for a recognised unit |
 | `datatype_mismatch` | WARNING | Subject and object differ in numeric vs string datatype |
-| `max_one_mmc_per_pair` | **BLOCK** | More than one `ManualMappingCuration` row for the same pair |
+| `max_one_mmc_per_pair` | **BLOCK** | More than one `ManualMappingCuration` row for the same (subject, object) pair |
+| `max_one_mmc_per_subject` | **BLOCK** | Same subject has multiple confirmed mappings to different objects |
 | `reproposal_of_approved` | **BLOCK** | Pair already has an approved `HumanCuration` in the audit log |
 | `reproposal_of_rejected` | **BLOCK** | Pair already has a rejected `HumanCuration` in the audit log |
 | `invalid_predicate` | **BLOCK** | Predicate is not one of the allowed SKOS/OWL predicates |
