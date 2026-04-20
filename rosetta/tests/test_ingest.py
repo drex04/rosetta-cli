@@ -288,6 +288,29 @@ def test_ingest_stamps_rosetta_csv_column_per_slot(tmp_path: Path) -> None:
         )
 
 
+def test_ingest_rdfs_normalizes_xsd_datetime_to_linkml(tmp_path: Path) -> None:
+    """OWL ontology with xsd:dateTime range → LinkML 'datetime' (lowercase)."""
+    runner = CliRunner()
+    out = tmp_path / "master.linkml.yaml"
+    result = runner.invoke(
+        cli,
+        [
+            "--input",
+            str(FIXTURES / "master_cop_ontology.ttl"),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    data = yaml.safe_load(out.read_text())
+    slots: dict[str, object] = data.get("slots") or {}
+    timestamp_slot = slots.get("hasTimestamp")
+    assert isinstance(timestamp_slot, dict), "Expected hasTimestamp slot"
+    assert timestamp_slot.get("range") == "datetime", (
+        f"Expected 'datetime' (lowercase), got: {timestamp_slot.get('range')!r}"
+    )
+
+
 def test_ingest_rdfs_ingest_does_not_stamp_source_format(tmp_path: Path) -> None:
     """RDFS-sourced schemas (master ontologies) have no rosetta_source_format annotation."""
     ttl_file = tmp_path / "test.ttl"

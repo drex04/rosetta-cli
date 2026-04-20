@@ -286,6 +286,33 @@ def stamp_slot_paths(schema_def: SchemaDefinition, fmt: str) -> None:
         slot.annotations = annotations  # pyright: ignore[reportAttributeAccessIssue]
 
 
+_XSD_TO_LINKML: dict[str, str] = {
+    "dateTime": "datetime",
+    "dateTimeStamp": "datetime",
+    "anyURI": "uri",
+    "int": "integer",
+    "long": "integer",
+    "short": "integer",
+    "byte": "integer",
+    "nonNegativeInteger": "integer",
+    "positiveInteger": "integer",
+    "nonPositiveInteger": "integer",
+    "negativeInteger": "integer",
+    "unsignedInt": "integer",
+    "unsignedLong": "integer",
+    "unsignedShort": "integer",
+    "unsignedByte": "integer",
+}
+
+
+def _normalize_xsd_ranges(schema: SchemaDefinition) -> None:
+    """Rewrite XSD datatype names to LinkML built-in type names on all slots."""
+    slots = schema.slots  # pyright: ignore[reportAttributeAccessIssue]
+    for slot in slots.values():  # pyright: ignore[reportAttributeAccessIssue,reportOptionalMemberAccess]
+        if slot.range and slot.range in _XSD_TO_LINKML:  # pyright: ignore[reportAttributeAccessIssue]
+            slot.range = _XSD_TO_LINKML[slot.range]  # pyright: ignore[reportAttributeAccessIssue]
+
+
 def normalize_schema(
     input_path: Path,
     fmt: str | None = None,
@@ -313,6 +340,8 @@ def normalize_schema(
     _saved_whitespace: str = _pp.ParserElement.DEFAULT_WHITE_CHARS
     schema: SchemaDefinition = _dispatch_import(resolved_fmt, input_path, name)
     _pp.ParserElement.set_default_whitespace_chars(_saved_whitespace)
+
+    _normalize_xsd_ranges(schema)
 
     # Post-assign schema name uniformly (XsdImportEngine lacks a name param)
     if name:
