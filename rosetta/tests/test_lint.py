@@ -715,3 +715,180 @@ def test_lint_sssom_mixed_composite_and_mmc_only_lints_mmc(tmp_path: Path) -> No
     assert any(f["source_uri"] == "ex:altitude_ft" for f in data["findings"]), (
         "MMC row should still be linted"
     )
+
+
+# ---------------------------------------------------------------------------
+# Structural reachability check (--source-schema + --master-schema)
+# ---------------------------------------------------------------------------
+
+_MASTER_SCHEMA_YAML = """\
+name: master
+id: https://example.org/master
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+default_range: string
+slots:
+  hasLongitude:
+    name: hasLongitude
+    range: double
+  hasTrackNumber:
+    name: hasTrackNumber
+    range: string
+classes:
+  Entity:
+    name: Entity
+    slots:
+    - hasLongitude
+  Track:
+    name: Track
+    is_a: Entity
+    slots:
+    - hasTrackNumber
+  SensorReport:
+    name: SensorReport
+"""
+
+_SOURCE_SCHEMA_YAML = """\
+name: source
+id: https://example.org/source
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+default_range: string
+slots:
+  longitude:
+    name: longitude
+    range: double
+classes:
+  Observation:
+    name: Observation
+    slots:
+    - longitude
+"""
+
+
+def test_lint_structural_block(tmp_path: Path) -> None:
+    """Slot on Entity, class mapped to SensorReport (unreachable) → BLOCK."""
+    src = tmp_path / "source.yaml"
+    src.write_text(_SOURCE_SCHEMA_YAML)
+    mst = tmp_path / "master.yaml"
+    mst.write_text(_MASTER_SCHEMA_YAML)
+    sssom = tmp_path / "mappings.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "source:Observation",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "master:SensorReport",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "source:longitude",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "master:hasLongitude",
+                "mapping_justification": _MMC,
+                "confidence": "0.85",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--sssom",
+            str(sssom),
+            "--config",
+            str(config),
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+        ],
+    )
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    structural = [f for f in data["findings"] if f["rule"] == "slot_class_unreachable"]
+    assert len(structural) == 1
+    assert structural[0]["severity"] == "BLOCK"
+    assert "Entity" in structural[0]["message"]
+    assert "SensorReport" in structural[0]["message"]
+
+
+def test_lint_structural_pass(tmp_path: Path) -> None:
+    """Slot on Entity, class mapped to Track (extends Entity) → no structural finding."""
+    src = tmp_path / "source.yaml"
+    src.write_text(_SOURCE_SCHEMA_YAML)
+    mst = tmp_path / "master.yaml"
+    mst.write_text(_MASTER_SCHEMA_YAML)
+    sssom = tmp_path / "mappings.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "source:Observation",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "master:Track",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "source:longitude",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "master:hasLongitude",
+                "mapping_justification": _MMC,
+                "confidence": "0.85",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--sssom",
+            str(sssom),
+            "--config",
+            str(config),
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+        ],
+    )
+    data = json.loads(result.output)
+    structural = [f for f in data["findings"] if f["rule"] == "slot_class_unreachable"]
+    assert not structural
+
+
+def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
+    """Only --source-schema without --master-schema → error exit."""
+    src = tmp_path / "source.yaml"
+    src.write_text(_SOURCE_SCHEMA_YAML)
+    sssom = tmp_path / "mappings.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        ["--sssom", str(sssom), "--config", str(config), "--source-schema", str(src)],
+    )
+    assert result.exit_code == 1
+    assert "must be provided together" in result.output

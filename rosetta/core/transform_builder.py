@@ -18,6 +18,11 @@ from linkml_runtime.utils.schemaview import SchemaView
 
 from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION
 from rosetta.core.models import CoverageReport, SSSOMRow
+from rosetta.core.schema_utils import (
+    build_slot_owner_index,
+    local_name,
+    nearest_mapped_ancestor,
+)
 from rosetta.core.unit_detect import detect_unit
 
 # Linear unit-conversion pairs supported by the forked YarrrmlCompiler's
@@ -121,44 +126,12 @@ class _ClassifyContext:
     mst_slot_owners: dict[str, str]
 
 
-def _build_slot_owner_index(view: SchemaView) -> dict[str, str]:
-    """Build a slot_name → owning_class index once per SchemaView.
-
-    Uses the class's *direct* slot declarations (cls.slots) so that inherited
-    slots are attributed to the class that defines them, not subclasses.
-    Falls back to induced slots for any slot not covered by direct declarations
-    (e.g. schemas that only use slot_usage without direct class-level slots).
-    """
-    index: dict[str, str] = {}
-    # Pass 1: direct slot declarations — "defining class" wins
-    for class_name in view.all_classes():  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        cls = view.get_class(class_name)  # pyright: ignore[reportUnknownMemberType]
-        for slot_name in list(getattr(cls, "slots", []) or []):
-            index.setdefault(str(slot_name), str(class_name))
-    # Pass 2: induced slots fill any gaps (slot_usage-only patterns)
-    for class_name in view.all_classes():  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        for slot in view.class_induced_slots(class_name):  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            slot_key = str(slot.name)  # pyright: ignore[reportUnknownMemberType]
-            index.setdefault(slot_key, str(class_name))
-    return index
-
-
 def _owning_class(index: dict[str, str], slot_name: str, schema_name: str) -> str:
     """Lookup in the pre-built index; raise if missing."""
     owner = index.get(slot_name)
     if owner is None:
         raise ValueError(f"slot {slot_name!r} has no owning class in schema {schema_name!r}")
     return owner
-
-
-def _local_name(curie: str) -> str:
-    """Strip the prefix from a CURIE, returning the local name.
-
-    SchemaView.get_class / get_slot match on the element *name*, not on the
-    CURIE — so "nor_radar:Observation" must be resolved to "Observation" before
-    the lookup.  Falls back to the full string if no ':' is present.
-    """
-    return curie.split(":", 1)[-1] if ":" in curie else curie
 
 
 def _build_slot_mapping(
@@ -184,8 +157,8 @@ def classify_row(row: SSSOMRow, ctx: _ClassifyContext) -> _Classification:
     """Resolve subject in source schema, object in master schema.
     Mixed-kind (slot↔class) is signalled via _Unresolved(side="mixed"); caller raises.
     """
-    subj_name = _local_name(row.subject_id)
-    obj_name = _local_name(row.object_id)
+    subj_name = local_name(row.subject_id)
+    obj_name = local_name(row.object_id)
     src_class = ctx.src_view.get_class(subj_name, strict=False)  # pyright: ignore[reportUnknownMemberType]
     src_slot = ctx.src_view.get_slot(subj_name, strict=False)  # pyright: ignore[reportUnknownMemberType]
     mst_class = ctx.master_view.get_class(obj_name, strict=False)  # pyright: ignore[reportUnknownMemberType]
@@ -382,7 +355,7 @@ def _resolve_composite_groups(
     out: list[tuple[str, SlotDerivation]] = []
     for gid, members in groups.items():
         sd_tentative = build_composite_slot_derivation(gid, members)  # raises on inconsistency
-        target_slot_obj = master_view.get_slot(_local_name(sd_tentative.name), strict=False)
+        target_slot_obj = master_view.get_slot(local_name(sd_tentative.name), strict=False)
         if not target_slot_obj:
             coverage.composite_groups.append(
                 {
@@ -478,55 +451,6 @@ def _populate_required_slot_coverage(
             coverage.unmapped_required_master_slots.append(f"{target_class}.{missing}")
 
 
-def _ancestors(class_name: str, view: SchemaView) -> set[str]:
-    """Return the set of all ancestors (is_a chain) of class_name, including itself."""
-    result: set[str] = set()
-    current: str | None = class_name
-    while current is not None:
-        result.add(current)
-        cls = view.get_class(current, strict=False)  # pyright: ignore[reportUnknownMemberType]
-        if cls is None:
-            break
-        parent = getattr(cls, "is_a", None)
-        current = str(parent) if parent else None
-    return result
-
-
-def _nearest_mapped_ancestor(
-    class_name: str,
-    mapped_classes: set[str],
-    view: SchemaView,
-) -> str | None:
-    """Find the best mapped class for a slot owner.
-
-    Two cases:
-    1. class_name is in mapped_classes — return it directly.
-    2. class_name is an *ancestor* of one or more mapped classes (i.e., the slot
-       is defined on a superclass but the mapping targets a subclass) — return
-       the first mapped class whose ancestor set includes class_name.
-    3. Walk up is_a from class_name to find a mapped ancestor.
-    Returns None if no relationship is found.
-    """
-    # Case 1: direct match
-    if class_name in mapped_classes:
-        return class_name
-    # Case 2: class_name is a superclass of some mapped class
-    for mc in mapped_classes:
-        if class_name in _ancestors(mc, view):
-            return mc
-    # Case 3: walk up from class_name
-    current: str | None = class_name
-    while current is not None:
-        if current in mapped_classes:
-            return current
-        cls = view.get_class(current, strict=False)  # pyright: ignore[reportUnknownMemberType]
-        if cls is None:
-            break
-        parent = getattr(cls, "is_a", None)
-        current = str(parent) if parent else None
-    return None
-
-
 def _remap_to_mapped_classes(
     slot_mappings: list[_SlotMapping],
     composite_derivations: list[tuple[str, SlotDerivation]],
@@ -542,7 +466,7 @@ def _remap_to_mapped_classes(
     """
     remapped_slots: list[_SlotMapping] = []
     for sm in slot_mappings:
-        nearest = _nearest_mapped_ancestor(sm.target_owning_class, mapped_classes, master_view)
+        nearest = nearest_mapped_ancestor(sm.target_owning_class, mapped_classes, master_view)
         if nearest is not None and nearest != sm.target_owning_class:
             sm = _SlotMapping(
                 source_slot_name=sm.source_slot_name,
@@ -557,7 +481,7 @@ def _remap_to_mapped_classes(
 
     remapped_composites: list[tuple[str, SlotDerivation]] = []
     for owner, sd in composite_derivations:
-        nearest = _nearest_mapped_ancestor(owner, mapped_classes, master_view)
+        nearest = nearest_mapped_ancestor(owner, mapped_classes, master_view)
         remapped_composites.append((nearest if nearest is not None else owner, sd))
 
     return remapped_slots, remapped_composites
@@ -713,8 +637,8 @@ def build_spec(
     ctx = _ClassifyContext(
         src_view=src_view,
         master_view=master_view,
-        src_slot_owners=_build_slot_owner_index(src_view),
-        mst_slot_owners=_build_slot_owner_index(master_view),
+        src_slot_owners=build_slot_owner_index(src_view),
+        mst_slot_owners=build_slot_owner_index(master_view),
     )
 
     coverage = CoverageReport(

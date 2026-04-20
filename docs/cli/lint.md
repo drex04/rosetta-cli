@@ -14,6 +14,7 @@ Validates analyst-proposed SSSOM TSV files *before* they are staged for accredit
 
 | Rule | Severity | Description |
 |------|----------|-------------|
+| `slot_class_unreachable` | **BLOCK** | Slot's owning class is not reachable from any class-level mapping target (requires `--source-schema` + `--master-schema`) |
 | `unit_dimension_mismatch` | **BLOCK** | Subject and object fields have incompatible physical dimensions |
 | `unit_conversion_required` | WARNING | Fields share a dimension but use different units — FnML conversion suggested |
 | `unit_not_detected` | INFO | No recognisable unit in field name, or unit has no QUDT IRI mapping |
@@ -25,6 +26,12 @@ Validates analyst-proposed SSSOM TSV files *before* they are staged for accredit
 | `invalid_predicate` | **BLOCK** | Predicate is not one of the allowed SKOS/OWL predicates |
 
 With `--strict`, all WARNINGs are upgraded to BLOCKs. Use this as a CI gate on a mapping repo.
+
+## Structural checks
+
+When `--source-schema` and `--master-schema` are provided, lint verifies that each slot mapping's owning class in the master schema is reachable (via `is_a` hierarchy) from at least one class-level mapping target. This catches invalid mappings early — before `rosetta-yarrrml-gen` fails with a cryptic class-resolution error at step 9.
+
+Both flags must be provided together; supplying only one is an error.
 
 ## Output — `LintReport` JSON
 
@@ -43,6 +50,11 @@ With `--strict`, all WARNINGs are upgraded to BLOCKs. Use this as a CI gate on a
 ```bash
 # Validate analyst proposals
 uv run rosetta-lint --sssom candidates.sssom.tsv
+
+# Structural check — verify slot/class mapping consistency against schemas
+uv run rosetta-lint --sssom candidates.sssom.tsv \
+  --source-schema nor_radar_en.linkml.yaml \
+  --master-schema master_cop_en.linkml.yaml
 
 # Strict mode — WARNINGs become BLOCKs (CI-friendly)
 uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json

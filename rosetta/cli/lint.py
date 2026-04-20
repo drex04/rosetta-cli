@@ -5,11 +5,13 @@ from pathlib import Path
 
 import click
 import rdflib
+from linkml_runtime.utils.schemaview import SchemaView
 
 from rosetta.core.accredit import load_log, parse_sssom_tsv
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
+from rosetta.core.schema_utils import check_slot_class_reachability
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 from rosetta.core.units import (
     load_qudt_graph,
@@ -228,10 +230,36 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")
 @click.option("--config", default=None, help="Path to rosetta.toml config file.")
-def cli(sssom: str | None, output: str | None, strict: bool, config: str | None) -> None:
+@click.option(
+    "--source-schema",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    default=None,
+    help="Source LinkML schema YAML (enables structural checks).",
+)
+@click.option(
+    "--master-schema",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    default=None,
+    help="Master LinkML schema YAML (enables structural checks).",
+)
+def cli(
+    sssom: str | None,
+    output: str | None,
+    strict: bool,
+    config: str | None,
+    source_schema: str | None,
+    master_schema: str | None,
+) -> None:
     """Lint a SSSOM proposal TSV for unit/datatype compatibility and structural rules."""
     if sssom is None:
         click.echo("Error: --sssom is required.", err=True)
+        sys.exit(1)
+
+    if bool(source_schema) != bool(master_schema):
+        click.echo(
+            "Error: --source-schema and --master-schema must be provided together.",
+            err=True,
+        )
         sys.exit(1)
 
     rows = parse_sssom_tsv(Path(sssom))
@@ -244,8 +272,30 @@ def cli(sssom: str | None, output: str | None, strict: bool, config: str | None)
     # 1. Proposal checks
     findings.extend(check_sssom_proposals(rows, log))
 
-    # 2. Per-row unit + datatype checks (user-confirmed mappings only)
     confirmed_rows = [r for r in rows if r.mapping_justification in {MMC, HC}]
+
+    # 2. Structural reachability check (requires schemas)
+    if source_schema and master_schema:
+        source_view = SchemaView(source_schema)
+        master_view = SchemaView(master_schema)
+        for mismatch in check_slot_class_reachability(confirmed_rows, source_view, master_view):
+            findings.append(
+                LintFinding(
+                    rule="slot_class_unreachable",
+                    severity="BLOCK",
+                    source_uri=mismatch.row.subject_id,
+                    target_uri=mismatch.row.object_id,
+                    message=(
+                        f"Slot '{mismatch.target_slot_name}' belongs to class "
+                        f"'{mismatch.target_owning_class}' which is not reachable from any "
+                        f"mapped class ({', '.join(sorted(mismatch.mapped_target_classes))}). "
+                        f"Map the source class to '{mismatch.target_owning_class}' or one of "
+                        f"its subclasses."
+                    ),
+                )
+            )
+
+    # 3. Per-row unit + datatype checks (user-confirmed mappings only)
     try:
         qudt_graph = load_qudt_graph()
         for row in confirmed_rows:
@@ -263,14 +313,14 @@ def cli(sssom: str | None, output: str | None, strict: bool, config: str | None)
             LintFinding(rule="parse_error", severity="WARNING", source_uri="", message=str(exc))
         )
 
-    # 3. --strict: upgrade WARNINGs → BLOCKs
+    # 4. --strict: upgrade WARNINGs → BLOCKs
     if strict:
         findings = [
             f.model_copy(update={"severity": "BLOCK"}) if f.severity == "WARNING" else f
             for f in findings
         ]
 
-    # 4. Build report and write
+    # 5. Build report and write
     summary = LintSummary(
         block=sum(1 for f in findings if f.severity == "BLOCK"),
         warning=sum(1 for f in findings if f.severity == "WARNING"),

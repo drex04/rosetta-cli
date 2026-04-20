@@ -19,9 +19,9 @@ from pydantic import ValidationError
 
 from rosetta.cli.yarrrml_gen import cli
 from rosetta.core.models import CoverageReport, SSSOMRow
+from rosetta.core.schema_utils import build_slot_owner_index
 from rosetta.core.transform_builder import (
     ROSETTA_GLOBAL_PREFIXES,
-    _build_slot_owner_index,
     _ClassifyContext,
     _ClassMapping,
     _SlotMapping,
@@ -176,8 +176,8 @@ def test_classify_row_class_to_class() -> None:
     ctx = _ClassifyContext(
         src_view=src_view,
         master_view=mst_view,
-        src_slot_owners=_build_slot_owner_index(src_view),
-        mst_slot_owners=_build_slot_owner_index(mst_view),
+        src_slot_owners=build_slot_owner_index(src_view),
+        mst_slot_owners=build_slot_owner_index(mst_view),
     )
     row = _mkrow(subject_id="src:Widget", object_id="mst:Thing")
     result = classify_row(row, ctx)
@@ -196,8 +196,8 @@ def test_classify_row_slot_to_slot() -> None:
     ctx = _ClassifyContext(
         src_view=src_view,
         master_view=mst_view,
-        src_slot_owners=_build_slot_owner_index(src_view),
-        mst_slot_owners=_build_slot_owner_index(mst_view),
+        src_slot_owners=build_slot_owner_index(src_view),
+        mst_slot_owners=build_slot_owner_index(mst_view),
     )
     row = _mkrow(subject_id="src:alpha", object_id="mst:beta")
     result = classify_row(row, ctx)
@@ -218,8 +218,8 @@ def test_classify_row_unresolved_subject() -> None:
     ctx = _ClassifyContext(
         src_view=src_view,
         master_view=mst_view,
-        src_slot_owners=_build_slot_owner_index(src_view),
-        mst_slot_owners=_build_slot_owner_index(mst_view),
+        src_slot_owners=build_slot_owner_index(src_view),
+        mst_slot_owners=build_slot_owner_index(mst_view),
     )
     row = _mkrow(subject_id="src:Ghost", object_id="mst:Thing")
     result = classify_row(row, ctx)
@@ -237,8 +237,8 @@ def test_classify_row_mixed_kinds_marked_mixed() -> None:
     ctx = _ClassifyContext(
         src_view=src_view,
         master_view=mst_view,
-        src_slot_owners=_build_slot_owner_index(src_view),
-        mst_slot_owners=_build_slot_owner_index(mst_view),
+        src_slot_owners=build_slot_owner_index(src_view),
+        mst_slot_owners=build_slot_owner_index(mst_view),
     )
     # subject is a class; object is a slot → mixed
     row = _mkrow(subject_id="src:Widget", object_id="mst:beta")

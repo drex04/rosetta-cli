@@ -280,16 +280,19 @@ Validates analyst-proposed SSSOM TSV files before they are staged for accreditor
 Usage: rosetta-lint [OPTIONS]
 
 Options:
-  --sssom PATH    SSSOM TSV file to validate  [required]
-  --output PATH   Output file (default: stdout)
-  --strict        Treat WARNINGs as BLOCKs (useful as a CI gate)
-  --config PATH   Path to rosetta.toml
+  --sssom PATH          SSSOM TSV file to validate  [required]
+  --output PATH         Output file (default: stdout)
+  --strict              Treat WARNINGs as BLOCKs (useful as a CI gate)
+  --config PATH         Path to rosetta.toml
+  --source-schema PATH  Source LinkML schema YAML (enables structural checks)
+  --master-schema PATH  Master LinkML schema YAML (enables structural checks)
 ```
 
 **Lint rules:**
 
 | Rule | Severity | Description |
 | ---- | -------- | ----------- |
+| `slot_class_unreachable` | BLOCK | Slot's owning class unreachable from any class-level mapping target (requires `--source-schema` + `--master-schema`) |
 | `unit_dimension_mismatch` | BLOCK | Subject and object fields have incompatible physical dimensions |
 | `unit_conversion_required` | WARNING | Fields share the same dimension but use different units (FnML conversion suggested) |
 | `unit_not_detected` | INFO | No recognizable unit in field name, or unit has no QUDT IRI mapping |
@@ -311,6 +314,11 @@ rosetta-lint --sssom proposals.sssom.tsv [--output report.json] [--strict] [--co
 
 # Validate analyst proposals
 uv run rosetta-lint --sssom candidates.sssom.tsv
+
+# Structural check — verify slot/class mapping consistency
+uv run rosetta-lint --sssom candidates.sssom.tsv \
+  --source-schema nor_radar_en.linkml.yaml \
+  --master-schema master_cop_en.linkml.yaml
 
 # Strict mode — WARNINGs become BLOCKs (useful as a CI gate)
 uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json
