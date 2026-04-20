@@ -1,6 +1,6 @@
 # rosetta-validate
 
-Validates an RDF Turtle file against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
+Validates an RDF data file (Turtle or JSON-LD) against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
 
 ## Command reference
 

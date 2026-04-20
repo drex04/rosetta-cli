@@ -244,10 +244,11 @@ def cli(sssom: str | None, output: str | None, strict: bool, config: str | None)
     # 1. Proposal checks
     findings.extend(check_sssom_proposals(rows, log))
 
-    # 2. Per-row unit + datatype checks
+    # 2. Per-row unit + datatype checks (user-confirmed mappings only)
+    confirmed_rows = [r for r in rows if r.mapping_justification in {MMC, HC}]
     try:
         qudt_graph = load_qudt_graph()
-        for row in rows:
+        for row in confirmed_rows:
             try:
                 _check_units(findings, row, qudt_graph)
                 _check_datatype(findings, row)

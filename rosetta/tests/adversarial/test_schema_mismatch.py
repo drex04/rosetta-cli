@@ -143,6 +143,15 @@ def test_suggest_type_divergence_flagged_by_lint(
     )
     assert sssom_out.exists()
 
+    # Lint only checks user-confirmed mappings (MMC/HC), so patch the
+    # system-generated justification to MMC to simulate the accredit step.
+    patched = (
+        sssom_out.read_text()
+        .replace("semapv:LexicalMatching", "semapv:ManualMappingCuration")
+        .replace("semapv:CompositeMatching", "semapv:ManualMappingCuration")
+    )
+    sssom_out.write_text(patched)
+
     # Run lint over the SSSOM output
     lint_result = runner.invoke(lint_cli, ["--sssom", str(sssom_out)])
 

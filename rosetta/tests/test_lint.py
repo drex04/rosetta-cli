@@ -659,3 +659,59 @@ def test_lint_sssom_proposals_json_finding(tmp_path: Path) -> None:
     proposal_findings = [f for f in data["findings"] if f["rule"] == "max_one_mmc_per_pair"]
     assert proposal_findings, "Expected max_one_mmc_per_pair finding in JSON"
     assert proposal_findings[0]["severity"] == "BLOCK"
+
+
+def test_lint_sssom_skips_composite_matching_rows(tmp_path: Path) -> None:
+    """CompositeMatching rows are system-generated suggestions — lint skips them entirely."""
+    sssom = tmp_path / "composite.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "ex:altitude_m",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:speed_kts",
+                "mapping_justification": "semapv:CompositeMatching",
+                "confidence": "0.8",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["findings"] == []
+
+
+def test_lint_sssom_mixed_composite_and_mmc_only_lints_mmc(tmp_path: Path) -> None:
+    """File with both CompositeMatching and MMC rows — only the MMC row produces findings."""
+    sssom = tmp_path / "mixed.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "ex:altitude_m",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:speed_kts",
+                "mapping_justification": "semapv:CompositeMatching",
+                "confidence": "0.8",
+            },
+            {
+                "subject_id": "ex:altitude_ft",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:altitude_m",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    config = _no_accredit_toml(tmp_path)
+    result = CliRunner().invoke(cli, ["--sssom", str(sssom), "--config", str(config)])
+    data = json.loads(result.output)
+    assert all(
+        f["source_uri"] != "ex:altitude_m" or f["target_uri"] != "ex:speed_kts"
+        for f in data["findings"]
+    ), "CompositeMatching row should not produce findings"
+    assert any(f["source_uri"] == "ex:altitude_ft" for f in data["findings"]), (
+        "MMC row should still be linted"
+    )

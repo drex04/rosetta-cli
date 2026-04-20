@@ -157,7 +157,7 @@ def cli(
             structural_weight=resolved_structural_weight,
         )
 
-        # Apply per-field boost/derank from HumanCuration log rows
+        # Apply per-field derank from rejected HumanCuration log rows
         hc_rows = [r for r in log if r.mapping_justification == "semapv:HumanCuration"]
         if hc_rows:
             for src_uri, entry in result.items():
@@ -173,6 +173,14 @@ def cli(
                     existing.mapping_date or DATETIME_MIN
                 ):
                     log_index[key] = row
+
+        # Approved HC pairs — suppress from output (already decided)
+        hc_approved_pairs: set[tuple[str, str]] = {
+            (r.subject_id, r.object_id)
+            for r in log
+            if r.mapping_justification == "semapv:HumanCuration"
+            and r.predicate_id != "owl:differentFrom"
+        }
 
         # For each candidate in result: if pair is in log_index, refresh justification/predicate
         for src_uri, entry in result.items():
@@ -191,6 +199,8 @@ def cli(
             src_label = src_report.root[src_uri].label
 
             for cand in candidates_tsv:
+                if (src_uri, cand["uri"]) in hc_approved_pairs:
+                    continue
                 obj_uri: str = cand["uri"]  # pyright: ignore[reportAny]
                 score: float = cand["score"]  # pyright: ignore[reportAny]
                 obj_label = (

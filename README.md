@@ -547,7 +547,7 @@ uv run rosetta-accredit ingest update.sssom.tsv
 
 ### rosetta-validate
 
-Validates an RDF Turtle file against SHACL shape constraints using pySHACL.
+Validates an RDF data file (Turtle or JSON-LD) against SHACL shape constraints using pySHACL.
 
 ```
 Usage: rosetta-validate [OPTIONS]

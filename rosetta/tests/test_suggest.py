@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 from pathlib import Path
 
 import numpy as np
@@ -290,33 +289,22 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     assert len(data_rows) <= len(SOURCE_EMB)
 
 
-def test_suggest_cli_log_based_boost(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """HC approval in audit log boosts candidate confidence."""
+def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """HC approval in audit log suppresses that pair from suggest output."""
     from rosetta.cli.suggest import cli as suggest_cli
     from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
-    sin_val = math.sqrt(1.0 - 0.81)
     src_uri = "http://ex.org/FieldA"
     master_uri = "http://ex.org/Master1"
 
-    src_emb = {src_uri: {"label": "FieldA", "lexical": [0.9, 0.0, sin_val]}}
+    src_emb = {src_uri: {"label": "FieldA", "lexical": [0.9, 0.0, 0.1]}}
     master_emb = {master_uri: {"label": "Master1", "lexical": [1.0, 0.0, 0.0]}}
 
     src_f = tmp_path / "src.json"
     src_f.write_text(json.dumps(src_emb))
     mst_f = tmp_path / "master.json"
     mst_f.write_text(json.dumps(master_emb))
-
-    runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_f), str(mst_f)])
-    assert baseline.exit_code == 0, baseline.output
-    baseline_data = [
-        ln
-        for ln in baseline.output.splitlines()
-        if ln.strip() and not ln.startswith(("#", "subject_id"))
-    ]
-    baseline_score = float(baseline_data[0].split("\t")[4])
 
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log(
@@ -344,15 +332,16 @@ def test_suggest_cli_log_based_boost(tmp_path: Path, tmp_rosetta_toml: Path) -> 
         log_path,
     )
 
-    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
+    result = CliRunner().invoke(
+        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
+    )
     assert result.exit_code == 0, result.output + str(result.exception)
-    boosted_data = [
+    data_rows = [
         ln
         for ln in result.output.splitlines()
         if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    boosted_score = float(boosted_data[0].split("\t")[4])
-    assert boosted_score > baseline_score
+    assert not data_rows, "Approved HC pair should be suppressed from suggest output"
 
 
 def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
@@ -486,6 +475,71 @@ def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path)
     ]
     assert data_rows
     assert MMC_JUSTIFICATION in data_rows[0]
+
+
+def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+    """HC row in audit log → that pair is omitted from suggest output entirely."""
+    from rosetta.cli.suggest import cli as suggest_cli
+    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.models import SSSOMRow
+
+    src_uri = "http://ex.org/FC"
+    master_uri_decided = "http://ex.org/MC_decided"
+    master_uri_new = "http://ex.org/MC_new"
+
+    src_emb = {src_uri: {"label": "FC", "lexical": [1.0, 0.0]}}
+    master_emb = {
+        master_uri_decided: {"label": "MC_decided", "lexical": [0.9, 0.1]},
+        master_uri_new: {"label": "MC_new", "lexical": [0.8, 0.2]},
+    }
+    src_f = tmp_path / "src.json"
+    src_f.write_text(json.dumps(src_emb))
+    mst_f = tmp_path / "master.json"
+    mst_f.write_text(json.dumps(master_emb))
+
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri_decided,
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
+    )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri,
+                object_id=master_uri_decided,
+                predicate_id="skos:exactMatch",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.95,
+            )
+        ],
+        log_path,
+    )
+
+    result = CliRunner().invoke(
+        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
+    )
+    assert result.exit_code == 0, result.output + str(result.exception)
+    data_rows = [
+        ln
+        for ln in result.output.splitlines()
+        if ln.strip() and not ln.startswith(("#", "subject_id"))
+    ]
+    assert data_rows, "Should still have suggestions for the undecided pair"
+    for row in data_rows:
+        assert master_uri_decided not in row, (
+            "HC-decided pair should be suppressed from suggest output"
+        )
+    assert any(master_uri_new in row for row in data_rows), (
+        "Undecided candidate should still appear"
+    )
 
 
 def test_suggest_cli_output_file(tmp_path: Path, src_file: str, mst_file: str) -> None:
@@ -792,22 +846,8 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Direct unit tests for _adjusted_score — covers all 4 branches
-# (review-2: previously only tested transitively via apply_sssom_feedback;
-# soft-derank 0.25 coefficient had no regression guard.)
+# Direct unit tests for _adjusted_score — derank branches
 # ---------------------------------------------------------------------------
-
-
-def _hc_row(subject: str, obj: str, predicate: str = "skos:exactMatch"):
-    from rosetta.core.models import SSSOMRow
-
-    return SSSOMRow(
-        subject_id=subject,
-        predicate_id=predicate,
-        object_id=obj,
-        mapping_justification="semapv:HumanCuration",
-        confidence=1.0,
-    )
 
 
 class TestAdjustedScore:
@@ -819,11 +859,8 @@ class TestAdjustedScore:
         score = _adjusted_score(
             cand_score=0.9,
             obj_id="obj:X",
-            subject_id="subj:A",
             diff_from_object_ids={"obj:X"},
             has_diff_from=True,
-            approved_rows=[],
-            boost=0.1,
             penalty=0.2,
         )
         assert score == pytest.approx(0.7)
@@ -834,11 +871,8 @@ class TestAdjustedScore:
         score = _adjusted_score(
             cand_score=0.1,
             obj_id="obj:X",
-            subject_id="subj:A",
             diff_from_object_ids={"obj:X"},
             has_diff_from=True,
-            approved_rows=[],
-            boost=0.1,
             penalty=0.5,
         )
         assert score == 0.0
@@ -854,11 +888,8 @@ class TestAdjustedScore:
         score = _adjusted_score(
             cand_score=0.8,
             obj_id="obj:OTHER",
-            subject_id="subj:A",
             diff_from_object_ids={"obj:X"},  # subject has diffFrom, but not for obj:OTHER
             has_diff_from=True,
-            approved_rows=[],
-            boost=0.1,
             penalty=0.2,
         )
         # 0.8 - (0.2 * 0.25) = 0.8 - 0.05 = 0.75
@@ -870,63 +901,11 @@ class TestAdjustedScore:
         score = _adjusted_score(
             cand_score=0.01,
             obj_id="obj:OTHER",
-            subject_id="subj:A",
             diff_from_object_ids={"obj:X"},
             has_diff_from=True,
-            approved_rows=[],
-            boost=0.1,
             penalty=1.0,  # 1.0 * 0.25 = 0.25; 0.01 - 0.25 → floor 0.0
         )
         assert score == 0.0
-
-    def test_boost_match_adds_boost_when_approved_row_matches(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
-
-        approved = [_hc_row("subj:A", "obj:X", "skos:exactMatch")]
-        score = _adjusted_score(
-            cand_score=0.7,
-            obj_id="obj:X",
-            subject_id="subj:A",
-            diff_from_object_ids=set(),
-            has_diff_from=False,
-            approved_rows=approved,
-            boost=0.1,
-            penalty=0.2,
-        )
-        assert score == pytest.approx(0.8)
-
-    def test_boost_match_caps_at_one(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
-
-        approved = [_hc_row("subj:A", "obj:X", "skos:closeMatch")]
-        score = _adjusted_score(
-            cand_score=0.95,
-            obj_id="obj:X",
-            subject_id="subj:A",
-            diff_from_object_ids=set(),
-            has_diff_from=False,
-            approved_rows=approved,
-            boost=0.3,
-            penalty=0.2,
-        )
-        assert score == 1.0
-
-    def test_boost_ignores_differentfrom_rows(self) -> None:
-        """owl:differentFrom rows in approved_rows must NOT trigger a boost."""
-        from rosetta.core.similarity import _adjusted_score
-
-        approved = [_hc_row("subj:A", "obj:X", "owl:differentFrom")]
-        score = _adjusted_score(
-            cand_score=0.5,
-            obj_id="obj:X",
-            subject_id="subj:A",
-            diff_from_object_ids=set(),  # caller didn't flag; check boost path only
-            has_diff_from=False,
-            approved_rows=approved,
-            boost=0.1,
-            penalty=0.2,
-        )
-        assert score == pytest.approx(0.5)  # passthrough, no boost
 
     def test_passthrough_when_no_feedback_applies(self) -> None:
         from rosetta.core.similarity import _adjusted_score
@@ -934,11 +913,8 @@ class TestAdjustedScore:
         score = _adjusted_score(
             cand_score=0.42,
             obj_id="obj:UNSEEN",
-            subject_id="subj:A",
             diff_from_object_ids=set(),
             has_diff_from=False,
-            approved_rows=[],
-            boost=0.1,
             penalty=0.2,
         )
         assert score == pytest.approx(0.42)

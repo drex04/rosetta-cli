@@ -9,6 +9,8 @@
 #   → accredit review
 #   → [accreditor edits review.sssom.tsv]
 #   → accredit ingest (accreditor decisions)
+#   → yarrrml-gen (TransformSpec + JSON-LD materialization)
+#   → validate (SHACL constraint checking)
 #
 # Usage: bash scripts/pipeline-demo.sh [OUTPUT_DIR]
 #   OUTPUT_DIR  Directory for generated files (default: demo_out)
@@ -30,6 +32,11 @@ info() {
 }
 
 ok() { echo "  ✓  $*"; }
+
+run_cmd() {
+    echo "  \$ $*"
+    "$@"
+}
 
 box() {
     local title="$1"; shift
@@ -63,28 +70,30 @@ confirm() {
 # ── Config ────────────────────────────────────────────────────────────────────
 
 OUT="${1:-demo_out}"
-SRC_FIXTURE="rosetta/tests/fixtures/nor_radar.csv"
-MASTER_FIXTURE="rosetta/tests/fixtures/master_cop_ontology.ttl"
+SRC_FIXTURE="rosetta/tests/fixtures/nations/nor_radar.csv"
+MASTER_FIXTURE="rosetta/tests/fixtures/nations/master_cop_ontology.ttl"
 LOG="store/audit-log.sssom.tsv"
+SHAPES_DIR="rosetta/policies/shacl"
 
 mkdir -p "$OUT"
 mkdir -p "$(dirname "$LOG")"
 
 echo ""
 echo "Pipeline demo"
-echo "  Output dir : $OUT"
-echo "  Audit log  : $LOG"
+echo "  Output dir  : $OUT"
+echo "  Audit log   : $LOG"
+echo "  SHACL shapes: $SHAPES_DIR"
 
 # ── Step 1: Ingest ────────────────────────────────────────────────────────────
 
 info "Step 1 — Ingest schemas → LinkML YAML"
 
-uv run rosetta-ingest \
+run_cmd uv run rosetta-ingest \
     --input  "$SRC_FIXTURE" \
     --output "$OUT/nor_radar.linkml.yaml"
 ok "$OUT/nor_radar.linkml.yaml"
 
-uv run rosetta-ingest \
+run_cmd uv run rosetta-ingest \
     --input  "$MASTER_FIXTURE" \
     --format rdfs \
     --output "$OUT/master_cop.linkml.yaml"
@@ -94,13 +103,13 @@ ok "$OUT/master_cop.linkml.yaml"
 
 info "Step 2 — Translate schemas to English"
 
-uv run rosetta-translate \
+run_cmd uv run rosetta-translate \
     --input       "$OUT/nor_radar.linkml.yaml" \
     --output      "$OUT/nor_radar_en.linkml.yaml" \
     --source-lang NB
 ok "$OUT/nor_radar_en.linkml.yaml"
 
-uv run rosetta-translate \
+run_cmd uv run rosetta-translate \
     --input       "$OUT/master_cop.linkml.yaml" \
     --output      "$OUT/master_cop_en.linkml.yaml" \
     --source-lang EN
@@ -111,12 +120,12 @@ ok "$OUT/master_cop_en.linkml.yaml"
 info "Step 3 — Embed schemas"
 echo "  (First run downloads the model ~1.2 GB from HuggingFace; subsequent runs use cache)"
 
-uv run rosetta-embed \
+run_cmd uv run rosetta-embed \
     --input  "$OUT/nor_radar_en.linkml.yaml" \
     --output "$OUT/nor_radar_emb.json"
 ok "$OUT/nor_radar_emb.json"
 
-uv run rosetta-embed \
+run_cmd uv run rosetta-embed \
     --input  "$OUT/master_cop_en.linkml.yaml" \
     --output "$OUT/master_cop_emb.json"
 ok "$OUT/master_cop_emb.json"
@@ -125,7 +134,7 @@ ok "$OUT/master_cop_emb.json"
 
 info "Step 4 — Generate mapping candidates"
 
-uv run rosetta-suggest \
+run_cmd uv run rosetta-suggest \
     "$OUT/nor_radar_emb.json" \
     "$OUT/master_cop_emb.json" \
     --output "$OUT/candidates.sssom.tsv"
@@ -151,7 +160,7 @@ confirm "Done editing? (yes to continue, skip to proceed without edits)" \
 info "Step 5 — Lint SSSOM proposals"
 
 while true; do
-    if uv run rosetta-lint --sssom "$OUT/candidates.sssom.tsv"; then
+    if run_cmd uv run rosetta-lint --sssom "$OUT/candidates.sssom.tsv"; then
         ok "Lint passed — no errors."
         break
     fi
@@ -174,13 +183,13 @@ done
 
 info "Step 6 — Stage analyst proposals into audit log"
 
-uv run rosetta-accredit --log "$LOG" ingest "$OUT/candidates.sssom.tsv"
+run_cmd uv run rosetta-accredit --log "$LOG" ingest "$OUT/candidates.sssom.tsv"
 
 # ── Step 7: Generate accreditor work list ─────────────────────────────────────
 
 info "Step 7 — Generate accreditor review list"
 
-uv run rosetta-accredit --log "$LOG" review --output "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta-accredit --log "$LOG" review --output "$OUT/review.sssom.tsv"
 ok "$OUT/review.sssom.tsv"
 
 # ── Pause: Accreditor edits review ───────────────────────────────────────────
@@ -200,15 +209,70 @@ confirm "Done editing? (yes to ingest decisions, skip to finish without ingestin
 
 info "Step 8 — Ingest accreditor decisions"
 
-uv run rosetta-accredit --log "$LOG" ingest "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta-accredit --log "$LOG" ingest "$OUT/review.sssom.tsv"
+
+# ── Step 9: Generate TransformSpec + Materialize JSON-LD ─────────────────────
+
+info "Step 9 — Generate TransformSpec + materialize JSON-LD"
+echo "  (Requires approved mappings in the audit log from steps 6–8)"
+
+JSONLD_OK=false
+if run_cmd uv run rosetta-yarrrml-gen \
+    --sssom "$LOG" \
+    --source-schema "$OUT/nor_radar_en.linkml.yaml" \
+    --master-schema "$OUT/master_cop_en.linkml.yaml" \
+    --source-format csv \
+    --output "$OUT/nor_to_mc.transform.yaml" \
+    --coverage-report "$OUT/coverage.json" \
+    --force \
+    --run \
+    --data "$SRC_FIXTURE" \
+    --jsonld-output "$OUT/output.jsonld" \
+    --workdir "$OUT/morph_workdir"; then
+    ok "$OUT/nor_to_mc.transform.yaml  (TransformSpec)"
+    ok "$OUT/coverage.json             (coverage report)"
+    ok "$OUT/output.jsonld             (materialized JSON-LD)"
+    JSONLD_OK=true
+else
+    echo "  ⚠  yarrrml-gen failed — the audit log may not contain approved mappings."
+    echo "     If you skipped editing candidates/review, this is expected."
+    echo "     Skipping validation step."
+fi
+
+# ── Step 10: Validate JSON-LD ────────────────────────────────────────────────
+
+if $JSONLD_OK; then
+    info "Step 10 — Validate materialized output against SHACL shapes"
+
+    if run_cmd uv run rosetta-validate \
+        --data "$OUT/output.jsonld" \
+        --shapes-dir "$SHAPES_DIR" \
+        --output "$OUT/validation-report.json"; then
+        ok "Validation passed — output conforms to SHACL shapes."
+        ok "$OUT/validation-report.json"
+    else
+        echo "  ⚠  Validation found constraint violations."
+        echo "     See: $OUT/validation-report.json"
+        echo "     (This is expected if the sample data does not fully"
+        echo "      populate all properties required by the SHACL shapes.)"
+    fi
+else
+    info "Step 10 — Validate (skipped — no JSON-LD produced)"
+fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 info "Pipeline complete"
 echo ""
-echo "  Candidates : $OUT/candidates.sssom.tsv"
-echo "  Review     : $OUT/review.sssom.tsv"
-echo "  Audit log  : $LOG"
+echo "  Candidates  : $OUT/candidates.sssom.tsv"
+echo "  Review      : $OUT/review.sssom.tsv"
+echo "  Audit log   : $LOG"
+if $JSONLD_OK; then
+echo "  TransformSpec: $OUT/nor_to_mc.transform.yaml"
+echo "  Coverage    : $OUT/coverage.json"
+echo "  JSON-LD     : $OUT/output.jsonld"
+echo "  Validation  : $OUT/validation-report.json"
+fi
 echo ""
 echo "  Next steps:"
 echo "    uv run rosetta-accredit --log '$LOG' status   # view all decisions"

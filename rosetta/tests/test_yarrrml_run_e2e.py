@@ -17,11 +17,10 @@ Design notes:
      `value.toNumber() * 3.28084`. morph-kgc evaluates the GREL at materialization
      time. The assertion below checks the converted numeric values with
      pytest.approx(rel=1e-2).
-  2. The master schema fixture contains a LinkML typo (`range: dateTime` instead
-     of `datetime`) which `linkml.generators.jsonldcontextgen.ContextGenerator`
-     rejects with a `ValueError`. To keep the E2E focused on the pipeline (and
-     not on unrelated fixture hygiene), the test copies both schemas into
-     `tmp_path` and rewrites `dateTime` → `datetime` before invoking the CLI.
+  2. The master schema fixture previously contained a LinkML typo
+     (`range: dateTime` instead of `datetime`) which was fixed in the fixture
+     itself. The helper copies schemas into `tmp_path` so the test operates on
+     isolated copies without mutating the fixture directory.
 """
 
 from __future__ import annotations
@@ -46,7 +45,7 @@ def _copy_and_patch_schemas(
     sssom_src: Path,
     csv_src: Path,
 ) -> tuple[Path, Path, Path, Path]:
-    """Copy fixtures to tmp_path and patch the ContextGenerator-hostile range."""
+    """Copy fixtures to tmp_path so the test operates on isolated copies."""
     nor_dst = dst_dir / "nor_radar.linkml.yaml"
     mc_dst = dst_dir / "master_cop.linkml.yaml"
     sssom_dst = dst_dir / "sssom_nor_approved.sssom.tsv"
@@ -77,15 +76,22 @@ def test_e2e_nor_radar_csv_to_jsonld(
         tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
     )
 
-    # Precondition (review truth #17): CSV columns ⊆ source schema slot names.
+    # Precondition (review truth #17): CSV columns ⊆ rosetta_csv_column values
+    # declared in the source schema.  Falls back to slot names for slots that
+    # lack the annotation.
     with csv.open("r", encoding="utf-8") as fh:
         header = fh.readline().strip().split(",")
     schema_yaml = yaml.safe_load(nor_schema.read_text(encoding="utf-8"))
-    schema_slots = set((schema_yaml.get("slots") or {}).keys())
-    missing = set(header) - schema_slots
+    slots = schema_yaml.get("slots") or {}
+    csv_columns: set[str] = set()
+    for slot_name, slot_def in slots.items():
+        ann = (slot_def or {}).get("annotations") or {}
+        csv_columns.add(ann.get("rosetta_csv_column", slot_name))
+    missing = set(header) - csv_columns
     assert not missing, (
         f"Precondition violated: CSV columns {missing!r} are not declared as "
-        f"slots in {nor_schema}. Schema slot names: {sorted(schema_slots)!r}"
+        f"rosetta_csv_column annotations (or slot names) in {nor_schema}. "
+        f"Known columns: {sorted(csv_columns)!r}"
     )
 
     wd = tmp_path / "wd"
@@ -163,6 +169,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
         "Observation",  # tolerate source-side class names if compaction drifts
     }
 
+    # Covers three compaction forms: "mc:Track", full URI containing "MasterCOP", bare name.
     def _type_matches_master(entry: dict[str, object]) -> bool:
         t = entry.get("@type")
         types: list[str] = (
@@ -208,7 +215,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
     # YarrrmlCompiler compiles it to GREL `value.toNumber() * 3.28084` which
     # morph-kgc evaluates at materialization time.
     # Source altitudes: 4100, 2500, 1800 meters → expected feet values below.
-    observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude", "hoyde_m"))
+    observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude"))
     assert observed_values, (
         "Could not locate hasAltitudeFt / hoyde_m numeric values in JSON-LD; "
         f"entries={json.dumps(typed_entries)[:600]}"

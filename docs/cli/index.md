@@ -12,7 +12,7 @@ Every command is auto-documented from its Click definition — options, argument
 | [`rosetta-suggest`](suggest.md) | Rank candidate mappings by cosine similarity |
 | [`rosetta-lint`](lint.md) | Validate analyst proposals against unit and log constraints |
 | [`rosetta-accredit`](accredit.md) | Manage the two-role accreditation state machine |
-| [`rosetta-validate`](validate.md) | SHACL-validate RDF Turtle |
+| [`rosetta-validate`](validate.md) | SHACL-validate RDF data (Turtle or JSON-LD) |
 | [`rosetta-yarrrml-gen`](yarrrml-gen.md) | Compile approved mappings to YARRRML and materialise JSON-LD |
 | [`rosetta-provenance`](provenance.md) | Stamp and query PROV-O records on Turtle artifacts |
 
