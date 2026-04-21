@@ -50,7 +50,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --all-extras
-      - run: uv run pytest -m "not slow and not e2e"
+      - run: uv run pytest
 
   analysis:
     runs-on: ubuntu-latest

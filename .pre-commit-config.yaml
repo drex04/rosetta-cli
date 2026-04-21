@@ -50,9 +50,9 @@ repos:
         types: [python]
 
       - id: pytest
-        name: pytest (not slow)
+        name: pytest (all tests)
         language: system
-        entry: uv run pytest -m "not slow"
+        entry: uv run pytest
         pass_filenames: false
         types: [python]
         stages: [pre-push]

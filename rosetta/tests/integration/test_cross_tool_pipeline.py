@@ -383,8 +383,11 @@ def test_compile_run_jsonld_validated_by_shacl(
     shutil.copy(sssom_nor_path, sssom)
     shutil.copy(nor_csv_sample_path, csv_data)
 
-    # 1. Generate SHACL shapes from master schema
-    shapes = tmp_path / "shapes.ttl"
+    # 1. Generate SHACL shapes from master schema into a directory
+    #    (validate expects a directory of .ttl files, not a single file)
+    shapes_dir = tmp_path / "shapes"
+    shapes_dir.mkdir()
+    shapes = shapes_dir / "shapes.ttl"
     result = runner.invoke(shacl_gen_cli, [str(mc_schema), "--output", str(shapes)])
     assert result.exit_code == 0, f"shacl-gen failed: {result.stderr}"
 
@@ -435,7 +438,7 @@ def test_compile_run_jsonld_validated_by_shacl(
         validate_cli,
         [
             str(jsonld_out),
-            str(shapes),
+            str(shapes_dir),
         ],
     )
     # Exit 0 = conformant, 1 = violations found. Both are valid —

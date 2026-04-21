@@ -74,7 +74,7 @@ Subcommands: `rosetta ingest`, `rosetta translate`, `rosetta embed`, `rosetta su
 - `uv run ruff format .` — auto-format
 - `uv run ruff check .` — lint (rules: E, W, F, I, UP)
 - `uv run basedpyright` — static type check (strict: source, basic: tests)
-- `uv run pytest -m "not slow"` — regression guard
+- `uv run pytest` — run **all** tests (do not skip slow-marked tests)
 - `uv run radon cc rosetta/core/ -n C -s` — complexity check (core only; fails on grade C+)
 - `uv run vulture rosetta/ --exclude rosetta/tests --min-confidence 80` — dead code detection
 - `uv run bandit -r rosetta/ -x rosetta/tests -ll` — security scan

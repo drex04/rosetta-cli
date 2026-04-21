@@ -23,6 +23,7 @@ from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.run import cli as run_cli
+from rosetta.cli.shacl_gen import cli as shacl_gen_cli
 
 pytestmark = [pytest.mark.integration]
 
@@ -290,19 +291,22 @@ def test_yarrrml_run_validate_with_committed_policy_shapes(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """`rosetta run --validate` on the committed policy shapes.
+    """`rosetta run --validate` with shapes generated from the master schema.
 
-    Pins the wiring against actual production shapes; does NOT assert
-    conformance because the closed-world shapes are stricter than the
-    NOR sample data populates.
+    Generates SHACL shapes via shacl-gen rather than relying on committed
+    policy shapes (removed in 5e4cf92). Does NOT assert conformance because
+    the closed-world shapes are stricter than the NOR sample data populates.
     """
     nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(
         tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
     )
 
-    repo_root = Path(__file__).resolve().parents[3]
-    policy_shapes = repo_root / "rosetta" / "policies" / "shacl"
-    assert policy_shapes.is_dir(), f"expected committed shapes dir at {policy_shapes}"
+    policy_shapes = tmp_path / "shapes"
+    policy_shapes.mkdir()
+    gen_result = CliRunner(mix_stderr=False).invoke(
+        shacl_gen_cli, [str(mc_schema), "--output", str(policy_shapes / "shapes.ttl")]
+    )
+    assert gen_result.exit_code == 0, f"shacl-gen failed: {gen_result.stderr}"
 
     yarrrml_out = _compile_to_yarrrml(tmp_path, sssom, nor_schema, mc_schema)
 

@@ -49,8 +49,7 @@ Full documentation — CLI reference, pipeline walkthrough, accreditation guide,
 ## Running tests
 
 ```bash
-uv run pytest                       # full suite
-uv run pytest -m "not slow"         # fast feedback
+uv run pytest                       # run all tests
 ```
 
 ## License
