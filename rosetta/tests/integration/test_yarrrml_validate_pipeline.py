@@ -268,9 +268,7 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
     val_result = CliRunner(mix_stderr=False).invoke(
         validate_cli,
         [
-            "--data",
             str(jsonld_out),
-            "--shapes-dir",
             str(shapes_dir),
             "--output",
             str(report_out),
