@@ -2,7 +2,7 @@
 
 **Map partner-nation schemas to a shared ontology — systematically, transparently, and with auditable human review.**
 
-Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot telemetry, US C2 feeds — each schema has its own language, units, field names, and structure. `rosetta-cli` is a composable Unix toolkit that takes heterogeneous partner schemas and produces a materialised, standards-compliant RDF knowledge graph aligned to a master ontology. Every step is a discrete tool you can script, pipe, inspect, and audit.
+Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot telemetry, US C2 feeds — each schema has its own language, units, field names, and structure. `rosetta` is a composable Unix toolkit that takes heterogeneous partner schemas and produces a materialised, standards-compliant RDF knowledge graph aligned to a master ontology. Every step is a discrete tool you can script, pipe, inspect, and audit.
 
 ## Key capabilities
 
