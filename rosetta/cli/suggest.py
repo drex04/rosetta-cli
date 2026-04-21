@@ -92,11 +92,8 @@ def cli(
         raise click.UsageError("Audit log not found — run rosetta accredit append first")
     log: list[SSSOMRow] = []
     lp = Path(log_path_str)
-    if not lp.exists():
-        raise click.UsageError(
-            f"Audit log not found — run rosetta accredit append first: {log_path_str}"
-        )
-    log = load_log(lp)
+    if lp.exists():
+        log = load_log(lp)
 
     try:
         src_raw = json.loads(Path(source).read_text())
