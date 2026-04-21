@@ -1,4 +1,4 @@
-# rosetta-cli
+# rosetta
 
 **Map partner-nation schemas to a shared ontology — systematically, transparently, and with auditable human review.**
 
