@@ -1,4 +1,4 @@
-"""rosetta-validate: Validate RDF graphs against SHACL constraints."""
+"""rosetta validate: Validate RDF graphs against SHACL constraints."""
 
 from __future__ import annotations
 
@@ -13,7 +13,13 @@ from rosetta.core.shacl_validate import validate_graph
 from rosetta.core.shapes_loader import load_shapes_from_dir
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta validate output.jsonld rosetta/policies/
+
+  rosetta -v validate output.jsonld rosetta/policies/ -o validation-report.json"""
+)
 @click.argument("data_file", type=click.Path(exists=True))
 @click.argument("shapes_dir", type=click.Path(exists=True))
 @click.option(

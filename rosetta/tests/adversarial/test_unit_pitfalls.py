@@ -1,7 +1,7 @@
 """Adversarial tests for unit-detection pitfalls (Phase 18-03, Task 6).
 
 Tests 1-3 exercise ``rosetta.core.unit_detect`` directly — pure-core, no CLI.
-Test 4 is the integration bridge: unit-detect → rosetta-lint surfaces the
+Test 4 is the integration bridge: unit-detect → rosetta lint surfaces the
 'recognized but unmapped' dBm diagnostic as a finding in LintReport.
 
 Locked-in context:
@@ -127,7 +127,7 @@ def _write_minimal_schema(path: Path, prefix: str, slots: list[str]) -> None:
 
 
 def test_lint_surfaces_recognized_but_unmapped_unit(tmp_path: Path) -> None:
-    """rosetta-lint emits a finding for a 'recognized but unmapped' dBm field.
+    """rosetta lint emits a finding for a 'recognized but unmapped' dBm field.
 
     The lint pipeline calls ``_check_units``; for each row where ``detect_unit``
     returns None on either side, ``_unit_not_detected`` emits an INFO finding.

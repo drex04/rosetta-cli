@@ -1,4 +1,4 @@
-"""rosetta-translate — translate class/slot titles in a LinkML schema using DeepL."""
+"""rosetta translate — translate class/slot titles in a LinkML schema using DeepL."""
 
 from __future__ import annotations
 
@@ -12,7 +12,13 @@ import click
 from rosetta.core.config import get_config_value, load_config
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta translate schema.linkml.yaml -o schema.en.linkml.yaml
+
+  rosetta -v translate schema.linkml.yaml --source-lang DE -o schema.en.linkml.yaml"""
+)
 @click.argument("schema_file", type=click.Path(exists=True))
 @click.option(
     "--source-lang",

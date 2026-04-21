@@ -7,7 +7,7 @@ Usage:
     uv run python rosetta/tests/fixtures/generate_fixtures.py [FLAGS]
 
 Flags:
-    --with-ingest  Regenerate LinkML schemas from source formats via rosetta-ingest.
+    --with-ingest  Regenerate LinkML schemas from source formats via rosetta ingest.
     --with-embed   Regenerate embed JSONs (requires model download).
     --all          Regenerate everything.
 """
@@ -172,7 +172,7 @@ def validate(path: Path) -> None:
 
 
 def generate_linkml_fixtures() -> None:
-    """Run rosetta-ingest to generate LinkML schemas from source formats."""
+    """Run rosetta ingest to generate LinkML schemas from source formats."""
     from click.testing import CliRunner
 
     from rosetta.cli.ingest import cli as ingest_cli
@@ -223,7 +223,7 @@ def generate_shacl_fixtures() -> None:
 
 
 def generate_embed_fixtures() -> None:
-    """Run rosetta-embed on both schemas (requires sentence-transformers)."""
+    """Run rosetta embed on both schemas (requires sentence-transformers)."""
     from click.testing import CliRunner
 
     from rosetta.cli.embed import cli as embed_cli

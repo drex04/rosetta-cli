@@ -1,4 +1,4 @@
-"""Integration tests for rosetta-accredit audit-log pipeline (Phase 18-02, Task 3.7).
+"""Integration tests for rosetta accredit audit-log pipeline (Phase 18-02, Task 3.7).
 
 Per D-18-10: the real CLI has no 'approve'/'revoke' subcommands. Accreditation
 is driven by appending SSSOM rows to the audit log:

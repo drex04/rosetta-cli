@@ -1,4 +1,4 @@
-"""Integration tests for rosetta-validate (Phase 18-02, Task 3.4)."""
+"""Integration tests for rosetta validate (Phase 18-02, Task 3.4)."""
 
 from __future__ import annotations
 

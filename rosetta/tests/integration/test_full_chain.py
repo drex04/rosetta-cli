@@ -1,5 +1,5 @@
 """End-to-end integration tests across the ingest→embed→suggest→lint pipeline
-and the ingest→yarrrml-gen materialisation pipeline (Phase 18-02, Task 4).
+and the ingest→compile→run materialisation pipeline (Phase 18-02, Task 4).
 
 LaBSE is mocked via the conftest test_embed fixture pattern — CI cannot
 download the 1.2 GB model.
@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.compile import cli as yarrrml_cli
+from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.lint import cli as lint_cli
@@ -131,7 +131,7 @@ def test_full_chain_json_to_lint(
 
 
 # ---------------------------------------------------------------------------
-# Test 2: ingest XSD → yarrrml-gen --run → JSON-LD
+# Test 2: ingest XSD → compile + run → JSON-LD
 # ---------------------------------------------------------------------------
 
 
@@ -180,12 +180,12 @@ def test_full_chain_xsd_to_jsonld(
     stress_dir: Path,
     master_schema_path: Path,
 ) -> None:
-    """XSD → ingest → yarrrml-gen (spec only) materialisation pipeline.
+    """XSD → ingest → compile (spec only) materialisation pipeline.
 
-    NOTE: `--run` XML materialisation is only exercised when the ingested XSD's
+    NOTE: `rosetta run` XML materialisation is only exercised when the ingested XSD's
     slots CURIE-align with a master slot. The stress XSD's attributes don't
     naturally map to master_cop slots, so we downgrade to asserting that
-    yarrrml-gen successfully produces a TransformSpec YAML (without --run).
+    compile successfully produces a TransformSpec YAML (without rosetta run).
     Plan 18-02 permits this downgrade when XML materialisation isn't supported
     end-to-end on a given fixture.
     """
@@ -207,7 +207,7 @@ def test_full_chain_xsd_to_jsonld(
 
     # 2. Build a minimal SSSOM TSV with 3 identity mappings referencing the
     # ingested schema's default prefix. We don't try to match master slots
-    # precisely — yarrrml-gen will simply skip unresolvable rows (the
+    # precisely — compile will simply skip unresolvable rows (the
     # `--allow-empty` flag keeps it exiting 0 when no rows resolve).
     sssom = _write_sssom_approved(
         tmp_path / "approved.sssom.tsv",
@@ -223,11 +223,11 @@ def test_full_chain_xsd_to_jsonld(
         ],
     )
 
-    # 3. Run yarrrml-gen WITHOUT --run. Assert exit 0 + a TransformSpec YAML
+    # 3. Run compile WITHOUT rosetta run. Assert exit 0 + a TransformSpec YAML
     # is emitted. This is the "weaker invariant" fallback authorised by the plan.
     spec_out = tmp_path / "transform.spec.yaml"
     yg_result = runner.invoke(
-        yarrrml_cli,
+        compile_cli,
         [
             str(sssom),
             "--source-schema",
@@ -240,7 +240,7 @@ def test_full_chain_xsd_to_jsonld(
     )
     # compile may exit 1 if empty after filtering (XSD schema prefix may not match)
     # The weaker invariant: if spec_out was written it's valid YAML; if not, just skip.
-    assert yg_result.exit_code in (0, 1), f"yarrrml compile: {yg_result.stderr}"
+    assert yg_result.exit_code in (0, 1), f"compile: {yg_result.stderr}"
     if yg_result.exit_code != 0:
         pytest.skip("compile produced no rows for XSD fixture — weaker invariant satisfied")
     assert spec_out.exists(), "TransformSpec YAML should have been written"

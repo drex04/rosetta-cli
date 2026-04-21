@@ -1,4 +1,4 @@
-"""rosetta-ingest — normalise a schema file to LinkML YAML."""
+"""rosetta ingest — normalise a schema file to LinkML YAML."""
 
 from __future__ import annotations
 
@@ -17,7 +17,13 @@ from rosetta.core.normalize import (
 )
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta ingest schema.json -o output.linkml.yaml
+
+  rosetta -v ingest schema.xsd --schema-format xsd -o output.linkml.yaml"""
+)
 @click.argument("schema_file", type=click.Path(exists=True))
 @click.option(
     "--schema-format",

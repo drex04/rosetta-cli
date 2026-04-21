@@ -78,12 +78,12 @@ The canonical production layout splits generated and hand-authored shapes into s
 ```
 rosetta/policies/shacl/
 ├── generated/
-│   └── master.shacl.ttl        ← written by rosetta-shacl-gen (rerunnable)
+│   └── master.shacl.ttl        ← written by rosetta shacl-gen (rerunnable)
 └── overrides/
     └── track_bearing_range.ttl  ← hand-authored tightening (never touched by regen)
 ```
 
-- **`generated/`** — the output of `rosetta-shacl-gen`. Treat it as a build artifact: check in to track drift, but do not edit it directly.
+- **`generated/`** — the output of `rosetta shacl-gen`. Treat it as a build artifact: check in to track drift, but do not edit it directly.
 - **`overrides/`** — any `.ttl` files here are merged on top of the generated shapes by `rosetta validate` and `rosetta run --validate` (both walk the directory recursively). Use this directory for:
     - Tightening a generated constraint (e.g., `mc:AirTrackBearingRangeShape` adds `0–360` range to the `mc:hasBearing` slot).
     - Cross-class constraints not expressible in LinkML.

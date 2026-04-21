@@ -16,7 +16,7 @@ Output is a 15-column SSSOM TSV with a YAML comment header:
 
 ```
 # mapping_set_id: https://rosetta-cli/mappings
-# mapping_tool: rosetta-suggest
+# mapping_tool: rosetta suggest
 # license: https://creativecommons.org/licenses/by/4.0/
 # curie_map:
 #   skos: http://www.w3.org/2004/02/skos/core#
@@ -47,7 +47,7 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 
 ## Structural blending
 
-When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
+When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
 
 When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 

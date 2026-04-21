@@ -1,4 +1,4 @@
-"""Integration tests for rosetta-ingest on stress fixtures (Phase 18-02)."""
+"""Integration tests for rosetta ingest on stress fixtures (Phase 18-02)."""
 
 from __future__ import annotations
 

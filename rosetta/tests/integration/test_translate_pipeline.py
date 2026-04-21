@@ -1,4 +1,4 @@
-"""Integration tests for rosetta-translate (Phase 18-02, Task 3.6).
+"""Integration tests for rosetta translate (Phase 18-02, Task 3.6).
 
 All DeepL calls are mocked via the ``fake_deepl`` conftest fixture — zero API credits.
 """

@@ -119,7 +119,7 @@ def test_run_stdout_and_validate_report_collision(
 
 
 def test_suggest_missing_required_args(tmp_path: Path) -> None:
-    """`rosetta-suggest` with no positional args → Click exits 2 with usage.
+    """`rosetta suggest` with no positional args → Click exits 2 with usage.
 
     `suggest_cli` declares two `click.argument`s (SOURCE, MASTER). Missing
     either → Click's built-in missing-argument error (exit code 2).

@@ -1,4 +1,4 @@
-"""rosetta-compile — compile SSSOM audit log to YARRRML mapping artifact."""
+"""rosetta compile — compile SSSOM audit log to YARRRML mapping artifact."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _resolve_source_format(source_def: SchemaDefinition) -> str:
     click.echo(
         (
             "Error: source schema lacks annotations.rosetta_source_format. "
-            "Re-run rosetta-ingest (which stamps the annotation on new schemas) "
+            "Re-run rosetta ingest (which stamps the annotation on new schemas) "
             "to produce a schema with this annotation."
         ),
         err=True,
@@ -41,7 +41,14 @@ def _resolve_source_format(source_def: SchemaDefinition) -> str:
     sys.exit(1)
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta compile audit.sssom.tsv --source-schema src.yaml --master-schema master.yaml -o map.yaml
+
+  rosetta -v compile audit.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      -o mapping.yaml --spec-output spec.yaml"""
+)
 @click.argument("sssom_file", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "--source-schema",
@@ -84,8 +91,8 @@ def cli(
 ) -> None:
     """Compile an SSSOM audit log to a YARRRML mapping artifact.
 
-    SSSOM_FILE is the path to the SSSOM audit log TSV produced by rosetta-accredit.
-    The primary output is YARRRML (the executable artifact consumed by rosetta-run).
+    SSSOM_FILE is the path to the SSSOM audit log TSV produced by rosetta accredit.
+    The primary output is YARRRML (the executable artifact consumed by rosetta run).
     Use --spec-output to also write the intermediate TransformSpec YAML.
     """
     # 1. Parse SSSOM audit log
@@ -101,9 +108,6 @@ def cli(
             SchemaDefinition,
             yaml_loader.load(source_schema, target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
         )
-    except (FileNotFoundError, OSError, yaml.YAMLError) as exc:
-        click.echo(f"Error loading source schema {source_schema}: {exc}", err=True)
-        sys.exit(1)
     except Exception as exc:
         click.echo(f"Error loading source schema {source_schema}: {exc}", err=True)
         sys.exit(1)
@@ -114,9 +118,6 @@ def cli(
             SchemaDefinition,
             yaml_loader.load(master_schema, target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
         )
-    except (FileNotFoundError, OSError, yaml.YAMLError) as exc:
-        click.echo(f"Error loading master schema {master_schema}: {exc}", err=True)
-        sys.exit(1)
     except Exception as exc:
         click.echo(f"Error loading master schema {master_schema}: {exc}", err=True)
         sys.exit(1)
@@ -201,7 +202,11 @@ def cli(
         sys.exit(1)
 
     # 12. Write YARRRML to stdout or --output
-    with open_output(output) as out:
-        out.write(yarrrml_text)
+    try:
+        with open_output(output) as out:
+            out.write(yarrrml_text)
+    except OSError as exc:
+        click.echo(f"Error writing YARRRML output: {exc}", err=True)
+        sys.exit(1)
 
     sys.exit(0)

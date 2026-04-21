@@ -1,4 +1,4 @@
-"""rosetta-accredit: Manage mapping accreditation via append-only SSSOM audit log."""
+"""rosetta accredit: Manage mapping accreditation via append-only SSSOM audit log."""
 
 from __future__ import annotations
 
@@ -26,7 +26,13 @@ from rosetta.core.io import open_output
 from rosetta.core.models import SSSOMRow
 
 
-@click.group()
+@click.group(
+    epilog="""Examples:
+
+  rosetta accredit append proposals.sssom.tsv
+
+  rosetta accredit review -o pending.sssom.tsv"""
+)
 @click.option("--audit-log", "log", default=None, help="Path to audit-log SSSOM TSV")
 @click.option("--config", "-c", "config", default=None, help="Path to rosetta.toml")
 @click.pass_context
@@ -62,7 +68,14 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
         writer.writerow([_row_to_tsv_cell(row, col) for col in AUDIT_LOG_COLUMNS])
 
 
-@cli.command("append")
+@cli.command(
+    "append",
+    epilog="""Examples:
+
+  rosetta accredit append proposals.sssom.tsv
+
+  rosetta -v accredit --audit-log store/audit-log.sssom.tsv append proposals.sssom.tsv""",
+)
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 @click.pass_context
 def append_cmd(ctx: click.Context, file: Path) -> None:
@@ -123,7 +136,14 @@ def append_cmd(ctx: click.Context, file: Path) -> None:
     )
 
 
-@cli.command("review")
+@cli.command(
+    "review",
+    epilog="""Examples:
+
+  rosetta accredit review
+
+  rosetta accredit review -o pending.sssom.tsv""",
+)
 @click.option("-o", "--output", "output", default=None, help="Output file (default stdout)")
 @click.pass_context
 def review(ctx: click.Context, output: str | None) -> None:
@@ -136,7 +156,14 @@ def review(ctx: click.Context, output: str | None) -> None:
         _write_sssom_tsv(pending, out)
 
 
-@cli.command("dump")
+@cli.command(
+    "dump",
+    epilog="""Examples:
+
+  rosetta accredit dump
+
+  rosetta accredit dump -o accredited.sssom.tsv""",
+)
 @click.option("-o", "--output", "output", default=None, help="Output file (default stdout)")
 @click.pass_context
 def dump(ctx: click.Context, output: str | None) -> None:

@@ -1,6 +1,6 @@
 # rosetta validate
 
-Validates an RDF data file (Turtle or JSON-LD) against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
+Validates a JSON-LD data file against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
 
 ## Command reference
 
@@ -16,20 +16,6 @@ Validates an RDF data file (Turtle or JSON-LD) against [SHACL](https://www.w3.or
 
 ```bash
 # Load all *.ttl shapes (generated + hand-authored overrides) from a directory
-uv run rosetta validate mapping.rml.ttl rosetta/policies/shacl/ \
-  -o validation.json
-```
-
-## JSON-LD input
-
-`rosetta validate` accepts JSON-LD as data input — useful for validating output from `rosetta run`. Format is autodetected by suffix:
-
-- `.ttl` → Turtle
-- `.jsonld`, `.json`, `.json-ld` → JSON-LD
-- Anything else → fallback to Turtle
-
-```bash
-# Validate JSON-LD output from rosetta run
 uv run rosetta validate out.jsonld rosetta/policies/shacl/ \
   -o validation.json
 ```

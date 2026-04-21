@@ -33,13 +33,13 @@ Fall back to Read only when you need the full file for editing.
 ## Project
 
 Composable CLI tools for semantic mapping between NATO defense schemas and a master ontology.
-Tools: `rosetta-ingest`, `rosetta-embed`, `rosetta-suggest`, `rosetta-lint`, `rosetta-validate`, `rosetta-yarrrml-gen`, `rosetta-provenance`, `rosetta-accredit`.
+Subcommands: `rosetta ingest`, `rosetta translate`, `rosetta embed`, `rosetta suggest`, `rosetta lint`, `rosetta compile`, `rosetta run`, `rosetta validate`, `rosetta shacl-gen`, `rosetta accredit`.
 
 ## Stack
 
 - **Language:** Python 3.11+ | **Package manager:** uv
 - `uv run pytest` — run tests
-- `uv run rosetta-ingest` — run a tool
+- `uv run rosetta ingest` — run a tool
 - `uv sync` — install deps
 - `uv add <pkg>` — add dependency
 
@@ -96,9 +96,9 @@ User-facing JSON outputs are typed via Pydantic v2:
 
 | Output            | Model                                                                  |
 | ----------------- | ---------------------------------------------------------------------- |
-| `rosetta-lint`    | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
-| `rosetta-suggest` | `SuggestionReport` (RootModel)                                         |
-| `rosetta-embed`   | `EmbeddingReport` (RootModel)                                          |
+| `rosetta lint`    | `LintReport` (contains `LintFinding`, `LintSummary`, `FnmlSuggestion`) |
+| `rosetta suggest` | `SuggestionReport` (RootModel)                                         |
+| `rosetta embed`   | `EmbeddingReport` (RootModel)                                          |
 
 - Construct model instances in the CLI, not bare dicts.
 - Serialise with `model.model_dump(mode="json")` before `json.dumps()`.

@@ -1,4 +1,4 @@
-"""Unit utilities for rosetta-lint: QUDT IRI mapping, dimension vectors,
+"""Unit utilities for rosetta lint: QUDT IRI mapping, dimension vectors,
 compatibility, and FnML suggestions."""
 
 from __future__ import annotations

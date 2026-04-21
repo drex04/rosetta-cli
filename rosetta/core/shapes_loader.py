@@ -1,6 +1,6 @@
 """Recursive, symlink-safe loader for SHACL shapes directories.
 
-Used by ``rosetta-validate`` and (after Plan 19-03) ``rosetta-yarrrml-gen --validate``.
+Used by ``rosetta validate`` and (after Plan 19-03) ``rosetta run --validate``.
 
 Core-layer module: stays framework-agnostic. Raises stdlib ``ValueError`` on
 user-visible input problems; CLI callers wrap these into ``click.UsageError``.

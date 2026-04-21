@@ -67,4 +67,4 @@ log = "store/audit-log.sssom.tsv"
 |-----|---------|---------|
 | `log` | `"store/audit-log.sssom.tsv"` | Path to the append-only audit log |
 
-`rosetta-suggest` and `rosetta-lint` both read `[accredit].log` automatically when it is set, providing boost/derank and conflict-checking without explicit flags.
+`rosetta suggest` and `rosetta lint` both read `[accredit].log` automatically when it is set, providing boost/derank and conflict-checking without explicit flags.

@@ -31,7 +31,7 @@ def test_ingest_malformed_json(adversarial_dir: Path, tmp_path: Path) -> None:
     """Malformed JSON with trailing comma → exit 1, JSON-related stderr, no output.
 
     Underlying exception: ``json.JSONDecodeError`` raised by schema-automator's
-    ``JsonSchemaImportEngine.convert`` → wrapped by ``rosetta-ingest`` into
+    ``JsonSchemaImportEngine.convert`` → wrapped by ``rosetta ingest`` into
     ``Error: <message>``. Observed message starts with "Illegal trailing comma"
     and includes a line number — we pin only the stable substrings.
     """
@@ -71,7 +71,7 @@ def test_ingest_truncated_xsd(adversarial_dir: Path, tmp_path: Path) -> None:
 
     Underlying exception: ``lxml.etree.XMLSyntaxError`` raised by
     schema-automator's ``XsdImportEngine`` (schema-automator uses lxml, not
-    stdlib ``xml.etree``). Wrapped by ``rosetta-ingest`` as
+    stdlib ``xml.etree``). Wrapped by ``rosetta ingest`` as
     ``Error: Premature end of data in tag ...``.
     """
     out = tmp_path / "out.yaml"
@@ -183,9 +183,9 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
 def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """LinkML master with zero classes → embed exits 1 ("No embeddable nodes").
 
-    OBSERVED BEHAVIOR: ``rosetta-suggest`` takes *embedding JSON* files, not
+    OBSERVED BEHAVIOR: ``rosetta suggest`` takes *embedding JSON* files, not
     raw LinkML YAML. An empty master schema therefore fails upstream in
-    ``rosetta-embed`` with ``Error: No embeddable nodes found in schema.``
+    ``rosetta embed`` with ``Error: No embeddable nodes found in schema.``
     before ``suggest`` is ever reached — the "empty master" condition is
     surfaced as an embed failure, not a suggest failure. This is the current
     behavior; if suggest-level empty-master handling is ever added, update

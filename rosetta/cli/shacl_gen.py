@@ -1,4 +1,4 @@
-"""rosetta-shacl-gen: Generate SHACL shapes from a master LinkML schema."""
+"""rosetta shacl-gen: Generate SHACL shapes from a master LinkML schema."""
 
 from __future__ import annotations
 
@@ -10,7 +10,13 @@ from rosetta.core.io import open_output
 from rosetta.core.shacl_generator import generate_shacl
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta shacl-gen master.linkml.yaml -o rosetta/policies/shapes.ttl
+
+  rosetta shacl-gen master.linkml.yaml --open -o rosetta/policies/shapes.ttl"""
+)
 @click.argument(
     "schema_file",
     type=click.Path(exists=True, dir_okay=False),

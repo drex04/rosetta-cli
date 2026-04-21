@@ -1,10 +1,10 @@
-"""Adversarial fixture-hygiene test for rosetta-yarrrml-gen (Phase 18-03, Task 7).
+"""Adversarial fixture-hygiene test for rosetta compile/run (Phase 18-03, Task 7).
 
 Phase 16-03's e2e test (``test_yarrrml_run_e2e.py``) works around a LinkML
 fixture typo — ``range: dateTime`` (capital T, invalid) instead of ``range:
 datetime`` — by rewriting the schema text before invoking the CLI. This
 adversarial test exercises the opposite contract: when the typo is present,
-``rosetta-yarrrml-gen --run`` surfaces a clear diagnostic (via the wrapped
+``rosetta run`` surfaces a clear diagnostic (via the wrapped
 ``RuntimeError`` / ``ValueError`` from
 ``linkml.generators.jsonldcontextgen.ContextGenerator``) rather than crashing
 opaquely, and it does not leave partial JSON-LD output behind.
@@ -157,12 +157,12 @@ def _master_schema_body_with_datetime_typo() -> dict[str, Any]:
     }
 
 
-def test_yarrrml_gen_run_with_datetime_typo(tmp_path: Path, nor_csv_sample_path: Path) -> None:
+def test_compile_run_with_datetime_typo(tmp_path: Path, nor_csv_sample_path: Path) -> None:
     """Master schema with ``range: dateTime`` typo → exit 1 with a clear diagnostic.
 
     Pins the observable error surface when the Phase 16-03 fixture-hygiene typo
     is present: ``ContextGenerator`` rejects ``dateTime`` (capital T) with a
-    ValueError, surfaced through the yarrrml-gen CLI's generic-exception block
+    ValueError, surfaced through the rosetta run CLI's generic-exception block
     as ``Error: {exc}`` on stderr. The substring check tolerates either
     ``dateTime``, ``ContextGenerator``, or ``@context`` — whichever the current
     error path emits — since LinkML's exact wording may drift.
@@ -277,7 +277,7 @@ def test_yarrrml_gen_run_with_datetime_typo(tmp_path: Path, nor_csv_sample_path:
         f"got: {result.stderr!r}"
     )
     # 3. Behavioral invariant: no JSON-LD output written (ContextGenerator
-    #    fails before the write step in cli/yarrrml_gen.py).
+    #    fails before the write step in cli/run.py).
     assert not jsonld_out.exists() or jsonld_out.stat().st_size == 0, (
         "JSON-LD output must not be written when ContextGenerator rejects the schema"
     )

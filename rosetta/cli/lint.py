@@ -1,4 +1,4 @@
-"""rosetta-lint: Validate unit and datatype compatibility in field mappings."""
+"""rosetta lint: Validate unit and datatype compatibility in field mappings."""
 
 import sys
 from pathlib import Path
@@ -239,7 +239,15 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
         )
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      --audit-log store/audit-log.sssom.tsv
+
+  rosetta -v lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      --audit-log store/audit-log.sssom.tsv -o report.json"""
+)
 @click.argument("sssom_file", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")

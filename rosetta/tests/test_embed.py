@@ -1,4 +1,4 @@
-"""Tests for rosetta-embed: embedding.py core + embed CLI."""
+"""Tests for rosetta embed: embedding.py core + embed CLI."""
 
 from __future__ import annotations
 

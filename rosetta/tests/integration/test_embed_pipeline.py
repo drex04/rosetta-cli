@@ -1,4 +1,4 @@
-"""Integration test for rosetta-embed on nested-JSON ingest output (Phase 18-02)."""
+"""Integration test for rosetta embed on nested-JSON ingest output (Phase 18-02)."""
 
 from __future__ import annotations
 
