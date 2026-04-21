@@ -271,11 +271,11 @@ classes:
 
 
 def test_cli_writes_output_file(master_schema_path: Path, tmp_path: Path) -> None:
-    """End-to-end CLI: --input + --output writes parseable Turtle, exit code 0."""
+    """End-to-end CLI: positional SCHEMA_FILE + --output writes parseable Turtle, exit code 0."""
     out_path = tmp_path / "shapes.ttl"
     result = CliRunner(mix_stderr=False).invoke(
         cli,
-        ["--input", str(master_schema_path), "--output", str(out_path)],
+        [str(master_schema_path), "--output", str(out_path)],
     )
     assert result.exit_code == 0, f"cli exited {result.exit_code}; stderr={result.stderr!r}"
     assert out_path.exists(), "expected --output file to be written"
@@ -291,7 +291,7 @@ def test_cli_malformed_yaml_exits_nonzero(tmp_path: Path) -> None:
     out_path = tmp_path / "shapes.ttl"
     result = CliRunner(mix_stderr=False).invoke(
         cli,
-        ["--input", str(bad), "--output", str(out_path)],
+        [str(bad), "--output", str(out_path)],
     )
     assert result.exit_code != 0, "malformed YAML should surface non-zero exit"
     assert result.stderr, "malformed YAML should emit a non-empty stderr message"

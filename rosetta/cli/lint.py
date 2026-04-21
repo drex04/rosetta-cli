@@ -240,51 +240,49 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
 
 
 @click.command()
-@click.option(
-    "--sssom",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    default=None,
-    help="SSSOM TSV file to lint.",
-)
+@click.argument("sssom_file", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")
 @click.option("--config", default=None, help="Path to rosetta.toml config file.")
 @click.option(
+    "--audit-log",
+    type=click.Path(),
+    default=None,
+    help="Path to SSSOM audit log.",
+)
+@click.option(
     "--source-schema",
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    default=None,
+    required=True,
     help="Source LinkML schema YAML (enables structural checks).",
 )
 @click.option(
     "--master-schema",
     type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    default=None,
+    required=True,
     help="Master LinkML schema YAML (enables structural checks).",
 )
 def cli(
-    sssom: str | None,
+    sssom_file: str,
     output: str | None,
     strict: bool,
     config: str | None,
-    source_schema: str | None,
-    master_schema: str | None,
+    audit_log: str | None,
+    source_schema: str,
+    master_schema: str,
 ) -> None:
     """Lint a SSSOM proposal TSV for unit/datatype compatibility and structural rules."""
-    if sssom is None:
-        click.echo("Error: --sssom is required.", err=True)
-        sys.exit(1)
-
-    if bool(source_schema) != bool(master_schema):
-        click.echo(
-            "Error: --source-schema and --master-schema must be provided together.",
-            err=True,
-        )
-        sys.exit(1)
-
-    rows = parse_sssom_tsv(Path(sssom))
     cfg = load_config(Path(config)) if config else load_config()
-    log_path_str = get_config_value(cfg, "accredit", "log")
-    log = load_log(Path(log_path_str)) if log_path_str and Path(log_path_str).exists() else []
+
+    # Resolve audit log: CLI flag > config > error
+    resolved_log_path: str | None = audit_log or get_config_value(cfg, "accredit", "log")
+    if resolved_log_path is None:
+        raise click.UsageError("Audit log not found — run rosetta accredit append first")
+    if not Path(resolved_log_path).exists():
+        raise click.UsageError("Audit log not found — run rosetta accredit append first")
+
+    rows = parse_sssom_tsv(Path(sssom_file))
+    log = load_log(Path(resolved_log_path))
 
     findings: list[LintFinding] = []
 
@@ -293,26 +291,25 @@ def cli(
 
     confirmed_rows = [r for r in rows if r.mapping_justification in {MMC, HC}]
 
-    # 2. Structural reachability check (requires schemas)
-    if source_schema and master_schema:
-        source_view = SchemaView(source_schema)
-        master_view = SchemaView(master_schema)
-        for mismatch in check_slot_class_reachability(confirmed_rows, source_view, master_view):
-            findings.append(
-                LintFinding(
-                    rule="slot_class_unreachable",
-                    severity="BLOCK",
-                    source_uri=mismatch.row.subject_id,
-                    target_uri=mismatch.row.object_id,
-                    message=(
-                        f"Slot '{mismatch.target_slot_name}' belongs to class "
-                        f"'{mismatch.target_owning_class}' which is not reachable from any "
-                        f"mapped class ({', '.join(sorted(mismatch.mapped_target_classes))}). "
-                        f"Map the source class to '{mismatch.target_owning_class}' or one of "
-                        f"its subclasses."
-                    ),
-                )
+    # 2. Structural reachability check
+    source_view = SchemaView(source_schema)
+    master_view = SchemaView(master_schema)
+    for mismatch in check_slot_class_reachability(confirmed_rows, source_view, master_view):
+        findings.append(
+            LintFinding(
+                rule="slot_class_unreachable",
+                severity="BLOCK",
+                source_uri=mismatch.row.subject_id,
+                target_uri=mismatch.row.object_id,
+                message=(
+                    f"Slot '{mismatch.target_slot_name}' belongs to class "
+                    f"'{mismatch.target_owning_class}' which is not reachable from any "
+                    f"mapped class ({', '.join(sorted(mismatch.mapped_target_classes))}). "
+                    f"Map the source class to '{mismatch.target_owning_class}' or one of "
+                    f"its subclasses."
+                ),
             )
+        )
 
     # 3. Per-row unit + datatype checks (user-confirmed mappings only)
     try:

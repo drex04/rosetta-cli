@@ -11,12 +11,9 @@ from rosetta.core.shacl_generator import generate_shacl
 
 
 @click.command()
-@click.option(
-    "--input",
-    "input_path",
-    required=True,
+@click.argument(
+    "schema_file",
     type=click.Path(exists=True, dir_okay=False),
-    help="Master LinkML YAML schema to derive SHACL shapes from.",
 )
 @click.option(
     "--output",
@@ -44,7 +41,7 @@ from rosetta.core.shacl_generator import generate_shacl
     help="Path to rosetta.toml.",
 )
 def cli(
-    input_path: str,
+    schema_file: str,
     output: str | None,
     open_flag: bool,
     config: str | None,
@@ -58,7 +55,7 @@ def cli(
     """
     del config  # Reserved for parity with other CLIs; no settings consumed yet.
     try:
-        turtle = generate_shacl(input_path, closed=not open_flag)
+        turtle = generate_shacl(schema_file, closed=not open_flag)
         with open_output(output) as fh:
             fh.write(turtle)
             if not turtle.endswith("\n"):

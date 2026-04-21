@@ -20,27 +20,32 @@ from rosetta.core.models import ValidationReport
 pytestmark = [pytest.mark.integration]
 
 
-_CONFORMANT_TRACK_TTL = """\
-@prefix mc:   <https://ontology.nato.int/core/MasterCOP#> .
-@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-
-mc:track-1 rdf:type mc:AirTrack .
+_CONFORMANT_TRACK_JSONLD = """\
+{
+  "@context": {
+    "mc": "https://ontology.nato.int/core/MasterCOP#"
+  },
+  "@id": "mc:track-1",
+  "@type": "mc:AirTrack"
+}
 """
 
 
 def test_shacl_gen_output_consumed_by_validate_single_file(
     master_schema_path: Path, tmp_path: Path
 ) -> None:
-    """`shacl-gen` writes shapes → `validate` consumes them with `--shapes`.
+    """`shacl-gen` writes shapes → `validate` consumes them via shapes dir.
 
     Confirms the generated Turtle is not just parseable in isolation but
-    also round-trips through the validate CLI as a single-file shapes input.
+    also round-trips through the validate CLI as a shapes-dir input.
     """
-    shapes_out = tmp_path / "master.shacl.ttl"
+    shapes_dir = tmp_path / "shapes"
+    shapes_dir.mkdir()
+    shapes_out = shapes_dir / "master.shacl.ttl"
 
     gen_result = CliRunner(mix_stderr=False).invoke(
         shacl_gen_cli,
-        ["--input", str(master_schema_path), "--output", str(shapes_out)],
+        [str(master_schema_path), "--output", str(shapes_out)],
     )
     assert gen_result.exit_code == 0, (
         f"shacl-gen failed: {gen_result.exit_code}; stderr={gen_result.stderr!r}"
@@ -48,17 +53,15 @@ def test_shacl_gen_output_consumed_by_validate_single_file(
     assert shapes_out.exists()
     assert shapes_out.stat().st_size > 1000, "generated shapes file implausibly small"
 
-    data = tmp_path / "track.ttl"
-    data.write_text(_CONFORMANT_TRACK_TTL, encoding="utf-8")
+    data = tmp_path / "track.jsonld"
+    data.write_text(_CONFORMANT_TRACK_JSONLD, encoding="utf-8")
     report_out = tmp_path / "report.json"
 
     val_result = CliRunner(mix_stderr=False).invoke(
         validate_cli,
         [
-            "--data",
             str(data),
-            "--shapes",
-            str(shapes_out),
+            str(shapes_dir),
             "--output",
             str(report_out),
         ],
@@ -90,7 +93,6 @@ def test_shacl_gen_output_consumed_by_validate_shapes_dir(
     gen_result = CliRunner(mix_stderr=False).invoke(
         shacl_gen_cli,
         [
-            "--input",
             str(master_schema_path),
             "--output",
             str(generated / "master.shacl.ttl"),
@@ -98,16 +100,14 @@ def test_shacl_gen_output_consumed_by_validate_shapes_dir(
     )
     assert gen_result.exit_code == 0, f"shacl-gen failed: {gen_result.stderr!r}"
 
-    data = tmp_path / "track.ttl"
-    data.write_text(_CONFORMANT_TRACK_TTL, encoding="utf-8")
+    data = tmp_path / "track.jsonld"
+    data.write_text(_CONFORMANT_TRACK_JSONLD, encoding="utf-8")
     report_out = tmp_path / "report.json"
 
     val_result = CliRunner(mix_stderr=False).invoke(
         validate_cli,
         [
-            "--data",
             str(data),
-            "--shapes-dir",
             str(shapes_dir),
             "--output",
             str(report_out),

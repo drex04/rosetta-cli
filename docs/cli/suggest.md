@@ -1,4 +1,4 @@
-# rosetta-suggest
+# rosetta suggest
 
 Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. When an audit log is configured, automatically boosts previously approved mappings and deranks rejected ones.
 
@@ -7,7 +7,7 @@ Compares source embeddings against master embeddings and ranks candidates by cos
 ::: mkdocs-click
     :module: rosetta.cli.suggest
     :command: cli
-    :prog_name: rosetta-suggest
+    :prog_name: rosetta suggest
     :depth: 2
 
 ## Output — SSSOM TSV
@@ -53,7 +53,7 @@ When blending is active, `mapping_justification` is `semapv:CompositeMatching`; 
 
 ## Audit-log integration
 
-When `[accredit].log` is set in `rosetta.toml` and the log file exists, `rosetta-suggest` automatically:
+When `[accredit].audit_log` is set in `rosetta.toml` (or `--audit-log` is passed) and the log file exists, `rosetta suggest` automatically:
 
 - **Boosts** candidates whose (subject, object) pair has an approved `HumanCuration` row in the log.
 - **Deranks** candidates whose pair has a rejected `HumanCuration` row (`predicate_id = owl:differentFrom`).
@@ -64,7 +64,7 @@ This means `candidates.sssom.tsv` provides a complete picture: newly computed ca
 ## Example
 
 ```bash
-uv run rosetta-suggest nor.emb.json master.emb.json --output candidates.sssom.tsv
+uv run rosetta suggest nor.emb.json master.emb.json --output candidates.sssom.tsv
 ```
 
 ## Exit codes

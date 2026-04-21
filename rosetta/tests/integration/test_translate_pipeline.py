@@ -98,7 +98,6 @@ def test_translate_de_pipeline(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -131,7 +130,6 @@ def test_translate_fr_pipeline(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -182,7 +180,6 @@ def test_translate_batch_efficiency(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -240,7 +237,6 @@ def test_translate_mixed_language(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),

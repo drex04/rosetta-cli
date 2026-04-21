@@ -27,7 +27,7 @@ from rosetta.core.models import SSSOMRow
 
 
 @click.group()
-@click.option("--log", default=None, help="Path to audit-log SSSOM TSV")
+@click.option("--audit-log", "log", default=None, help="Path to audit-log SSSOM TSV")
 @click.option("--config", "-c", "config", default=None, help="Path to rosetta.toml")
 @click.pass_context
 def cli(ctx: click.Context, log: str | None, config: str | None) -> None:

@@ -1,14 +1,15 @@
-"""Tests for SHACL shapes loading, override merging, and loader edge-cases.
+"""Phase 19 / Plan 19-02 / Task 5 — tests for SHACL overrides + shapes_loader.
 
-Covers:
+Six tests covering:
 
-1. Recursive merge of generated + override shapes via ``load_shapes_from_dir``.
-2. Override constraint (``mc:AirTrackBearingRangeShape``) fires on invalid data.
-3. Re-running ``rosetta-shacl-gen`` does NOT touch unrelated files.
-4. ``load_shapes_from_dir`` is symlink-loop safe and parses each file once.
-5. ``load_shapes_from_dir`` warns on Turtle files containing no SHACL shapes.
-6. ``load_shapes_from_dir`` surfaces file path on malformed Turtle.
-7. ``load_shapes_from_dir`` rejects non-directory paths.
+1. Recursive merge of generated + override shapes from ``rosetta/policies/shacl/``.
+2. Override constraint (``mc:AirTrackBearingRangeShape``) actually fires on a
+   data graph with an out-of-range ``mc:hasBearing``.
+3. Re-running ``rosetta-shacl-gen`` does NOT touch the overrides directory.
+4. Legacy ``rosetta/policies/mapping.shacl.ttl`` is fully removed (D-19-09).
+5. ``load_shapes_from_dir`` is symlink-loop safe and parses each file once.
+6. ``load_shapes_from_dir`` warns on Turtle files containing no SHACL shapes
+   but still merges them (D-19-17 — open-world warn-and-merge).
 """
 
 from __future__ import annotations
@@ -35,10 +36,14 @@ SH = rdflib.Namespace("http://www.w3.org/ns/shacl#")
 MC = rdflib.Namespace("https://ontology.nato.int/core/MasterCOP#")
 XSD = rdflib.Namespace("http://www.w3.org/2001/XMLSchema#")
 
-_NATIONS = Path(__file__).resolve().parent / "fixtures" / "nations"
-_MASTER_SCHEMA = _NATIONS / "master_cop.linkml.yaml"
-_GENERATED_SHAPES = _NATIONS / "master_cop.shapes.ttl"
-_OVERRIDE_SHAPES = _NATIONS / "track_bearing_range.override.ttl"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SHAPES_DIR = REPO_ROOT / "rosetta" / "policies" / "shacl"
+OVERRIDES_DIR = SHAPES_DIR / "overrides"
+GENERATED_DIR = SHAPES_DIR / "generated"
+OVERRIDE_FILE = OVERRIDES_DIR / "track_bearing_range.ttl"
+GENERATED_FILE = GENERATED_DIR / "master.shacl.ttl"
+LEGACY_MAPPING_SHACL = REPO_ROOT / "rosetta" / "policies" / "mapping.shacl.ttl"
+MASTER_SCHEMA = REPO_ROOT / "rosetta" / "tests" / "fixtures" / "nations" / "master_cop.linkml.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -46,25 +51,20 @@ _OVERRIDE_SHAPES = _NATIONS / "track_bearing_range.override.ttl"
 # ---------------------------------------------------------------------------
 
 
-def test_shapes_dir_recursive_merge(tmp_path: Path) -> None:
-    """``load_shapes_from_dir`` walks a dir and merges all .ttl shapes."""
-    shapes_dir = tmp_path / "shapes"
-    shapes_dir.mkdir()
-    (shapes_dir / "generated").mkdir()
+def test_shapes_dir_recursive_merge() -> None:
+    """``load_shapes_from_dir`` walks generated/ + overrides/ and merges all shapes."""
+    merged = load_shapes_from_dir(SHAPES_DIR)
 
-    import shutil
-
-    shutil.copy(_GENERATED_SHAPES, shapes_dir / "generated" / "master.shacl.ttl")
-    shutil.copy(_OVERRIDE_SHAPES, shapes_dir / "override.ttl")
-
-    merged = load_shapes_from_dir(shapes_dir)
-
+    # Generated shape — mc:AirTrack itself is declared as a sh:NodeShape with
+    # sh:targetClass mc:AirTrack in master.shacl.ttl (see generated head).
     assert (MC.AirTrack, RDF.type, SH.NodeShape) in merged
     assert (MC.AirTrack, SH.targetClass, MC.AirTrack) in merged
 
+    # Override shape — mc:AirTrackBearingRangeShape from overrides/.
     assert (MC.AirTrackBearingRangeShape, RDF.type, SH.NodeShape) in merged
     assert (MC.AirTrackBearingRangeShape, SH.targetClass, MC.AirTrack) in merged
 
+    # Total NodeShape count must be at least generated (43) + override (1).
     n_node_shapes = sum(1 for _ in merged.triples((None, RDF.type, SH.NodeShape)))
     assert n_node_shapes >= 44, (
         f"Expected at least 44 NodeShapes (43 generated + 1 override), got {n_node_shapes}"
@@ -76,16 +76,9 @@ def test_shapes_dir_recursive_merge(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_override_constraint_fires_on_data(tmp_path: Path) -> None:
+def test_override_constraint_fires_on_data() -> None:
     """An mc:AirTrack with mc:hasBearing 400.0 must violate the override shape."""
-    import shutil
-
-    shapes_dir = tmp_path / "shapes"
-    shapes_dir.mkdir()
-    shutil.copy(_GENERATED_SHAPES, shapes_dir / "generated.ttl")
-    shutil.copy(_OVERRIDE_SHAPES, shapes_dir / "override.ttl")
-
-    merged = load_shapes_from_dir(shapes_dir)
+    merged = load_shapes_from_dir(SHAPES_DIR)
 
     data_g = rdflib.Graph()
     data_g.bind("mc", MC)
@@ -97,6 +90,10 @@ def test_override_constraint_fires_on_data(tmp_path: Path) -> None:
 
     assert not report.summary.conforms, "Out-of-range bearing should violate the override shape"
 
+    # The offending track must be cited as a focus node. The override shape is
+    # the only shape in the merged graph with a range constraint on
+    # mc:hasBearing, so any violation on the bad track means the override
+    # constraint fired.
     focus_nodes = {f.focus_node for f in report.findings}
     assert str(track) in focus_nodes, (
         f"Expected mc:track-bad-bearing in violation focus nodes; got {focus_nodes}"
@@ -104,22 +101,30 @@ def test_override_constraint_fires_on_data(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3 — override survives regen of generated shapes
+# Test 3 — override survives regen of generated/
 # ---------------------------------------------------------------------------
 
 
 def test_override_survives_regen(tmp_path: Path) -> None:
-    """Re-running ``rosetta-shacl-gen`` writes to ``--output`` and never touches other files."""
-    override_copy = tmp_path / "override.ttl"
-    import shutil
+    """Re-running ``rosetta-shacl-gen`` writes to ``--output`` and never touches overrides/.
 
-    shutil.copy(_OVERRIDE_SHAPES, override_copy)
-    pre_hash = hashlib.sha256(override_copy.read_bytes()).hexdigest()
+    Output is directed at a tmp_path file rather than the committed
+    ``generated/master.shacl.ttl`` because rdflib serialization is not
+    byte-deterministic — writing to the canonical path would churn the
+    working tree on every test run. The override-preservation assertion
+    is independent of where regen output lands.
+    """
+    pre_bytes = OVERRIDE_FILE.read_bytes()
+    pre_hash = hashlib.sha256(pre_bytes).hexdigest()
 
     regen_output = tmp_path / "regen.shacl.ttl"
     result = CliRunner().invoke(
         shacl_gen_cli,
-        ["--input", str(_MASTER_SCHEMA), "--output", str(regen_output)],
+        [
+            str(MASTER_SCHEMA),
+            "--output",
+            str(regen_output),
+        ],
     )
     assert result.exit_code == 0, (
         f"shacl-gen failed: exit={result.exit_code} output={result.output!r} "
@@ -127,14 +132,27 @@ def test_override_survives_regen(tmp_path: Path) -> None:
     )
     assert regen_output.exists(), "regen --output file was not written"
 
-    post_hash = hashlib.sha256(override_copy.read_bytes()).hexdigest()
+    post_hash = hashlib.sha256(OVERRIDE_FILE.read_bytes()).hexdigest()
     assert pre_hash == post_hash, (
-        "Override file was modified by rosetta-shacl-gen — regen must only touch --output."
+        "Overrides directory was modified by rosetta-shacl-gen — regen must only touch --output."
     )
 
 
 # ---------------------------------------------------------------------------
-# Test 4 — symlink-loop safety
+# Test 4 — legacy mapping.shacl.ttl removal regression guard (D-19-09)
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_mapping_shacl_removed() -> None:
+    """``rosetta/policies/mapping.shacl.ttl`` must NOT exist (D-19-09 deletion)."""
+    assert not LEGACY_MAPPING_SHACL.exists(), (
+        f"Legacy SHACL file resurfaced at {LEGACY_MAPPING_SHACL} — "
+        "D-19-09 mandated its deletion in favour of generated/ + overrides/."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 5 — symlink-loop safety (review-harden)
 # ---------------------------------------------------------------------------
 
 
@@ -165,11 +183,14 @@ def test_shapes_loader_does_not_follow_symlink_loop(tmp_path: Path) -> None:
     )
 
     ex = rdflib.Namespace("http://example.org/")
-    assert (ex.S, RDF.type, SH.NodeShape) in merged
-    assert (ex.S, SH.targetClass, ex.T) in merged
-
+    # Triple must be present exactly ONCE; rdflib graphs deduplicate by default,
+    # so we instead assert the count of triples loaded equals the count from a
+    # single direct parse (i.e. the loop did not trigger a second os.walk pass).
     direct = rdflib.Graph()
     direct.parse(str(valid_ttl), format="turtle")
+
+    assert (ex.S, RDF.type, SH.NodeShape) in merged
+    assert (ex.S, SH.targetClass, ex.T) in merged
     assert len(merged) == len(direct), (
         f"Expected {len(direct)} triples (single parse), got {len(merged)} — "
         "symlink loop caused duplicate parses."
@@ -177,7 +198,7 @@ def test_shapes_loader_does_not_follow_symlink_loop(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 5 — warn-and-merge on non-shape Turtle
+# Test 6 — warn-and-merge on non-shape Turtle (D-19-17)
 # ---------------------------------------------------------------------------
 
 
@@ -206,9 +227,11 @@ def test_shapes_loader_warns_on_non_shape_turtle(
     ex = rdflib.Namespace("http://example.org/")
     OWL = rdflib.Namespace("http://www.w3.org/2002/07/owl#")
 
+    # Both files merged.
     assert (ex.S, RDF.type, SH.NodeShape) in merged
     assert (ex.Foo, RDF.type, OWL.Class) in merged
 
+    # Stderr warning emitted for the non-shape file.
     captured = capsys.readouterr()
     assert "ontology.ttl contains no SHACL shapes" in captured.err, (
         f"Expected warning for ontology.ttl in stderr; got: {captured.err!r}"
@@ -216,13 +239,15 @@ def test_shapes_loader_warns_on_non_shape_turtle(
 
 
 # ---------------------------------------------------------------------------
-# Test 6 — malformed Turtle surfaces a file-scoped error
+# Test 7 — malformed Turtle surfaces a file-scoped error (GAP-4)
 # ---------------------------------------------------------------------------
 
 
 def test_shapes_loader_surfaces_file_path_on_malformed_turtle(tmp_path: Path) -> None:
     """A syntactically broken ``.ttl`` file must raise ``ValueError`` naming the
-    offending path."""
+    offending path — never an unattributed rdflib parser trace."""
+    # Write a valid file and a malformed one. Loader must fail pointing at the
+    # malformed file, not merely crash with "Bad syntax" and no file reference.
     (tmp_path / "valid.ttl").write_text(
         "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
         "@prefix ex: <http://example.org/> .\n"
@@ -238,7 +263,7 @@ def test_shapes_loader_surfaces_file_path_on_malformed_turtle(tmp_path: Path) ->
 
 def test_shapes_loader_rejects_non_directory(tmp_path: Path) -> None:
     """``load_shapes_from_dir`` must raise ``ValueError`` when pointed at a
-    non-directory path."""
+    non-directory path (file or missing), not return an empty graph."""
     missing = tmp_path / "does-not-exist"
     with pytest.raises(ValueError, match="not a directory"):
         load_shapes_from_dir(missing)

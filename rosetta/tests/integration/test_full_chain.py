@@ -71,9 +71,8 @@ def test_full_chain_json_to_lint(
     ingest_result = runner.invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "nested_json_schema.json"),
-            "--format",
+            "--schema-format",
             "json-schema",
             "--output",
             str(stress_yaml),
@@ -86,14 +85,14 @@ def test_full_chain_json_to_lint(
     src_embed = tmp_path / "src.embed.json"
     src_embed_result = runner.invoke(
         embed_cli,
-        ["--input", str(stress_yaml), "--output", str(src_embed)],
+        [str(stress_yaml), "--output", str(src_embed)],
     )
     assert src_embed_result.exit_code == 0, f"embed(src): {src_embed_result.stderr}"
 
     master_embed = tmp_path / "master.embed.json"
     master_embed_result = runner.invoke(
         embed_cli,
-        ["--input", str(master_schema_path), "--output", str(master_embed)],
+        [str(master_schema_path), "--output", str(master_embed)],
     )
     assert master_embed_result.exit_code == 0, f"embed(master): {master_embed_result.stderr}"
 
@@ -110,7 +109,15 @@ def test_full_chain_json_to_lint(
     lint_out = tmp_path / "lint.json"
     lint_result = runner.invoke(
         lint_cli,
-        ["--sssom", str(sssom_out), "--output", str(lint_out)],
+        [
+            str(sssom_out),
+            "--output",
+            str(lint_out),
+            "--source-schema",
+            str(stress_yaml),
+            "--master-schema",
+            str(master_schema_path),
+        ],
     )
     # Lint exit code is 0 only if no BLOCK findings exist.
     assert lint_result.exit_code == 0, f"lint: {lint_result.stderr}"
@@ -189,9 +196,8 @@ def test_full_chain_xsd_to_jsonld(
     ingest_result = runner.invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "complex_types.xsd"),
-            "--format",
+            "--schema-format",
             "xsd",
             "--output",
             str(xsd_yaml),

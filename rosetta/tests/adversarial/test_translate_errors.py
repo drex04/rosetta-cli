@@ -102,7 +102,6 @@ def test_translate_auth_failure(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -138,7 +137,6 @@ def test_translate_quota_exceeded(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -170,7 +168,6 @@ def test_translate_transient_error(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -206,7 +203,6 @@ def test_translate_missing_key_non_en(
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -249,7 +245,6 @@ def test_translate_en_passthrough_no_key(
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
@@ -291,7 +286,6 @@ def test_translate_empty_schema(tmp_path: Path, fake_deepl: Any) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         translate_cli,
         [
-            "--input",
             str(src),
             "--output",
             str(out),
