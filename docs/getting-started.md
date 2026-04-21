@@ -8,17 +8,17 @@ cd rosetta-cli
 uv sync
 ```
 
-All nine commands are then available via `uv run <tool>`:
+All nine commands are then available via `uv run rosetta <cmd>`:
 
 ```bash
-uv run rosetta-ingest --help
-uv run rosetta-embed --help
-uv run rosetta-suggest --help
+uv run rosetta ingest --help
+uv run rosetta embed --help
+uv run rosetta suggest --help
 # ...
 ```
 
 !!! tip "First embed run"
-    The default embedding model (`intfloat/e5-large-v2`, ~1.2 GB) downloads from HuggingFace on the first `rosetta-embed` invocation. Subsequent runs use the local cache.
+    The default embedding model (`intfloat/e5-large-v2`, ~1.2 GB) downloads from HuggingFace on the first `rosetta embed` invocation. Subsequent runs use the local cache.
 
 ## Run the bundled demo
 
@@ -36,8 +36,8 @@ The script pauses at each human-in-the-loop step so you can inspect and edit int
 3. **Embed** — produce per-slot vectors for each schema.
 4. **Suggest** — rank candidate mappings by cosine similarity.
 5. **Lint** — validate analyst proposals for unit dimensionality and audit-log conflicts.
-6. **Accredit** — ingest analyst proposals, generate the accreditor work list, ingest decisions.
-7. **Generate & materialise** — `rosetta-yarrrml-gen --run` compiles an approved SSSOM log into a YARRRML mapping and produces JSON-LD aligned to the master ontology.
+6. **Accredit** — append analyst proposals, generate the accreditor work list, append decisions.
+7. **Generate & materialise** — `rosetta compile` then `rosetta run` compiles an approved SSSOM log into a YARRRML mapping and produces JSON-LD aligned to the master ontology.
 
 ## Minimal pipeline
 
@@ -45,15 +45,15 @@ For the impatient — a three-command pipeline that goes from two partner schema
 
 ```bash
 # 1. Ingest both sides to LinkML
-uv run rosetta-ingest --input partner.csv       --output partner.linkml.yaml
-uv run rosetta-ingest --input master.ttl        --output master.linkml.yaml --format rdfs
+uv run rosetta ingest partner.csv       -o partner.linkml.yaml
+uv run rosetta ingest master.ttl        -o master.linkml.yaml --format rdfs
 
 # 2. Embed each schema
-uv run rosetta-embed   --input partner.linkml.yaml --output partner.emb.json
-uv run rosetta-embed   --input master.linkml.yaml  --output master.emb.json
+uv run rosetta embed   partner.linkml.yaml -o partner.emb.json
+uv run rosetta embed   master.linkml.yaml  -o master.emb.json
 
 # 3. Rank candidate mappings
-uv run rosetta-suggest partner.emb.json master.emb.json --output candidates.sssom.tsv
+uv run rosetta suggest partner.emb.json master.emb.json -o candidates.sssom.tsv
 ```
 
 Open `candidates.sssom.tsv` in any TSV viewer — the top-K candidates per source field, ranked by cosine score, ready for analyst review.

@@ -4,42 +4,33 @@ version = "0.1.0"
 description = "Composable CLI tools for semantic mapping between NATO defense schemas and a master ontology."
 requires-python = ">=3.11"
 dependencies = [
-    "rdflib>=6.3",
+    "rdflib>=7.2",
     "click>=8.1",
     "pyyaml>=6.0",
-    "pyshacl>=0.20",
-    "sentence-transformers>=3.0",
-    "numpy>=1.26",
-    "pydantic>=2.13.0",
-    "deepl>=1.18,<2",
-    "genson>=1.2",
+    "pyshacl>=0.31",
+    "sentence-transformers>=5.4",
+    "numpy>=2.4",
+    "pydantic>=2.13",
+    "deepl>=1.30,<2",
+    "genson>=1.3",
     "schema-automator>=0.5.5",
     "sssom>=0.4.15",
-    "linkml>=1.10.0",
+    "linkml>=1.10",
     "linkml-map",
-    "curies>=0.13.3",
+    "curies>=0.13.4",
     "morph-kgc==2.10.0",
-    "quantulum3>=0.10.0",
-    "pint>=0.25.3",
+    "quantulum3>=0.10",
+    "pint>=0.25",
 ]
 
 [project.scripts]
-rosetta-ingest     = "rosetta.cli.ingest:cli"
-rosetta-embed      = "rosetta.cli.embed:cli"
-rosetta-suggest    = "rosetta.cli.suggest:cli"
-rosetta-lint       = "rosetta.cli.lint:cli"
-rosetta-validate   = "rosetta.cli.validate:cli"
-rosetta-yarrrml-gen = "rosetta.cli.yarrrml_gen:cli"
-rosetta-provenance = "rosetta.cli.provenance:cli"
-rosetta-accredit   = "rosetta.cli.accredit:cli"
-rosetta-translate  = "rosetta.cli.translate:cli"
-rosetta-shacl-gen  = "rosetta.cli.shacl_gen:cli"
+rosetta = "rosetta.cli:main"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4",
-    "ruff>=0.4",
-    "pytest-cov>=4.1",
+    "pytest>=9.0",
+    "ruff>=0.15",
+    "pytest-cov>=7.1",
 ]
 
 [build-system]
@@ -63,21 +54,27 @@ markers = [
     "e2e: marks tests as full end-to-end pipelines; always also slow (deselect with '-m not e2e')",
     "adversarial: marks tests as adversarial CLI misuse / hostile-input checks (deselect with '-m not adversarial')",
 ]
+testpaths = ["rosetta/tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:rdflib.*",
+    "ignore::DeprecationWarning:pyparsing.*",
+    "ignore::DeprecationWarning:multiprocessing.*",
+]
 
 [dependency-groups]
 dev = [
-    "bandit>=1.8",
-    "basedpyright>=1.39.0",
-    "pre-commit>=4.5.1",
-    "pytest>=9.0.3",
+    "bandit>=1.9",
+    "basedpyright>=1.39",
+    "pre-commit>=4.5",
+    "pytest>=9.0",
     "radon>=6.0",
-    "ruff>=0.15.10",
-    "vulture>=2.14",
-    "refurb>=2.0",
-    "pytest-cov>=7.1.0",
+    "ruff>=0.15",
+    "vulture>=2.16",
+    "refurb>=2.3",
+    "pytest-cov>=7.1",
     "mkdocs>=1.6",
-    "mkdocs-material>=9.5",
-    "mkdocs-click>=0.8",
+    "mkdocs-material>=9.7",
+    "mkdocs-click>=0.9",
 ]
 
 [tool.radon]

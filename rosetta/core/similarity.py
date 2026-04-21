@@ -102,38 +102,27 @@ def rank_suggestions(
 def _adjusted_score(
     cand_score: float,
     obj_id: str,
-    subject_id: str,
     diff_from_object_ids: set[str],
     has_diff_from: bool,
-    approved_rows: list[SSSOMRow],
-    boost: float,
     penalty: float,
 ) -> float:
-    """Compute the feedback-adjusted score for a single candidate."""
+    """Compute the feedback-adjusted score for a single candidate (derank only)."""
     if obj_id in diff_from_object_ids:
         return max(cand_score - penalty, 0.0)
     if has_diff_from:
         return max(cand_score - penalty * 0.25, 0.0)
-    boost_match = any(
-        r.subject_id == subject_id
-        and r.object_id == obj_id
-        and r.predicate_id != "owl:differentFrom"
-        for r in approved_rows
-    )
-    return min(cand_score + boost, 1.0) if boost_match else cand_score
+    return cand_score
 
 
 def apply_sssom_feedback(
     subject_id: str,
     candidates: list[dict[str, Any]],
     approved_rows: list[SSSOMRow],
-    boost: float = 0.1,
     penalty: float = 0.2,
 ) -> list[dict[str, Any]]:
-    """Boost or derank candidates based on approved SSSOM rows.
+    """Derank candidates based on rejected HumanCuration log rows.
 
     - Row predicate_id == owl:differentFrom → subtract penalty (floor 0.0), row NOT removed.
-    - Any other predicate match on (subject_id, object_id) → add boost (cap 1.0).
     - If ANY differentFrom row exists for subject_id → apply penalty * 0.25 to all
       OTHER candidates for that field (soft subject-breadth deranking).
     Returns a new list (does not mutate input).
@@ -152,11 +141,8 @@ def apply_sssom_feedback(
         cand["score"] = _adjusted_score(
             float(cand["score"]),
             obj_id,
-            subject_id,
             diff_from_object_ids,
             has_diff_from,
-            approved_rows,
-            boost,
             penalty,
         )
 

@@ -1,4 +1,4 @@
-"""rosetta-embed — embed a LinkML schema using a sentence-transformer model."""
+"""rosetta embed — embed a LinkML schema using a sentence-transformer model."""
 
 from __future__ import annotations
 
@@ -21,20 +21,29 @@ from rosetta.core.features import extract_structural_features_linkml
 from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 
 
-@click.command()
-@click.option(
-    "--input",
-    "input_path",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Input .linkml.yaml schema file.",
+@click.command(
+    epilog="""Examples:
+
+  rosetta embed source.linkml.yaml -o source.embeddings.json
+
+  rosetta -v embed source.linkml.yaml --include-definitions -o source.embeddings.json"""
 )
+@click.argument("schema_file", type=click.Path(exists=True, path_type=Path))
 @click.option("--model", default=None, help="Sentence-transformer model name.")
 @click.option(
+    "-o",
     "--output",
     default=None,
     type=click.Path(path_type=Path),
     help="Output JSON path (default: stdout).",
+)
+@click.option(
+    "-c",
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to rosetta.toml config file.",
 )
 @click.option(
     "--include-definitions",
@@ -61,9 +70,10 @@ from rosetta.core.models import EmbeddingReport, EmbeddingVectors
     help="Append direct is_a child class names to embedded text.",
 )
 def cli(
-    input_path: Path,
+    schema_file: Path,
     model: str | None,
     output: Path | None,
+    config_path: Path | None,
     include_definitions: bool,
     include_parents: bool,
     include_ancestors: bool,
@@ -71,14 +81,14 @@ def cli(
 ) -> None:
     """Embed a LinkML schema using a sentence-transformer model."""
     try:
-        config = load_config(None)
+        config = load_config(config_path)
         model_name: str = (
             model or get_config_value(config, "embed", "model") or "intfloat/e5-large-v2"
         )
 
         schema = _cast(
             SchemaDefinition,
-            yaml_loader.load(str(input_path), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+            yaml_loader.load(str(schema_file), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
         )
         pairs = extract_text_inputs_linkml(
             schema,
@@ -96,7 +106,7 @@ def cli(
         schema_name: str = schema.name or "schema"
         slots = _cast("dict[str, Any]", schema.slots)
         datatype_map: dict[str, str | None] = {
-            f"{schema_name}/{name}": (str(slot.range) if slot.range else None)  # pyright: ignore[reportUnknownMemberType]
+            f"{schema_name}:{name}": (str(slot.range) if slot.range else None)  # pyright: ignore[reportUnknownMemberType]
             for name, slot in slots.items()
         }
 

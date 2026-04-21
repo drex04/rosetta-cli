@@ -1,4 +1,4 @@
-"""Integration tests for rosetta-lint on SSSOM fixtures (Phase 18-02)."""
+"""Integration tests for rosetta lint on SSSOM fixtures (Phase 18-02)."""
 
 from __future__ import annotations
 
@@ -14,27 +14,46 @@ from rosetta.core.models import LintReport
 pytestmark = [pytest.mark.integration]
 
 _MMC = "semapv:ManualMappingCuration"
-_SSSOM_HEADER = "# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n"
-_SSSOM_COLS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
 
 
-def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
-    with path.open("w") as f:
-        f.write(_SSSOM_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLS, delimiter="\t", extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
+def _cell(row: object, col: str) -> str:
+    if col == "confidence":
+        return str(getattr(row, col))
+    if col == "mapping_date":
+        d = getattr(row, col, None)
+        return d.isoformat() if d else ""
+    val = getattr(row, col, None)
+    return "" if val is None else str(val)
+
+
+def _write_sssom(path: Path, rows: list[dict[str, object]]) -> None:
+    """Write SSSOM TSV using real SSSOMRow models for format consistency."""
+    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
+    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+    from rosetta.core.models import SSSOMRow
+
+    built: list[SSSOMRow] = []
+    for r in rows:
+        defaults: dict[str, object] = {
+            "predicate_id": "skos:exactMatch",
+            "mapping_justification": _MMC,
+            "confidence": 0.9,
+            "subject_label": "",
+            "object_label": "",
+            "subject_type": None,
+            "object_type": None,
+            "mapping_group_id": None,
+            "composition_expr": None,
+        }
+        defaults.update(r)
+        built.append(SSSOMRow(**defaults))  # pyright: ignore[reportArgumentType]
+
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(_HEADER)
+        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+        writer.writerow(AUDIT_LOG_COLUMNS)
+        for row in built:
+            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
 
 
 def _no_accredit_toml(tmp_path: Path) -> Path:
@@ -45,10 +64,46 @@ def _no_accredit_toml(tmp_path: Path) -> Path:
 
 def test_lint_on_suggest_output(tmp_path: Path, sssom_nor_path: Path) -> None:
     """Clean SSSOM proposal fixture → exit 0, zero BLOCK findings."""
+    import csv
+
+    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
+    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+
     config = _no_accredit_toml(tmp_path)
+
+    audit_log = tmp_path / "audit-log.sssom.tsv"
+    with audit_log.open("w") as fh:
+        fh.write(_HEADER)
+        csv.writer(fh, delimiter="\t").writerow(AUDIT_LOG_COLUMNS)
+
+    src_schema = tmp_path / "source.yaml"
+    src_schema.write_text(
+        "name: source\nid: https://example.org/source\nimports:\n- linkml:types\n"
+        "prefixes:\n  linkml:\n    prefix_prefix: linkml\n"
+        "    prefix_reference: https://w3id.org/linkml/\ndefault_range: string\n"
+        "classes:\n  Thing:\n    name: Thing\n"
+    )
+    mst_schema = tmp_path / "master.yaml"
+    mst_schema.write_text(
+        "name: master\nid: https://example.org/master\nimports:\n- linkml:types\n"
+        "prefixes:\n  linkml:\n    prefix_prefix: linkml\n"
+        "    prefix_reference: https://w3id.org/linkml/\ndefault_range: string\n"
+        "classes:\n  Thing:\n    name: Thing\n"
+    )
+
     result = CliRunner(mix_stderr=False).invoke(
         lint_cli,
-        ["--sssom", str(sssom_nor_path), "--config", str(config)],
+        [
+            str(sssom_nor_path),
+            "--audit-log",
+            str(audit_log),
+            "--config",
+            str(config),
+            "--source-schema",
+            str(src_schema),
+            "--master-schema",
+            str(mst_schema),
+        ],
     )
     assert result.exit_code == 0, f"lint failed: {result.stdout}\n{result.stderr}"
 
@@ -74,10 +129,46 @@ def test_lint_unit_dimension_mismatch(tmp_path: Path) -> None:
             },
         ],
     )
+    import csv
+
+    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
+    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+
     config = _no_accredit_toml(tmp_path)
+
+    audit_log = tmp_path / "audit-log.sssom.tsv"
+    with audit_log.open("w") as fh:
+        fh.write(_HEADER)
+        csv.writer(fh, delimiter="\t").writerow(AUDIT_LOG_COLUMNS)
+
+    src_schema = tmp_path / "source.yaml"
+    src_schema.write_text(
+        "name: source\nid: https://example.org/source\nimports:\n- linkml:types\n"
+        "prefixes:\n  linkml:\n    prefix_prefix: linkml\n"
+        "    prefix_reference: https://w3id.org/linkml/\ndefault_range: string\n"
+        "classes:\n  Thing:\n    name: Thing\n"
+    )
+    mst_schema = tmp_path / "master.yaml"
+    mst_schema.write_text(
+        "name: master\nid: https://example.org/master\nimports:\n- linkml:types\n"
+        "prefixes:\n  linkml:\n    prefix_prefix: linkml\n"
+        "    prefix_reference: https://w3id.org/linkml/\ndefault_range: string\n"
+        "classes:\n  Thing:\n    name: Thing\n"
+    )
+
     result = CliRunner(mix_stderr=False).invoke(
         lint_cli,
-        ["--sssom", str(sssom), "--config", str(config)],
+        [
+            str(sssom),
+            "--audit-log",
+            str(audit_log),
+            "--config",
+            str(config),
+            "--source-schema",
+            str(src_schema),
+            "--master-schema",
+            str(mst_schema),
+        ],
     )
     # Exit code 1 because BLOCK findings are present.
     assert result.exit_code == 1, f"expected exit 1, got {result.exit_code}: {result.stdout}"

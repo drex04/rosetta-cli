@@ -1,4 +1,4 @@
-"""Slow end-to-end test: NOR radar CSV → JSON-LD via rosetta-yarrrml-gen --run.
+"""Slow end-to-end test: NOR radar CSV → JSON-LD via rosetta compile/run.
 
 This test walks the full pipeline:
 
@@ -17,11 +17,10 @@ Design notes:
      `value.toNumber() * 3.28084`. morph-kgc evaluates the GREL at materialization
      time. The assertion below checks the converted numeric values with
      pytest.approx(rel=1e-2).
-  2. The master schema fixture contains a LinkML typo (`range: dateTime` instead
-     of `datetime`) which `linkml.generators.jsonldcontextgen.ContextGenerator`
-     rejects with a `ValueError`. To keep the E2E focused on the pipeline (and
-     not on unrelated fixture hygiene), the test copies both schemas into
-     `tmp_path` and rewrites `dateTime` → `datetime` before invoking the CLI.
+  2. The master schema fixture previously contained a LinkML typo
+     (`range: dateTime` instead of `datetime`) which was fixed in the fixture
+     itself. The helper copies schemas into `tmp_path` so the test operates on
+     isolated copies without mutating the fixture directory.
 """
 
 from __future__ import annotations
@@ -34,7 +33,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
+from rosetta.cli.compile import cli as compile_cli
+from rosetta.cli.run import cli as run_cli
 
 pytestmark = [pytest.mark.integration, pytest.mark.e2e, pytest.mark.slow]
 
@@ -46,7 +46,7 @@ def _copy_and_patch_schemas(
     sssom_src: Path,
     csv_src: Path,
 ) -> tuple[Path, Path, Path, Path]:
-    """Copy fixtures to tmp_path and patch the ContextGenerator-hostile range."""
+    """Copy fixtures to tmp_path so the test operates on isolated copies."""
     nor_dst = dst_dir / "nor_radar.linkml.yaml"
     mc_dst = dst_dir / "master_cop.linkml.yaml"
     sssom_dst = dst_dir / "sssom_nor_approved.sssom.tsv"
@@ -68,7 +68,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """Materialize a 3-row NOR CSV through the full rosetta-yarrrml-gen --run pipeline.
+    """Materialize a 3-row NOR CSV through the full rosetta compile/run pipeline.
 
     Asserts the contract in Plan 16-03 truths #1, #2, #3 (relaxed per docstring),
     and review truth #17 (compaction-tolerant key lookup with pytest.approx).
@@ -77,46 +77,65 @@ def test_e2e_nor_radar_csv_to_jsonld(
         tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
     )
 
-    # Precondition (review truth #17): CSV columns ⊆ source schema slot names.
+    # Precondition (review truth #17): CSV columns ⊆ rosetta_csv_column values
+    # declared in the source schema.  Falls back to slot names for slots that
+    # lack the annotation.
     with csv.open("r", encoding="utf-8") as fh:
         header = fh.readline().strip().split(",")
     schema_yaml = yaml.safe_load(nor_schema.read_text(encoding="utf-8"))
-    schema_slots = set((schema_yaml.get("slots") or {}).keys())
-    missing = set(header) - schema_slots
+    slots = schema_yaml.get("slots") or {}
+    csv_columns: set[str] = set()
+    for slot_name, slot_def in slots.items():
+        ann = (slot_def or {}).get("annotations") or {}
+        csv_columns.add(ann.get("rosetta_csv_column", slot_name))
+    missing = set(header) - csv_columns
     assert not missing, (
         f"Precondition violated: CSV columns {missing!r} are not declared as "
-        f"slots in {nor_schema}. Schema slot names: {sorted(schema_slots)!r}"
+        f"rosetta_csv_column annotations (or slot names) in {nor_schema}. "
+        f"Known columns: {sorted(csv_columns)!r}"
     )
 
     wd = tmp_path / "wd"
-    spec_out = tmp_path / "spec.yaml"
+    yarrrml_out = tmp_path / "mapping.yarrrml.yaml"
+    jsonld_out = tmp_path / "output.jsonld"
 
-    result = CliRunner(mix_stderr=False).invoke(
-        yarrrml_gen_cli,
+    # Step 1: compile SSSOM → YARRRML
+    compile_result = CliRunner(mix_stderr=False).invoke(
+        compile_cli,
         [
-            "--sssom",
             str(sssom),
             "--source-schema",
             str(nor_schema),
             "--master-schema",
             str(mc_schema),
-            "--output",
-            str(spec_out),
-            "--force",
-            "--run",
-            "--data",
+            "-o",
+            str(yarrrml_out),
+        ],
+    )
+    assert compile_result.exit_code == 0, (
+        f"compile exited {compile_result.exit_code}; stderr=\n{compile_result.stderr}\n"
+        f"exception={compile_result.exception!r}"
+    )
+
+    # Step 2: run YARRRML → JSON-LD
+    result = CliRunner(mix_stderr=False).invoke(
+        run_cli,
+        [
+            str(yarrrml_out),
             str(csv),
+            "--master-schema",
+            str(mc_schema),
+            "-o",
+            str(jsonld_out),
             "--workdir",
             str(wd),
         ],
     )
     assert result.exit_code == 0, (
-        f"CLI exited {result.exit_code}; stderr=\n{result.stderr}\nexception={result.exception!r}"
+        f"run exited {result.exit_code}; stderr=\n{result.stderr}\nexception={result.exception!r}"
     )
 
-    # With --output set, the TransformSpec YAML lands in spec.yaml and stdout
-    # receives only the JSON-LD payload (see SPEC §4.2 stdout matrix).
-    payload = json.loads(result.stdout)
+    payload = json.loads(jsonld_out.read_bytes())
 
     # Assertion A: @context present and contains master default_prefix 'mc'.
     dumped = json.dumps(payload)
@@ -163,6 +182,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
         "Observation",  # tolerate source-side class names if compaction drifts
     }
 
+    # Covers three compaction forms: "mc:Track", full URI containing "MasterCOP", bare name.
     def _type_matches_master(entry: dict[str, object]) -> bool:
         t = entry.get("@type")
         types: list[str] = (
@@ -208,7 +228,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
     # YarrrmlCompiler compiles it to GREL `value.toNumber() * 3.28084` which
     # morph-kgc evaluates at materialization time.
     # Source altitudes: 4100, 2500, 1800 meters → expected feet values below.
-    observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude", "hoyde_m"))
+    observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude"))
     assert observed_values, (
         "Could not locate hasAltitudeFt / hoyde_m numeric values in JSON-LD; "
         f"entries={json.dumps(typed_entries)[:600]}"

@@ -1,4 +1,4 @@
-"""Integration test for rosetta-suggest on inheritance schema (Phase 18-02)."""
+"""Integration test for rosetta suggest on inheritance schema (Phase 18-02)."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _embed_schema(linkml_path: Path, out_path: Path, monkeypatch: pytest.MonkeyP
     )
     result = CliRunner(mix_stderr=False).invoke(
         embed_cli,
-        ["--input", str(linkml_path), "--output", str(out_path)],
+        [str(linkml_path), "--output", str(out_path)],
     )
     assert result.exit_code == 0, f"embed failed: {result.stderr}"
 
@@ -65,9 +65,13 @@ def test_suggest_inheritance_schema(
 
     # 3. Run suggest — writes SSSOM TSV.
     out_tsv = tmp_path / "suggestions.sssom.tsv"
-    # Need a rosetta.toml so suggest's config loader does not complain.
+    # Need a rosetta.toml with [accredit].log so suggest's audit-log requirement is satisfied.
+    audit_log = tmp_path / "audit-log.sssom.tsv"
+    from rosetta.core.accredit import append_log
+
+    append_log([], audit_log)
     config = tmp_path / "rosetta.toml"
-    config.write_text("[suggest]\ntop_k = 5\n")
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
 
     result = CliRunner(mix_stderr=False).invoke(
         suggest_cli,

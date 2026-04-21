@@ -1,15 +1,17 @@
-"""rosetta-lint: Validate unit and datatype compatibility in field mappings."""
+"""rosetta lint: Validate unit and datatype compatibility in field mappings."""
 
 import sys
 from pathlib import Path
 
 import click
 import rdflib
+from linkml_runtime.utils.schemaview import SchemaView
 
 from rosetta.core.accredit import load_log, parse_sssom_tsv
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
+from rosetta.core.schema_utils import check_slot_class_reachability
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 from rosetta.core.units import (
     load_qudt_graph,
@@ -68,7 +70,26 @@ def check_sssom_proposals(
                 )
             )
 
-    # 2. NoHumanCurationReproposal
+    # 2. MaxOneMmcPerSubject
+    subject_counts: dict[str, list[str]] = {}
+    for r in mmc_rows:
+        subject_counts.setdefault(r.subject_id, []).append(r.object_id)
+    for subject_id, objects in subject_counts.items():
+        if len(objects) > 1:
+            findings.append(
+                LintFinding(
+                    rule="max_one_mmc_per_subject",
+                    severity="BLOCK",
+                    source_uri=subject_id,
+                    target_uri=objects[0],
+                    message=(
+                        f"MaxOneMmcPerSubject: {subject_id} has {len(objects)} confirmed "
+                        f"mappings ({', '.join(objects)}); only one is allowed"
+                    ),
+                )
+            )
+
+    # 3. NoHumanCurationReproposal
     if log:
         approved_pairs: set[tuple[str, str]] = set()
         rejected_pairs: set[tuple[str, str]] = set()
@@ -103,7 +124,7 @@ def check_sssom_proposals(
                     )
                 )
 
-    # 3. ValidPredicate
+    # 4. ValidPredicate
     for r in mmc_rows:
         if r.predicate_id not in _VALID_PREDICATES:
             findings.append(
@@ -218,36 +239,88 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
         )
 
 
-@click.command()
-@click.option(
-    "--sssom",
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    default=None,
-    help="SSSOM TSV file to lint.",
+@click.command(
+    epilog="""Examples:
+
+  rosetta lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      --audit-log audit-log.sssom.tsv
+
+  rosetta -v lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      --audit-log audit-log.sssom.tsv -o report.json"""
 )
+@click.argument("sssom_file", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")
 @click.option("--config", default=None, help="Path to rosetta.toml config file.")
-def cli(sssom: str | None, output: str | None, strict: bool, config: str | None) -> None:
+@click.option(
+    "--audit-log",
+    type=click.Path(),
+    default=None,
+    help="Path to SSSOM audit log.",
+)
+@click.option(
+    "--source-schema",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    required=True,
+    help="Source LinkML schema YAML (enables structural checks).",
+)
+@click.option(
+    "--master-schema",
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+    required=True,
+    help="Master LinkML schema YAML (enables structural checks).",
+)
+def cli(
+    sssom_file: str,
+    output: str | None,
+    strict: bool,
+    config: str | None,
+    audit_log: str | None,
+    source_schema: str,
+    master_schema: str,
+) -> None:
     """Lint a SSSOM proposal TSV for unit/datatype compatibility and structural rules."""
-    if sssom is None:
-        click.echo("Error: --sssom is required.", err=True)
-        sys.exit(1)
-
-    rows = parse_sssom_tsv(Path(sssom))
     cfg = load_config(Path(config)) if config else load_config()
-    log_path_str = get_config_value(cfg, "accredit", "log")
-    log = load_log(Path(log_path_str)) if log_path_str and Path(log_path_str).exists() else []
+
+    # Resolve audit log: CLI flag > config > empty
+    resolved_log_path: str | None = audit_log or get_config_value(cfg, "accredit", "log")
+    log: list[SSSOMRow] = []
+    if resolved_log_path and Path(resolved_log_path).exists():
+        log = load_log(Path(resolved_log_path))
+
+    rows = parse_sssom_tsv(Path(sssom_file))
 
     findings: list[LintFinding] = []
 
     # 1. Proposal checks
     findings.extend(check_sssom_proposals(rows, log))
 
-    # 2. Per-row unit + datatype checks
+    confirmed_rows = [r for r in rows if r.mapping_justification in {MMC, HC}]
+
+    # 2. Structural reachability check
+    source_view = SchemaView(source_schema)
+    master_view = SchemaView(master_schema)
+    for mismatch in check_slot_class_reachability(confirmed_rows, source_view, master_view):
+        findings.append(
+            LintFinding(
+                rule="slot_class_unreachable",
+                severity="BLOCK",
+                source_uri=mismatch.row.subject_id,
+                target_uri=mismatch.row.object_id,
+                message=(
+                    f"Slot '{mismatch.target_slot_name}' belongs to class "
+                    f"'{mismatch.target_owning_class}' which is not reachable from any "
+                    f"mapped class ({', '.join(sorted(mismatch.mapped_target_classes))}). "
+                    f"Map the source class to '{mismatch.target_owning_class}' or one of "
+                    f"its subclasses."
+                ),
+            )
+        )
+
+    # 3. Per-row unit + datatype checks (user-confirmed mappings only)
     try:
         qudt_graph = load_qudt_graph()
-        for row in rows:
+        for row in confirmed_rows:
             try:
                 _check_units(findings, row, qudt_graph)
                 _check_datatype(findings, row)
@@ -262,14 +335,14 @@ def cli(sssom: str | None, output: str | None, strict: bool, config: str | None)
             LintFinding(rule="parse_error", severity="WARNING", source_uri="", message=str(exc))
         )
 
-    # 3. --strict: upgrade WARNINGs → BLOCKs
+    # 4. --strict: upgrade WARNINGs → BLOCKs
     if strict:
         findings = [
             f.model_copy(update={"severity": "BLOCK"}) if f.severity == "WARNING" else f
             for f in findings
         ]
 
-    # 4. Build report and write
+    # 5. Build report and write
     summary = LintSummary(
         block=sum(1 for f in findings if f.severity == "BLOCK"),
         warning=sum(1 for f in findings if f.severity == "WARNING"),

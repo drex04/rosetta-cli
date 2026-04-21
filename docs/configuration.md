@@ -27,7 +27,7 @@ structural_weight = 0.2
 strict = false
 
 [accredit]
-log = "store/audit-log.sssom.tsv"
+log = "audit-log.sssom.tsv"
 ```
 
 ## Sections
@@ -65,6 +65,6 @@ log = "store/audit-log.sssom.tsv"
 
 | Key | Default | Purpose |
 |-----|---------|---------|
-| `log` | `"store/audit-log.sssom.tsv"` | Path to the append-only audit log |
+| `log` | `"audit-log.sssom.tsv"` | Path to the append-only audit log |
 
-`rosetta-suggest` and `rosetta-lint` both read `[accredit].log` automatically when it is set, providing boost/derank and conflict-checking without explicit flags.
+`rosetta suggest` and `rosetta lint` both read `[accredit].log` automatically when it is set, providing boost/derank and conflict-checking without explicit flags.

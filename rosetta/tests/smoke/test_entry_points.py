@@ -1,4 +1,4 @@
-"""Subprocess smoke tests — verify installed console scripts resolve."""
+"""Subprocess smoke tests — verify the `rosetta` CLI dispatches subcommands."""
 
 from __future__ import annotations
 
@@ -10,34 +10,47 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.slow, pytest.mark.e2e]
 
 
-def _skip_if_not_installed(name: str) -> None:
-    if shutil.which(name) is None:
-        pytest.skip(f"{name} not installed — run `uv sync` first")
+def _skip_if_not_installed() -> None:
+    if shutil.which("rosetta") is None:
+        pytest.skip("rosetta not installed — run `uv sync` first")
 
 
-def test_rosetta_ingest_entry_point() -> None:
-    _skip_if_not_installed("rosetta-ingest")
+_ALL_SUBCOMMANDS = [
+    "ingest",
+    "translate",
+    "embed",
+    "suggest",
+    "lint",
+    "validate",
+    "compile",
+    "run",
+    "accredit",
+    "shacl-gen",
+]
+
+
+@pytest.mark.parametrize("subcmd", _ALL_SUBCOMMANDS)
+def test_subcommand_help(subcmd: str) -> None:
+    _skip_if_not_installed()
     result = subprocess.run(
-        ["rosetta-ingest", "--help"],
+        ["rosetta", subcmd, "--help"],
         capture_output=True,
         text=True,
         check=False,
         timeout=30,
     )
-    assert result.returncode == 0
-    assert "Normalise a schema file" in result.stdout
-    assert "--format" in result.stdout
+    assert result.returncode == 0, f"rosetta {subcmd} --help failed: {result.stderr}"
+    assert "Usage:" in result.stdout
 
 
-def test_rosetta_yarrrml_gen_entry_point() -> None:
-    _skip_if_not_installed("rosetta-yarrrml-gen")
+def test_rosetta_version() -> None:
+    _skip_if_not_installed()
     result = subprocess.run(
-        ["rosetta-yarrrml-gen", "--help"],
+        ["rosetta", "--version"],
         capture_output=True,
         text=True,
         check=False,
-        timeout=30,
+        timeout=10,
     )
     assert result.returncode == 0
-    assert "--sssom" in result.stdout
-    assert "--run" in result.stdout
+    assert "rosetta" in result.stdout

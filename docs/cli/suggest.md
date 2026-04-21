@@ -1,4 +1,4 @@
-# rosetta-suggest
+# rosetta suggest
 
 Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. When an audit log is configured, automatically boosts previously approved mappings and deranks rejected ones.
 
@@ -7,7 +7,7 @@ Compares source embeddings against master embeddings and ranks candidates by cos
 ::: mkdocs-click
     :module: rosetta.cli.suggest
     :command: cli
-    :prog_name: rosetta-suggest
+    :prog_name: rosetta suggest
     :depth: 2
 
 ## Output — SSSOM TSV
@@ -16,7 +16,7 @@ Output is a 15-column SSSOM TSV with a YAML comment header:
 
 ```
 # mapping_set_id: https://rosetta-cli/mappings
-# mapping_tool: rosetta-suggest
+# mapping_tool: rosetta suggest
 # license: https://creativecommons.org/licenses/by/4.0/
 # curie_map:
 #   skos: http://www.w3.org/2004/02/skos/core#
@@ -47,13 +47,13 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 
 ## Structural blending
 
-When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
+When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
 
 When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
 ## Audit-log integration
 
-When `[accredit].log` is set in `rosetta.toml` and the log file exists, `rosetta-suggest` automatically:
+When `[accredit].audit_log` is set in `rosetta.toml` (or `--audit-log` is passed) and the log file exists, `rosetta suggest` automatically:
 
 - **Boosts** candidates whose (subject, object) pair has an approved `HumanCuration` row in the log.
 - **Deranks** candidates whose pair has a rejected `HumanCuration` row (`predicate_id = owl:differentFrom`).
@@ -64,7 +64,7 @@ This means `candidates.sssom.tsv` provides a complete picture: newly computed ca
 ## Example
 
 ```bash
-uv run rosetta-suggest nor.emb.json master.emb.json --output candidates.sssom.tsv
+uv run rosetta suggest nor.emb.json master.emb.json --output candidates.sssom.tsv
 ```
 
 ## Exit codes

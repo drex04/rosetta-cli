@@ -92,7 +92,7 @@ def extract_text_inputs_linkml(
 ) -> list[tuple[str, str, str]]:
     """Return (node_id, label, text) triples for each class and slot in a LinkML SchemaDefinition.
 
-    node_id format: "{schema.name}/{node_name}"
+    node_id format: "{schema.name}:{node_name}"
     label: human-readable title (used as the base text and stored in embeddings for display)
     text: label + optional definition, parents/ancestors, children — joined with ". "
     --include-ancestors supersedes --include-parents (ancestors is a strict superset).
@@ -117,7 +117,7 @@ def extract_text_inputs_linkml(
             include_ancestors=include_ancestors,
             include_children=include_children,
         )
-        results.append((f"{schema_name}/{node_name}", parts[0], ". ".join(parts)))
+        results.append((f"{schema_name}:{node_name}", parts[0], ". ".join(parts)))
 
     return results
 

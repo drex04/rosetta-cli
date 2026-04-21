@@ -380,5 +380,50 @@ consolidate fixture paths into `conftest.py` so tests stop re-declaring `_FIXTUR
 
 **Note:** Phase 19 builds on the v2 pipeline (Phases 12–18) but is independent of any future milestone. The legacy `mapping.shacl.ttl` is retired in 19-02.
 
+---
 
+## Milestone: v3.0 — CLI UX Refactor
+
+---
+
+## Phase 20: UX Refactor — CLI Standardization
+**Goal:** Unify the CLI under a single `rosetta` parent command, standardize option conventions across all tools, delete unused commands, and split overloaded commands into single-responsibility stages. Apply Unix philosophy: composable, pipeable, consistent.
+
+Design doc: `.planning/designs/2026-04-21-ux-refactor.md`
+
+**Delivers (split across 4 plans):**
+
+### 20-01: Entry point unification
+- Single `rosetta` parent Click group in `rosetta/cli/__init__.py`
+- All 10 hyphenated `rosetta-*` entry points replaced by `rosetta = "rosetta.cli:cli"`
+- `rosetta --version` via `importlib.metadata`
+- Smoke tests updated
+
+### 20-02: Command cleanup
+- `rosetta-provenance` deleted entirely (CLI, core, tests, docs)
+- `accredit status` subcommand deleted + `StatusEntry` model removed
+- `accredit ingest` renamed to `accredit append`
+- `rosetta-yarrrml-gen` split into `rosetta compile` (SSSOM → YARRRML) and `rosetta run` (YARRRML + data → JSON-LD)
+- `compile` drops `--include-manual`, `--allow-empty`, `--force`, `--source-format`
+
+### 20-03: Option standardization
+- All primary inputs become positional args (not `--input`/`--sssom`/`--data` flags)
+- `-o`/`--output` default stdout on all commands; `-c`/`--config` on all commands
+- `-v`/`--verbose` and `-q`/`--quiet` on parent group
+- `--audit-log` required on `suggest` and `lint`
+- `--source-schema` and `--master-schema` required on `lint`
+- `--schema-format` replaces `--format` on `ingest`; `--schema-name` deleted
+- `validate` JSON-LD only (no `--data-format`); shapes-dir positional
+- `accredit` uses `--audit-log` (not `--log`)
+- `run --validate <shapes-dir>` combines two flags into one
+
+### 20-04: Pipeline citizenship & documentation
+- SIGPIPE handler (clean exit on broken pipe)
+- `NO_COLOR` env var respected; TTY detection
+- Help text with usage examples on every subcommand
+- README.md rewritten for new command surface
+- `docs/cli/compile.md` and `docs/cli/run.md` created; `provenance.md` and `yarrrml-gen.md` deleted
+- `pipeline-demo.sh` updated; `mkdocs build --strict` passes
+
+**Requirements:** REQ-UX-REFACTOR-01
 

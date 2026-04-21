@@ -31,7 +31,7 @@ def test_ingest_malformed_json(adversarial_dir: Path, tmp_path: Path) -> None:
     """Malformed JSON with trailing comma → exit 1, JSON-related stderr, no output.
 
     Underlying exception: ``json.JSONDecodeError`` raised by schema-automator's
-    ``JsonSchemaImportEngine.convert`` → wrapped by ``rosetta-ingest`` into
+    ``JsonSchemaImportEngine.convert`` → wrapped by ``rosetta ingest`` into
     ``Error: <message>``. Observed message starts with "Illegal trailing comma"
     and includes a line number — we pin only the stable substrings.
     """
@@ -39,9 +39,8 @@ def test_ingest_malformed_json(adversarial_dir: Path, tmp_path: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "malformed_nested.json"),
-            "--format",
+            "--schema-format",
             "json-schema",
             "--output",
             str(out),
@@ -72,16 +71,15 @@ def test_ingest_truncated_xsd(adversarial_dir: Path, tmp_path: Path) -> None:
 
     Underlying exception: ``lxml.etree.XMLSyntaxError`` raised by
     schema-automator's ``XsdImportEngine`` (schema-automator uses lxml, not
-    stdlib ``xml.etree``). Wrapped by ``rosetta-ingest`` as
+    stdlib ``xml.etree``). Wrapped by ``rosetta ingest`` as
     ``Error: Premature end of data in tag ...``.
     """
     out = tmp_path / "out.yaml"
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "truncated_complex.xsd"),
-            "--format",
+            "--schema-format",
             "xsd",
             "--output",
             str(out),
@@ -119,9 +117,8 @@ def test_ingest_wrong_encoding_csv(adversarial_dir: Path, tmp_path: Path) -> Non
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "wrong_encoding.csv"),
-            "--format",
+            "--schema-format",
             "csv",
             "--output",
             str(out),
@@ -162,7 +159,7 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
     out = tmp_path / "out.yaml"
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
-        ["--input", str(in_csv), "--format", "csv", "--output", str(out)],
+        [str(in_csv), "--schema-format", "csv", "--output", str(out)],
     )
 
     # 1. Exit code — ingestion succeeds.
@@ -186,9 +183,9 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
 def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """LinkML master with zero classes → embed exits 1 ("No embeddable nodes").
 
-    OBSERVED BEHAVIOR: ``rosetta-suggest`` takes *embedding JSON* files, not
+    OBSERVED BEHAVIOR: ``rosetta suggest`` takes *embedding JSON* files, not
     raw LinkML YAML. An empty master schema therefore fails upstream in
-    ``rosetta-embed`` with ``Error: No embeddable nodes found in schema.``
+    ``rosetta embed`` with ``Error: No embeddable nodes found in schema.``
     before ``suggest`` is ever reached — the "empty master" condition is
     surfaced as an embed failure, not a suggest failure. This is the current
     behavior; if suggest-level empty-master handling is ever added, update
@@ -225,7 +222,7 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     master_emb = tmp_path / "master.embed.json"
     runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(embed_cli, ["--input", str(master_yaml), "--output", str(master_emb)])
+    result = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
 
     # 1. Exit code
     assert result.exit_code == 1, (
@@ -252,7 +249,17 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         # Write a minimal valid src embed too
         src_emb = tmp_path / "src.embed.json"
         src_emb.write_text(json.dumps({"src/foo": {"lexical": [0.0, 0.0, 0.0, 0.0]}}))
+        dummy_log = tmp_path / "audit-log.sssom.tsv"
+        dummy_log.write_text("")
         sg = runner.invoke(
-            suggest_cli, [str(src_emb), str(empty_emb), "--output", str(tmp_path / "o.tsv")]
+            suggest_cli,
+            [
+                str(src_emb),
+                str(empty_emb),
+                "--audit-log",
+                str(dummy_log),
+                "--output",
+                str(tmp_path / "o.tsv"),
+            ],
         )
         assert sg.exit_code == 1, f"suggest with empty master embed: {sg.exit_code} {sg.stderr!r}"

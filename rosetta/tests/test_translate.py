@@ -1,4 +1,4 @@
-"""Tests for rosetta-translate CLI — LinkML YAML input/output."""
+"""Tests for rosetta translate CLI — LinkML YAML input/output."""
 
 from __future__ import annotations
 
@@ -146,7 +146,7 @@ def test_cli_missing_key_non_english_exits_1(
     input_path = _write_input(tmp_path)
     result = runner.invoke(
         cli,
-        ["--input", str(input_path), "--output", str(tmp_path / "out.yaml"), "--source-lang", "DE"],
+        [str(input_path), "--output", str(tmp_path / "out.yaml"), "--source-lang", "DE"],
     )
     assert result.exit_code == 1
     assert "DeepL API key" in result.output
@@ -162,7 +162,7 @@ def test_cli_english_source_passthrough(tmp_path: Path, monkeypatch: pytest.Monk
     out_path = tmp_path / "out.yaml"
     result = runner.invoke(
         cli,
-        ["--input", str(input_path), "--output", str(out_path), "--source-lang", "EN"],
+        [str(input_path), "--output", str(out_path), "--source-lang", "EN"],
     )
     assert result.exit_code == 0, result.output
     assert out_path.exists()
@@ -189,7 +189,6 @@ def test_cli_translate_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(input_path),
             "--output",
             str(out_path),
@@ -219,7 +218,6 @@ def test_cli_translate_exception_exits_1(tmp_path: Path, monkeypatch: pytest.Mon
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(input_path),
             "--output",
             str(tmp_path / "out.yaml"),
@@ -231,6 +229,18 @@ def test_cli_translate_exception_exits_1(tmp_path: Path, monkeypatch: pytest.Mon
     )
     assert result.exit_code == 1
     assert "Error" in result.output
+
+
+def test_cli_stdout_when_no_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When --output is omitted, YAML is written to stdout."""
+    from rosetta.cli.translate import cli
+
+    monkeypatch.delenv("DEEPL_API_KEY", raising=False)
+    runner = CliRunner()
+    input_path = _write_input(tmp_path)
+    result = runner.invoke(cli, [str(input_path), "--source-lang", "EN"])
+    assert result.exit_code == 0, result.output
+    assert "name:" in result.output
 
 
 def test_fake_deepl_fixture_smoke(fake_deepl: Any) -> None:

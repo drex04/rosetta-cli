@@ -67,14 +67,14 @@ nav:
       - Accreditation workflow: concepts/accreditation.md
   - CLI reference:
       - Overview: cli/index.md
-      - rosetta-ingest: cli/ingest.md
-      - rosetta-translate: cli/translate.md
-      - rosetta-embed: cli/embed.md
-      - rosetta-suggest: cli/suggest.md
-      - rosetta-lint: cli/lint.md
-      - rosetta-accredit: cli/accredit.md
-      - rosetta-validate: cli/validate.md
-      - rosetta-shacl-gen: cli/shacl-gen.md
-      - rosetta-yarrrml-gen: cli/yarrrml-gen.md
-      - rosetta-provenance: cli/provenance.md
+      - rosetta ingest: cli/ingest.md
+      - rosetta translate: cli/translate.md
+      - rosetta embed: cli/embed.md
+      - rosetta suggest: cli/suggest.md
+      - rosetta lint: cli/lint.md
+      - rosetta compile: cli/compile.md
+      - rosetta run: cli/run.md
+      - rosetta validate: cli/validate.md
+      - rosetta shacl-gen: cli/shacl-gen.md
+      - rosetta accredit: cli/accredit.md
   - Configuration: configuration.md

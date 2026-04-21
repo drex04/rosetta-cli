@@ -1,4 +1,4 @@
-"""rosetta-validate: Validate RDF graphs against SHACL constraints."""
+"""rosetta validate: Validate RDF graphs against SHACL constraints."""
 
 from __future__ import annotations
 
@@ -13,55 +13,15 @@ from rosetta.core.shacl_validate import validate_graph
 from rosetta.core.shapes_loader import load_shapes_from_dir
 
 
-def _resolve_data_format(data_path: str, data_format: str) -> str:
-    """Resolve the rdflib parser format for ``--data``.
+@click.command(
+    epilog="""Examples:
 
-    ``data_format`` is constrained by Click ``Choice`` to one of
-    ``"turtle"``, ``"json-ld"``, ``"auto"``. The ``"auto"`` value picks
-    a format from the file suffix, falling back to ``"turtle"`` for any
-    unknown extension to preserve historical behavior.
-    """
-    if data_format == "turtle":
-        return "turtle"
-    if data_format == "json-ld":
-        return "json-ld"
-    # auto
-    suffix = Path(data_path).suffix.lower()
-    if suffix == ".ttl":
-        return "turtle"
-    if suffix in (".jsonld", ".json", ".json-ld"):
-        return "json-ld"
-    return "turtle"
+  rosetta validate output.jsonld rosetta/policies/
 
-
-@click.command()
-@click.option(
-    "--data",
-    required=True,
-    type=click.Path(exists=True, dir_okay=False),
-    help="RDF data file to validate (Turtle or JSON-LD).",
+  rosetta -v validate output.jsonld rosetta/policies/ -o validation-report.json"""
 )
-@click.option(
-    "--data-format",
-    type=click.Choice(["turtle", "json-ld", "auto"]),
-    default="auto",
-    help=(
-        "Input data format. 'auto' picks by suffix: .ttl=turtle, "
-        ".jsonld/.json/.json-ld=json-ld, fallback=turtle."
-    ),
-)
-@click.option(
-    "--shapes",
-    default=None,
-    type=click.Path(exists=True, dir_okay=False),
-    help="Single SHACL shapes Turtle file.",
-)
-@click.option(
-    "--shapes-dir",
-    default=None,
-    type=click.Path(exists=True, file_okay=False),
-    help="Directory; loads all *.ttl files as shapes.",
-)
+@click.argument("data_file", type=click.Path(exists=True))
+@click.argument("shapes_dir", type=click.Path(exists=True))
 @click.option(
     "--output",
     "-o",
@@ -71,32 +31,27 @@ def _resolve_data_format(data_path: str, data_format: str) -> str:
 )
 @click.option("--config", "-c", default=None, help="Path to rosetta.toml.")
 def cli(
-    data: str,
-    data_format: str,
-    shapes: str | None,
-    shapes_dir: str | None,
+    data_file: str,
+    shapes_dir: str,
     output: str | None,
     config: str | None,
 ) -> None:
-    """Validate RDF graphs against SHACL constraints."""
+    """Validate RDF graphs against SHACL constraints.
+
+    DATA_FILE is a JSON-LD file to validate.
+    SHAPES_DIR is a directory of SHACL Turtle (*.ttl) shape files.
+    """
     try:
-        if shapes is None is shapes_dir:
-            raise click.UsageError("At least one of --shapes or --shapes-dir must be provided.")
-
-        # Load data graph (Turtle or JSON-LD)
-        fmt = _resolve_data_format(data, data_format)
+        # Load data graph (JSON-LD only)
         data_g = rdflib.Graph()
-        data_g.parse(data, format=fmt)
+        data_g.parse(data_file, format="json-ld")
 
-        # Build shapes graph
+        # Build shapes graph from directory
         shapes_g = rdflib.Graph()
-        if shapes is not None:
-            shapes_g.parse(shapes, format="turtle")
-        if shapes_dir is not None:
-            try:
-                shapes_g += load_shapes_from_dir(Path(shapes_dir))
-            except ValueError as exc:
-                raise click.UsageError(str(exc)) from exc
+        try:
+            shapes_g += load_shapes_from_dir(Path(shapes_dir))
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
 
         # Run SHACL via shared helper
         report = validate_graph(data_g, shapes_g)

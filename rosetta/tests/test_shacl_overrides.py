@@ -5,7 +5,7 @@ Six tests covering:
 1. Recursive merge of generated + override shapes from ``rosetta/policies/shacl/``.
 2. Override constraint (``mc:AirTrackBearingRangeShape``) actually fires on a
    data graph with an out-of-range ``mc:hasBearing``.
-3. Re-running ``rosetta-shacl-gen`` does NOT touch the overrides directory.
+3. Re-running ``rosetta shacl-gen`` does NOT touch the overrides directory.
 4. Legacy ``rosetta/policies/mapping.shacl.ttl`` is fully removed (D-19-09).
 5. ``load_shapes_from_dir`` is symlink-loop safe and parses each file once.
 6. ``load_shapes_from_dir`` warns on Turtle files containing no SHACL shapes
@@ -106,7 +106,7 @@ def test_override_constraint_fires_on_data() -> None:
 
 
 def test_override_survives_regen(tmp_path: Path) -> None:
-    """Re-running ``rosetta-shacl-gen`` writes to ``--output`` and never touches overrides/.
+    """Re-running ``rosetta shacl-gen`` writes to ``--output`` and never touches overrides/.
 
     Output is directed at a tmp_path file rather than the committed
     ``generated/master.shacl.ttl`` because rdflib serialization is not
@@ -121,7 +121,6 @@ def test_override_survives_regen(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         shacl_gen_cli,
         [
-            "--input",
             str(MASTER_SCHEMA),
             "--output",
             str(regen_output),
@@ -135,7 +134,7 @@ def test_override_survives_regen(tmp_path: Path) -> None:
 
     post_hash = hashlib.sha256(OVERRIDE_FILE.read_bytes()).hexdigest()
     assert pre_hash == post_hash, (
-        "Overrides directory was modified by rosetta-shacl-gen — regen must only touch --output."
+        "Overrides directory was modified by rosetta shacl-gen — regen must only touch --output."
     )
 
 

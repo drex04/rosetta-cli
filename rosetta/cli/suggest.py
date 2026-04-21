@@ -1,4 +1,4 @@
-"""rosetta-suggest: Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
+"""rosetta suggest: Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
 
 import csv
 import io
@@ -21,7 +21,7 @@ from rosetta.core.similarity import apply_sssom_feedback, rank_suggestions
 
 _SSSOM_HEADER_LINES = [
     "# mapping_set_id: https://rosetta-cli/mappings",
-    "# mapping_tool: rosetta-suggest",
+    "# mapping_tool: rosetta suggest",
     "# license: https://creativecommons.org/licenses/by/4.0/",
     "# curie_map:",
     "#   skos: http://www.w3.org/2004/02/skos/core#",
@@ -47,13 +47,29 @@ _SSSOM_COLUMNS = [
 ]
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta suggest source.embeddings.json master.embeddings.json \\
+      --audit-log audit-log.sssom.tsv -o proposals.sssom.tsv
+
+  rosetta -v suggest source.embeddings.json master.embeddings.json \\
+      --audit-log audit-log.sssom.tsv --top-k 10"""
+)
 @click.argument("source", type=click.Path(exists=True))
 @click.argument("master", type=click.Path(exists=True))
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
-@click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
-@click.option("--config", default="rosetta.toml", show_default=True)
+@click.option(
+    "-o", "--output", default=None, type=click.Path(), help="Output file (default: stdout)"
+)
+@click.option("-c", "--config", default="rosetta.toml", show_default=True)
+@click.option(
+    "--audit-log",
+    default=None,
+    type=click.Path(),
+    help="Path to SSSOM audit log.",
+)
 def cli(
     source: str,
     master: str,
@@ -61,6 +77,7 @@ def cli(
     min_score: float | None,
     output: str | None,
     config: str,
+    audit_log: str | None,
 ) -> None:
     """Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
     cfg = load_config(Path(config))
@@ -69,13 +86,14 @@ def cli(
         get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
     )
 
-    # Load audit log if configured
-    log_path_str: str | None = get_config_value(cfg, "accredit", "log", cli_value=None)
+    # Resolve audit log path: CLI flag > config fallback > error
+    log_path_str: str | None = audit_log or get_config_value(cfg, "accredit", "log", cli_value=None)
+    if not log_path_str:
+        raise click.UsageError("Audit log not found — run rosetta accredit append first")
     log: list[SSSOMRow] = []
-    if log_path_str:
-        lp = Path(log_path_str)
-        if lp.exists():
-            log = load_log(lp)
+    lp = Path(log_path_str)
+    if lp.exists():
+        log = load_log(lp)
 
     try:
         src_raw = json.loads(Path(source).read_text())
@@ -157,7 +175,7 @@ def cli(
             structural_weight=resolved_structural_weight,
         )
 
-        # Apply per-field boost/derank from HumanCuration log rows
+        # Apply per-field derank from rejected HumanCuration log rows
         hc_rows = [r for r in log if r.mapping_justification == "semapv:HumanCuration"]
         if hc_rows:
             for src_uri, entry in result.items():
@@ -173,6 +191,14 @@ def cli(
                     existing.mapping_date or DATETIME_MIN
                 ):
                     log_index[key] = row
+
+        # Approved HC pairs — suppress from output (already decided)
+        hc_approved_pairs: set[tuple[str, str]] = {
+            (r.subject_id, r.object_id)
+            for r in log
+            if r.mapping_justification == "semapv:HumanCuration"
+            and r.predicate_id != "owl:differentFrom"
+        }
 
         # For each candidate in result: if pair is in log_index, refresh justification/predicate
         for src_uri, entry in result.items():
@@ -191,6 +217,8 @@ def cli(
             src_label = src_report.root[src_uri].label
 
             for cand in candidates_tsv:
+                if (src_uri, cand["uri"]) in hc_approved_pairs:
+                    continue
                 obj_uri: str = cand["uri"]  # pyright: ignore[reportAny]
                 score: float = cand["score"]  # pyright: ignore[reportAny]
                 obj_label = (

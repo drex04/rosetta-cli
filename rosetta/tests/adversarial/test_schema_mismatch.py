@@ -127,14 +127,18 @@ def test_suggest_type_divergence_flagged_by_lint(
 
     src_emb = tmp_path / "src.embed.json"
     master_emb = tmp_path / "master.embed.json"
-    r1 = runner.invoke(embed_cli, ["--input", str(src_yaml), "--output", str(src_emb)])
+    r1 = runner.invoke(embed_cli, [str(src_yaml), "--output", str(src_emb)])
     assert r1.exit_code == 0, f"embed(src): {r1.stderr!r}"
-    r2 = runner.invoke(embed_cli, ["--input", str(master_yaml), "--output", str(master_emb)])
+    r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
     assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
+
+    dummy_log = tmp_path / "audit-log.sssom.tsv"
+    dummy_log.write_text("")
 
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
-        suggest_cli, [str(src_emb), str(master_emb), "--output", str(sssom_out)]
+        suggest_cli,
+        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
     )
 
     # 1. Exit code — suggest succeeds
@@ -143,8 +147,39 @@ def test_suggest_type_divergence_flagged_by_lint(
     )
     assert sssom_out.exists()
 
+    # Lint only checks user-confirmed mappings (MMC/HC), so we keep only the
+    # speed_kts→speed_kts slot row (one mapping per subject) and patch the
+    # justification to MMC to simulate the accredit step. Keeping all rows
+    # would trigger max_one_mmc_per_subject BLOCK (multiple rows per subject).
+    lines = sssom_out.read_text().splitlines(keepends=True)
+    header = [ln for ln in lines if ln.startswith("#")]
+    col_line = next(ln for ln in lines if not ln.startswith("#"))
+    data_lines = [ln for ln in lines if not ln.startswith("#") and ln != col_line]
+    # Keep only the slot-to-slot row (speed_kts → speed_kts)
+    slot_rows = [
+        ln
+        for ln in data_lines
+        if "speed_kts" in ln.split("\t")[0] and "speed_kts" in ln.split("\t")[2]
+    ]
+    filtered = "".join(header) + col_line + "".join(slot_rows)
+    patched = filtered.replace("semapv:LexicalMatching", "semapv:ManualMappingCuration").replace(
+        "semapv:CompositeMatching", "semapv:ManualMappingCuration"
+    )
+    sssom_out.write_text(patched)
+
     # Run lint over the SSSOM output
-    lint_result = runner.invoke(lint_cli, ["--sssom", str(sssom_out)])
+    lint_result = runner.invoke(
+        lint_cli,
+        [
+            str(sssom_out),
+            "--source-schema",
+            str(src_yaml),
+            "--master-schema",
+            str(master_yaml),
+            "--audit-log",
+            str(dummy_log),
+        ],
+    )
 
     # 1. Exit code — observed: 0 (WARNING-only, no BLOCK).
     # Pin the observed value so a future severity-to-exit-code change breaks
@@ -174,7 +209,7 @@ def test_renamed_field_survives_as_alias(tmp_path: Path, monkeypatch: pytest.Mon
     """Source ``altitude_ft`` vs master ``altitude`` → suggest produces a row
     linking the two; the predicate is deterministic (``skos:relatedMatch``).
 
-    OBSERVED-BEHAVIOR NOTE: ``rosetta-suggest`` currently emits
+    OBSERVED-BEHAVIOR NOTE: ``rosetta suggest`` currently emits
     ``skos:relatedMatch`` for every row regardless of score magnitude.
     This test pins that predicate; if suggest's predicate-selection logic
     becomes score-dependent (e.g. ``skos:exactMatch`` for high scores,
@@ -191,14 +226,18 @@ def test_renamed_field_survives_as_alias(tmp_path: Path, monkeypatch: pytest.Mon
 
     src_emb = tmp_path / "src.embed.json"
     master_emb = tmp_path / "master.embed.json"
-    r1 = runner.invoke(embed_cli, ["--input", str(src_yaml), "--output", str(src_emb)])
+    r1 = runner.invoke(embed_cli, [str(src_yaml), "--output", str(src_emb)])
     assert r1.exit_code == 0, f"embed(src): {r1.stderr!r}"
-    r2 = runner.invoke(embed_cli, ["--input", str(master_yaml), "--output", str(master_emb)])
+    r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
     assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
+
+    dummy_log = tmp_path / "audit-log.sssom.tsv"
+    dummy_log.write_text("")
 
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
-        suggest_cli, [str(src_emb), str(master_emb), "--output", str(sssom_out)]
+        suggest_cli,
+        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
     )
 
     # 1. Exit code

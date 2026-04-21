@@ -1,60 +1,23 @@
-# rosetta-validate
+# rosetta validate
 
-Validates an RDF Turtle file against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
+Validates a JSON-LD data file against [SHACL](https://www.w3.org/TR/shacl/) shape constraints using [pySHACL](https://github.com/RDFLib/pySHACL).
 
 ## Command reference
 
 ::: mkdocs-click
     :module: rosetta.cli.validate
     :command: cli
-    :prog_name: rosetta-validate
+    :prog_name: rosetta validate
     :depth: 2
 
-At least one of `--shapes` or `--shapes-dir` must be provided.
+`SHAPES_DIR` is required.
 
 ## Examples
 
 ```bash
 # Load all *.ttl shapes (generated + hand-authored overrides) from a directory
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes-dir rosetta/policies/shacl/ \
+uv run rosetta validate out.jsonld rosetta/policies/shacl/ \
   -o validation.json
-
-# Or point at a single shapes file (e.g. a one-off or third-party shape set)
-uv run rosetta-validate \
-  --data mapping.rml.ttl \
-  --shapes my-shapes.ttl \
-  -o validation.json
-```
-
-`--shapes` and `--shapes-dir` can also be combined — the directory is walked recursively and merged on top of the single-file shapes into one graph before validation.
-
-## JSON-LD input
-
-`rosetta-validate` accepts JSON-LD as data input — useful for validating output from `rosetta-yarrrml-gen --run`. Format is autodetected by suffix:
-
-- `.ttl` → Turtle
-- `.jsonld`, `.json`, `.json-ld` → JSON-LD
-- Anything else → fallback to Turtle
-
-!!! warning "Autodetect surprise"
-    Files with an unrecognized suffix (e.g. `.txt`, `.data`) are parsed as **Turtle** under `--data-format=auto`. A JSON-LD payload in a file named `tracks.data` will therefore produce an rdflib Turtle parse error, not a JSON-LD parse. Pass `--data-format json-ld` explicitly for any non-standard suffix, or rename the file to one of the recognized extensions.
-
-Pass `--data-format {turtle,json-ld,auto}` to override. Example:
-
-```bash
-# Validate JSON-LD output from yarrrml-gen --run
-uv run rosetta-validate \
-  --data out.jsonld \
-  --shapes-dir rosetta/policies/shacl/ \
-  -o validation.json
-
-# Force JSON-LD parser on a non-standard suffix
-uv run rosetta-validate \
-  --data data.txt \
-  --data-format json-ld \
-  --shapes my-shapes.ttl
 ```
 
 ## Exit codes
@@ -64,5 +27,5 @@ uv run rosetta-validate \
 
 ## See also
 
-- [`rosetta-shacl-gen`](shacl-gen.md) — auto-generate the `--shapes` / `--shapes-dir` input from a master LinkML schema; documents the `generated/` + `overrides/` directory convention.
-- [`rosetta-yarrrml-gen`](yarrrml-gen.md) — chain materialization and validation in one step via `--validate --shapes-dir`.
+- [`rosetta shacl-gen`](shacl-gen.md) — auto-generate the `SHAPES_DIR` input from a master LinkML schema; documents the `generated/` + `overrides/` directory convention.
+- [`rosetta run`](run.md) — chain materialization and validation in one step via `--validate <shapes-dir>`.

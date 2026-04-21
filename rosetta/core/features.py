@@ -57,7 +57,7 @@ def extract_structural_features_linkml(
       f4: slot_usage_count_normalized (for slots: count of classes whose .slots list
           includes this slot name, divided by max(1, total_class_count))
 
-    node_id format: "{schema_name}/{node_name}"
+    node_id format: "{schema_name}:{node_name}"
     All feature values are in [0.0, 1.0].
     """
     schema_name: str = schema.name or "schema"  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
@@ -72,7 +72,7 @@ def extract_structural_features_linkml(
 
     for node_name in classes:
         depth_norm: float = depths.get(node_name, 0) / max_depth if max_depth > 0 else 0.0
-        result[f"{schema_name}/{node_name}"] = [1.0, depth_norm, 0.0, 0.0, 0.0]
+        result[f"{schema_name}:{node_name}"] = [1.0, depth_norm, 0.0, 0.0, 0.0]
 
     for node_name in slots:
         node = slots[node_name]
@@ -80,7 +80,7 @@ def extract_structural_features_linkml(
         is_required: float = 1.0 if getattr(node, "required", False) else 0.0
         is_multivalued: float = 1.0 if getattr(node, "multivalued", False) else 0.0
         usage_norm: float = slot_usage.get(node_name, 0) / max(1, total_class_count)
-        result[f"{schema_name}/{node_name}"] = [
+        result[f"{schema_name}:{node_name}"] = [
             0.0,
             depth_norm,
             is_required,

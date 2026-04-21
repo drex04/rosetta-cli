@@ -92,20 +92,6 @@ def make_approved_rows(predicate: str = "skos:relatedMatch") -> list[SSSOMRow]:
     ]
 
 
-def test_approve_boost() -> None:
-    """Accredited mapping raises score of matching candidate."""
-    from rosetta.core.similarity import apply_sssom_feedback
-
-    approved_rows = make_approved_rows("skos:relatedMatch")
-    candidates = make_candidates()
-    result = apply_sssom_feedback(SRC_URI, candidates, approved_rows, boost=0.1)
-
-    tgt = next(c for c in result if c["uri"] == TGT_URI)
-    old_score = 0.75
-    assert tgt["score"] == pytest.approx(old_score + 0.1, abs=0.001)
-    assert tgt["score"] <= 1.0
-
-
 def test_derank_revoked() -> None:
     """owl:differentFrom row decreases score but candidate is NOT removed."""
     from rosetta.core.similarity import apply_sssom_feedback
@@ -133,18 +119,6 @@ def test_no_approved_rows_match_passthrough() -> None:
     for res, orig in zip(result, original):
         assert res["uri"] == orig["uri"]
         assert res["score"] == pytest.approx(float(orig["score"]))  # pyright: ignore[reportArgumentType]
-
-
-def test_boost_cap_at_1() -> None:
-    """Score boosted beyond 1.0 is capped at 1.0."""
-    from rosetta.core.similarity import apply_sssom_feedback
-
-    approved_rows = make_approved_rows("skos:relatedMatch")
-    high_score_candidates: list[dict[str, object]] = [
-        {"uri": TGT_URI, "score": 0.95, "label": "Altitude"}
-    ]
-    result = apply_sssom_feedback(SRC_URI, high_score_candidates, approved_rows, boost=0.1)
-    assert result[0]["score"] == pytest.approx(1.0)
 
 
 def test_empty_candidates() -> None:
@@ -179,36 +153,28 @@ def _make_embed_fixtures(
     return src_file, master_file
 
 
-def test_full_flow_approve_boosts_future_suggestion(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """MMC → HC approve → suggest shows boosted confidence for that pair."""
+def test_full_flow_approve_suppresses_future_suggestion(
+    tmp_path: Path, tmp_rosetta_toml: Path
+) -> None:
+    """MMC → HC approve → suggest omits that pair from output."""
     src_file, master_file = _make_embed_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
-
-    # Baseline suggest (no log)
-    runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_file), str(master_file)])
-    assert baseline.exit_code == 0, baseline.output
-    baseline_rows = _parse_suggest_output(baseline.output)
-    baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
-    assert baseline_tgt is not None
-    baseline_score = float(baseline_tgt["confidence"])
 
     # Ingest MMC then HC approval
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
     append_log([_row(SRC_URI, TGT_URI, HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
 
     # Suggest with config pointing to audit log
-    result = runner.invoke(
+    result = CliRunner().invoke(
         suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)
-    boosted_rows = _parse_suggest_output(result.output)
-    boosted_tgt = next((r for r in boosted_rows if TGT_URI in r.get("object_id", "")), None)
-    assert boosted_tgt is not None
-    boosted_score = float(boosted_tgt["confidence"])
-    assert boosted_score > baseline_score, (
-        f"Expected boosted ({boosted_score}) > baseline ({baseline_score})"
+    rows = _parse_suggest_output(result.output)
+    approved_tgt = next(
+        (r for r in rows if r.get("subject_id") == SRC_URI and r.get("object_id") == TGT_URI),
+        None,
     )
+    assert approved_tgt is None, "Approved HC pair should be suppressed from suggest output"
 
 
 def test_full_flow_reject_deranks_future_suggestion(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
@@ -218,7 +184,11 @@ def test_full_flow_reject_deranks_future_suggestion(tmp_path: Path, tmp_rosetta_
 
     # Baseline
     runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_file), str(master_file)])
+    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
+    dummy_log.write_text("")
+    baseline = runner.invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
+    )
     assert baseline.exit_code == 0, baseline.output
     baseline_rows = _parse_suggest_output(baseline.output)
     baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
@@ -251,7 +221,11 @@ def test_full_flow_correction_overrides_previous_decision(
 
     # Baseline
     runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_file), str(master_file)])
+    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
+    dummy_log.write_text("")
+    baseline = runner.invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
+    )
     assert baseline.exit_code == 0
     baseline_rows = _parse_suggest_output(baseline.output)
     baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
