@@ -30,7 +30,7 @@ With `--strict`, all WARNINGs are upgraded to BLOCKs. Use this as a CI gate on a
 
 ## Structural checks
 
-When `--source-schema` and `--master-schema` are provided, lint verifies that each slot mapping's owning class in the master schema is reachable (via `is_a` hierarchy) from at least one class-level mapping target. This catches invalid mappings early — before `rosetta-yarrrml-gen` fails with a cryptic class-resolution error at step 9.
+When `--source-schema` and `--master-schema` are provided, lint verifies that each slot mapping's owning class in the master schema is reachable (via `is_a` hierarchy) from at least one class-level mapping target. This catches invalid mappings early — before `rosetta compile` fails with a cryptic class-resolution error.
 
 Both flags must be provided together; supplying only one is an error.
 

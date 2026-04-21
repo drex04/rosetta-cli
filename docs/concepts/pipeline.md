@@ -9,17 +9,17 @@
 │  Partner       │───▶│  LinkML YAML  │───▶│  Embeddings  │
 │  schema        │    │  (normalised) │    │  (per slot)  │
 └────────────────┘    └───────────────┘    └──────┬───────┘
-   rosetta-ingest        rosetta-translate        │  rosetta-embed
+   rosetta ingest        rosetta translate         │  rosetta embed
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  rosetta-suggest  →  candidates.sssom.tsv                    │
+│  rosetta suggest  →  candidates.sssom.tsv                    │
 │     (cosine similarity, boosted/deranked by audit log)       │
 └──────────────────────────────────────────────────────────────┘
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  Analyst edits → rosetta-lint → rosetta-accredit append      │
-│  Accreditor reviews → rosetta-accredit append                │
+│  Analyst edits → rosetta lint → rosetta accredit append      │
+│  Accreditor reviews → rosetta accredit append                │
 │                           │                                  │
 │                           ▼                                  │
 │                  audit-log.sssom.tsv  (append-only)          │
@@ -27,13 +27,13 @@
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  rosetta-yarrrml-gen --run                                   │
+│  rosetta compile → rosetta run                               │
 │     TransformSpec YAML → YARRRML → morph-kgc → JSON-LD       │
 └──────────────────────────────────────────────────────────────┘
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  rosetta-validate (SHACL)                                    │
+│  rosetta validate (SHACL)                                    │
 │     Conformant, validated RDF artifact                       │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -42,27 +42,27 @@
 
 ### 1. Ingest — schemas to LinkML
 
-[`rosetta-ingest`](../cli/ingest.md) auto-detects the input format and produces a LinkML schema YAML. Every generated schema is stamped with `annotations.rosetta_source_format` and per-slot path annotations (CSV column, JSONPath, or XPath) so downstream tools can generate format-aware RML mappings.
+[`rosetta ingest`](../cli/ingest.md) auto-detects the input format and produces a LinkML schema YAML. Every generated schema is stamped with `annotations.rosetta_source_format` and per-slot path annotations (CSV column, JSONPath, or XPath) so downstream tools can generate format-aware RML mappings.
 
 ### 2. Translate — optional, multilingual normalisation
 
-[`rosetta-translate`](../cli/translate.md) runs non-English titles and descriptions through DeepL so embeddings can compare across languages. Originals are preserved in `aliases`. For English-source schemas, pass `--source-lang EN` and the step is a no-op.
+[`rosetta translate`](../cli/translate.md) runs non-English titles and descriptions through DeepL so embeddings can compare across languages. Originals are preserved in `aliases`. For English-source schemas, pass `--source-lang EN` and the step is a no-op.
 
 ### 3. Embed — semantic vectors per slot
 
-[`rosetta-embed`](../cli/embed.md) produces a JSON map of slot URI → embedding vector. Each entry carries a `label`, a `lexical` vector (from the sentence transformer), and a 5-dimensional `structural` vector encoding is-class, hierarchy depth, is-required, is-multivalued, and slot-usage count — all normalised to `[0, 1]`.
+[`rosetta embed`](../cli/embed.md) produces a JSON map of slot URI → embedding vector. Each entry carries a `label`, a `lexical` vector (from the sentence transformer), and a 5-dimensional `structural` vector encoding is-class, hierarchy depth, is-required, is-multivalued, and slot-usage count — all normalised to `[0, 1]`.
 
 ### 4. Suggest — rank candidates
 
-[`rosetta-suggest`](../cli/suggest.md) blends lexical and structural cosine similarity, ranks the top-K candidates per source slot, and emits SSSOM TSV. When an audit log is configured, previously approved pairs are boosted and previously rejected pairs are deranked automatically.
+[`rosetta suggest`](../cli/suggest.md) blends lexical and structural cosine similarity, ranks the top-K candidates per source slot, and emits SSSOM TSV. When an audit log is configured, previously approved pairs are boosted and previously rejected pairs are deranked automatically.
 
 ### 5. Lint — catch problems before humans see them
 
-[`rosetta-lint`](../cli/lint.md) flags physical-unit dimension mismatches, datatype incompatibilities, duplicate proposals, and conflicts with prior accreditation decisions. In `--strict` mode, warnings become blocks — use it as a CI gate on the mapping repo.
+[`rosetta lint`](../cli/lint.md) flags physical-unit dimension mismatches, datatype incompatibilities, duplicate proposals, and conflicts with prior accreditation decisions. In `--strict` mode, warnings become blocks — use it as a CI gate on the mapping repo.
 
 ### 6. Accredit — the two-role state machine
 
-[`rosetta-accredit`](../cli/accredit.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. See [Accreditation workflow](accreditation.md) for the full state machine.
+[`rosetta accredit`](../cli/accredit.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. See [Accreditation workflow](accreditation.md) for the full state machine.
 
 ### 7. Generate — compile approved mappings into RML
 
@@ -70,7 +70,7 @@
 
 ### 8. Validate — SHACL conformance
 
-[`rosetta-validate`](../cli/validate.md) runs the materialised RDF against SHACL shapes. Exit `0` conformant, `1` violations — compose it into CI.
+[`rosetta validate`](../cli/validate.md) runs the materialised RDF against SHACL shapes. Exit `0` conformant, `1` violations — compose it into CI.
 
 ## Composability
 

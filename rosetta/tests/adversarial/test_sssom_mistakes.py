@@ -1,6 +1,6 @@
-"""Adversarial tests for rosetta-accredit SSSOM ingest mistakes (Phase 18-03, Task 4).
+"""Adversarial tests for rosetta accredit SSSOM ingest mistakes (Phase 18-03, Task 4).
 
-These tests pin the observable error behaviour of `rosetta-accredit append` against
+These tests pin the observable error behaviour of `rosetta accredit append` against
 malformed SSSOM inputs:
 
 - Duplicate MMC rows in a single file (in-file pre-scan at `rosetta/cli/accredit.py::append_cmd`)

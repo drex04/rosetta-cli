@@ -52,5 +52,5 @@ Both `--output` and `--validate-report` can target stdout. Setting both to stdou
 ## See also
 
 - [`rosetta compile`](compile.md) — produce the YARRRML mapping file consumed by `run`.
-- [`rosetta-shacl-gen`](shacl-gen.md) — generate the shapes directory for `--validate`.
-- [`rosetta-validate`](validate.md) — standalone validator for offline validation.
+- [`rosetta shacl-gen`](shacl-gen.md) — generate the shapes directory for `--validate`.
+- [`rosetta validate`](validate.md) — standalone validator for offline validation.

@@ -1,4 +1,4 @@
-"""Adversarial tests for rosetta-translate error paths (Phase 18-03, Task 8).
+"""Adversarial tests for rosetta translate error paths (Phase 18-03, Task 8).
 
 All DeepL API interaction is mocked via the ``fake_deepl`` conftest fixture — no
 network, no API credits. Each test asserts a three-level contract:

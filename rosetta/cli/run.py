@@ -1,4 +1,4 @@
-"""rosetta-run — materialize a YARRRML mapping against a data file into JSON-LD."""
+"""rosetta run — materialize a YARRRML mapping against a data file into JSON-LD."""
 
 from __future__ import annotations
 
@@ -14,7 +14,14 @@ from rosetta.core.io import open_output
 from rosetta.core.rml_runner import graph_to_jsonld, run_materialize
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta run mapping.yarrrml.yaml data.json --master-schema master.linkml.yaml -o output.jsonld
+
+  rosetta -v run mapping.yarrrml.yaml data.json --master-schema master.linkml.yaml \\
+      --validate rosetta/policies/ -o output.jsonld"""
+)
 @click.argument("mapping_file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("source_file", type=click.Path(exists=True, dir_okay=False))
 @click.option(

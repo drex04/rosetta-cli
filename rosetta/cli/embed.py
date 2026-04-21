@@ -1,4 +1,4 @@
-"""rosetta-embed — embed a LinkML schema using a sentence-transformer model."""
+"""rosetta embed — embed a LinkML schema using a sentence-transformer model."""
 
 from __future__ import annotations
 
@@ -21,7 +21,13 @@ from rosetta.core.features import extract_structural_features_linkml
 from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta embed source.linkml.yaml -o source.embeddings.json
+
+  rosetta -v embed source.linkml.yaml --include-definitions -o source.embeddings.json"""
+)
 @click.argument("schema_file", type=click.Path(exists=True, path_type=Path))
 @click.option("--model", default=None, help="Sentence-transformer model name.")
 @click.option(

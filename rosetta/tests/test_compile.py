@@ -1,4 +1,4 @@
-"""Tests for rosetta-compile CLI (migrated from test_yarrrml_gen.py, Task 5)."""
+"""Tests for rosetta compile CLI (migrated from the old yarrrml-gen tests, Task 5)."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ expected 'nor_radar:Observation'.
 Seams tested:
   - ingest -> embed
   - ingest -> translate -> embed
-  - embed -> suggest -> yarrrml-gen
+  - embed -> suggest -> compile
   - suggest -> accredit
   - suggest -> lint
   - shacl-gen -> validate
@@ -26,7 +26,7 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.accredit import cli as accredit_cli
-from rosetta.cli.compile import cli as yarrrml_cli
+from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.lint import cli as lint_cli
@@ -54,17 +54,17 @@ def mock_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda name: _FakeModel())
 
 
-def test_embed_suggest_yarrrml_gen_format_compatibility(
+def test_embed_suggest_compile_format_compatibility(
     tmp_path: Path,
     nor_linkml_path: Path,
     master_schema_path: Path,
     mock_model: None,
 ) -> None:
-    """Chain embed -> suggest -> yarrrml-gen with real tool output at every seam.
+    """Chain embed -> suggest -> compile with real tool output at every seam.
 
     No hand-crafted intermediates. Suggest SSSOM rows are promoted to
-    HumanCuration (simulating accreditor approval) and fed to yarrrml-gen.
-    The primary assertion is that yarrrml-gen's prefix filter accepts the
+    HumanCuration (simulating accreditor approval) and fed to compile.
+    The primary assertion is that compile's prefix filter accepts the
     suggest output format -- not that the mock model produces meaningful mappings.
     """
     runner = CliRunner(mix_stderr=False)
@@ -124,7 +124,7 @@ def test_embed_suggest_yarrrml_gen_format_compatibility(
 
     # 6. Feed to compile -- prefix filter must accept the format
     result = runner.invoke(
-        yarrrml_cli,
+        compile_cli,
         [
             str(approved),
             "--source-schema",
@@ -135,9 +135,9 @@ def test_embed_suggest_yarrrml_gen_format_compatibility(
     )
     combined = result.output + result.stderr
     assert "no rows after filtering" not in combined, (
-        "yarrrml-gen rejected all rows -- format mismatch between suggest output "
-        "and yarrrml-gen prefix filter. This indicates embed/suggest produce "
-        "subject_ids in a format yarrrml-gen does not expect."
+        "compile rejected all rows -- format mismatch between suggest output "
+        "and compile prefix filter. This indicates embed/suggest produce "
+        "subject_ids in a format compile does not expect."
     )
 
 
@@ -351,22 +351,22 @@ def test_shacl_gen_to_validate(
 
 
 # ---------------------------------------------------------------------------
-# Seam: yarrrml-gen --run -> shacl-gen -> validate (full pipeline)
+# Seam: compile + run -> shacl-gen -> validate (full pipeline)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.e2e
-def test_yarrrml_gen_jsonld_validated_by_shacl(
+def test_compile_run_jsonld_validated_by_shacl(
     tmp_path: Path,
     nor_linkml_path: Path,
     master_schema_path: Path,
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """Full pipeline: yarrrml-gen --run produces JSON-LD, shacl-gen produces
+    """Full pipeline: compile + run produces JSON-LD, shacl-gen produces
     shapes, validate checks the JSON-LD against the shapes.
 
-    Tests the last untested seam: yarrrml-gen's materialized output uses
+    Tests the last untested seam: run's materialized output uses
     namespace URIs and class/property structure that shacl-gen's shapes
     can parse and evaluate.
     """
@@ -391,7 +391,7 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
     # 2. Compile SSSOM → YARRRML
     yarrrml_out = tmp_path / "mapping.yarrrml.yaml"
     compile_result = runner.invoke(
-        yarrrml_cli,
+        compile_cli,
         [
             str(sssom),
             "--source-schema",
@@ -424,10 +424,10 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
         ],
     )
     assert result.exit_code == 0, (
-        f"yarrrml-gen --run failed (exit {result.exit_code}): {result.stderr}\n{result.exception!r}"
+        f"rosetta run failed (exit {result.exit_code}): {result.stderr}\n{result.exception!r}"
     )
     assert jsonld_out.exists() and jsonld_out.stat().st_size > 0, (
-        "yarrrml-gen produced no JSON-LD output"
+        "rosetta run produced no JSON-LD output"
     )
 
     # 3. Validate JSON-LD against SHACL shapes
@@ -443,6 +443,6 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
     # the shapes without crashing.
     assert result.exit_code in (0, 1), (
         f"validate crashed (exit {result.exit_code}): {result.stderr}\n"
-        "This indicates format incompatibility between yarrrml-gen's "
+        "This indicates format incompatibility between rosetta run's "
         "JSON-LD output and shacl-gen's SHACL shapes."
     )

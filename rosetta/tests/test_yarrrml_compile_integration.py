@@ -1,4 +1,4 @@
-"""Integration tests: rosetta-yarrrml-gen TransformSpec → fork's YarrrmlCompiler round-trip.
+"""Integration tests: rosetta compile TransformSpec → fork's YarrrmlCompiler round-trip.
 
 Tests 1-2 are fast (in-process).
 Tests 3-4 invoke the fork's CLI via subprocess and are marked @pytest.mark.slow.
@@ -17,7 +17,7 @@ from linkml_runtime.linkml_model import ClassDefinition, SchemaDefinition, SlotD
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView
 
-from rosetta.cli.compile import cli as yarrrml_gen_cli
+from rosetta.cli.compile import cli as compile_cli
 from rosetta.core.accredit import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec
 
@@ -30,7 +30,7 @@ _ROSETTA_CWD = Path(__file__).resolve().parents[2]
 
 
 # ---------------------------------------------------------------------------
-# Helper builders (mirrors test_yarrrml_gen.py pattern)
+# Helper builders (mirrors the old yarrrml-gen test pattern)
 # ---------------------------------------------------------------------------
 
 
@@ -201,7 +201,7 @@ def test_yarrrml_compile_csv_references_match_annotations(
 
 
 # ---------------------------------------------------------------------------
-# Test 3 — CLI end-to-end: rosetta-yarrrml-gen → linkml-map compile
+# Test 3 — CLI end-to-end: rosetta compile → linkml-map compile
 # ---------------------------------------------------------------------------
 
 
@@ -212,14 +212,14 @@ def test_yarrrml_compile_cli_end_to_end(
     master_schema_path: Path,
     sssom_nor_path: Path,
 ) -> None:
-    """rosetta-yarrrml-gen writes spec.yaml; linkml-map compile --target yarrrml reads it."""
+    """rosetta compile writes spec.yaml; linkml-map compile --target yarrrml reads it."""
     spec_out = tmp_path / "spec.yaml"
     yarrrml_out = tmp_path / "output.yarrrml.yaml"
 
-    # Step 1: produce TransformSpec via rosetta-yarrrml-gen CLI
+    # Step 1: produce TransformSpec via rosetta compile CLI
     runner = CliRunner()
     result = runner.invoke(  # noqa: FURB184
-        yarrrml_gen_cli,
+        compile_cli,
         [
             str(sssom_nor_path),
             "--source-schema",
@@ -288,7 +288,7 @@ def test_yarrrml_compile_cli_self_describing(
     # Produce spec with embedded source/target schema paths
     runner = CliRunner()
     result = runner.invoke(  # noqa: FURB184
-        yarrrml_gen_cli,
+        compile_cli,
         [
             str(sssom_nor_path),
             "--source-schema",

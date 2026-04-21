@@ -1,6 +1,6 @@
 """Shared SHACL validation helper.
 
-Used by ``rosetta-validate`` and ``rosetta-yarrrml-gen --validate`` so the
+Used by ``rosetta validate`` and ``rosetta run --validate`` so the
 two entrypoints share one invocation path and produce structurally identical
 ``ValidationReport`` outputs.
 """
@@ -53,7 +53,7 @@ def validate_graph(
         The merged SHACL shapes graph.
     inference
         Pass-through to pyshacl. Default ``"none"`` matches the existing
-        ``rosetta-validate`` contract.
+        ``rosetta validate`` contract.
 
     Returns
     -------

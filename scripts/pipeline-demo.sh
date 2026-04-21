@@ -9,7 +9,8 @@
 #   → accredit review
 #   → [accreditor edits review.sssom.tsv]
 #   → accredit append (accreditor decisions)
-#   → yarrrml-gen (TransformSpec + JSON-LD materialization)
+#   → compile (YARRRML mapping artifact)
+#   → run (JSON-LD materialization)
 #   → validate (SHACL constraint checking)
 #
 # Usage: bash scripts/pipeline-demo.sh [OUTPUT_DIR]
@@ -89,14 +90,14 @@ echo "  SHACL shapes: $SHAPES_DIR"
 info "Step 1 — Ingest schemas → LinkML YAML"
 
 run_cmd uv run rosetta ingest \
-    --input  "$SRC_FIXTURE" \
-    --output "$OUT/nor_radar.linkml.yaml"
+    "$SRC_FIXTURE" \
+    -o "$OUT/nor_radar.linkml.yaml"
 ok "$OUT/nor_radar.linkml.yaml"
 
 run_cmd uv run rosetta ingest \
-    --input  "$MASTER_FIXTURE" \
-    --format rdfs \
-    --output "$OUT/master_cop.linkml.yaml"
+    "$MASTER_FIXTURE" \
+    --schema-format rdfs \
+    -o "$OUT/master_cop.linkml.yaml"
 ok "$OUT/master_cop.linkml.yaml"
 
 # ── Step 2: Translate ─────────────────────────────────────────────────────────
@@ -104,15 +105,15 @@ ok "$OUT/master_cop.linkml.yaml"
 info "Step 2 — Translate schemas to English"
 
 run_cmd uv run rosetta translate \
-    --input       "$OUT/nor_radar.linkml.yaml" \
-    --output      "$OUT/nor_radar_en.linkml.yaml" \
-    --source-lang NB
+    "$OUT/nor_radar.linkml.yaml" \
+    --source-lang NB \
+    -o "$OUT/nor_radar_en.linkml.yaml"
 ok "$OUT/nor_radar_en.linkml.yaml"
 
 run_cmd uv run rosetta translate \
-    --input       "$OUT/master_cop.linkml.yaml" \
-    --output      "$OUT/master_cop_en.linkml.yaml" \
-    --source-lang EN
+    "$OUT/master_cop.linkml.yaml" \
+    --source-lang EN \
+    -o "$OUT/master_cop_en.linkml.yaml"
 ok "$OUT/master_cop_en.linkml.yaml"
 
 # ── Step 3: Embed ─────────────────────────────────────────────────────────────
@@ -121,13 +122,13 @@ info "Step 3 — Embed schemas"
 echo "  (First run downloads the model ~1.2 GB from HuggingFace; subsequent runs use cache)"
 
 run_cmd uv run rosetta embed \
-    --input  "$OUT/nor_radar_en.linkml.yaml" \
-    --output "$OUT/nor_radar_emb.json"
+    "$OUT/nor_radar_en.linkml.yaml" \
+    -o "$OUT/nor_radar_emb.json"
 ok "$OUT/nor_radar_emb.json"
 
 run_cmd uv run rosetta embed \
-    --input  "$OUT/master_cop_en.linkml.yaml" \
-    --output "$OUT/master_cop_emb.json"
+    "$OUT/master_cop_en.linkml.yaml" \
+    -o "$OUT/master_cop_emb.json"
 ok "$OUT/master_cop_emb.json"
 
 # ── Step 4: Suggest ───────────────────────────────────────────────────────────
@@ -137,7 +138,8 @@ info "Step 4 — Generate mapping candidates"
 run_cmd uv run rosetta suggest \
     "$OUT/nor_radar_emb.json" \
     "$OUT/master_cop_emb.json" \
-    --output "$OUT/candidates.sssom.tsv"
+    --audit-log "$LOG" \
+    -o "$OUT/candidates.sssom.tsv"
 ok "$OUT/candidates.sssom.tsv"
 
 # ── Pause: Analyst edits candidates ──────────────────────────────────────────
@@ -160,9 +162,10 @@ confirm "Done editing? (yes to continue, skip to proceed without edits)" \
 info "Step 5 — Lint SSSOM proposals"
 
 while true; do
-    if run_cmd uv run rosetta lint --sssom "$OUT/candidates.sssom.tsv" \
+    if run_cmd uv run rosetta lint "$OUT/candidates.sssom.tsv" \
         --source-schema "$OUT/nor_radar_en.linkml.yaml" \
-        --master-schema "$OUT/master_cop_en.linkml.yaml"; then
+        --master-schema "$OUT/master_cop_en.linkml.yaml" \
+        --audit-log "$LOG"; then
         ok "Lint passed — no errors."
         break
     fi
@@ -186,13 +189,13 @@ done
 
 info "Step 6 — Stage analyst proposals into audit log"
 
-run_cmd uv run rosetta accredit --log "$LOG" append "$OUT/candidates.sssom.tsv"
+run_cmd uv run rosetta accredit --audit-log "$LOG" append "$OUT/candidates.sssom.tsv"
 
 # ── Step 7: Generate accreditor work list ─────────────────────────────────────
 
 info "Step 7 — Generate accreditor review list"
 
-run_cmd uv run rosetta accredit --log "$LOG" review --output "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta accredit --audit-log "$LOG" review -o "$OUT/review.sssom.tsv"
 ok "$OUT/review.sssom.tsv"
 
 # ── Pause: Accreditor edits review ───────────────────────────────────────────
@@ -212,45 +215,61 @@ confirm "Done editing? (yes to append decisions, skip to finish without appendin
 
 info "Step 8 — Append accreditor decisions"
 
-run_cmd uv run rosetta accredit --log "$LOG" append "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta accredit --audit-log "$LOG" append "$OUT/review.sssom.tsv"
 
-# ── Step 9: Generate TransformSpec + Materialize JSON-LD ─────────────────────
+# ── Step 9: Compile YARRRML mapping artifact ─────────────────────────────────
 
-info "Step 9 — Generate TransformSpec + materialize JSON-LD"
+info "Step 9 — Compile SSSOM audit log to YARRRML mapping"
 echo "  (Requires approved mappings in the audit log from steps 6–8)"
 
-JSONLD_OK=false
-if run_cmd uv run rosetta yarrrml-gen \
-    --sssom "$LOG" \
+COMPILE_OK=false
+if run_cmd uv run rosetta compile "$LOG" \
     --source-schema "$OUT/nor_radar_en.linkml.yaml" \
     --master-schema "$OUT/master_cop_en.linkml.yaml" \
-    --source-format csv \
-    --output "$OUT/nor_to_mc.transform.yaml" \
     --coverage-report "$OUT/coverage.json" \
-    --force \
-    --run \
-    --data "$SRC_FIXTURE" \
-    --jsonld-output "$OUT/output.jsonld" \
-    --workdir "$OUT/morph_workdir"; then
+    --spec-output "$OUT/nor_to_mc.transform.yaml" \
+    -o "$OUT/nor_to_mc.yarrrml.yaml"; then
+    ok "$OUT/nor_to_mc.yarrrml.yaml    (YARRRML mapping)"
     ok "$OUT/nor_to_mc.transform.yaml  (TransformSpec)"
     ok "$OUT/coverage.json             (coverage report)"
-    ok "$OUT/output.jsonld             (materialized JSON-LD)"
-    JSONLD_OK=true
+    COMPILE_OK=true
 else
-    echo "  ⚠  yarrrml-gen failed — the audit log may not contain approved mappings."
+    echo "  ⚠  compile failed — the audit log may not contain approved mappings."
     echo "     If you skipped editing candidates/review, this is expected."
-    echo "     Skipping validation step."
+    echo "     Skipping run and validation steps."
 fi
 
-# ── Step 10: Validate JSON-LD ────────────────────────────────────────────────
+# ── Step 10: Materialize JSON-LD ──────────────────────────────────────────────
+
+JSONLD_OK=false
+if $COMPILE_OK; then
+    info "Step 10 — Materialize JSON-LD from YARRRML mapping"
+
+    if run_cmd uv run rosetta run \
+        "$OUT/nor_to_mc.yarrrml.yaml" \
+        "$SRC_FIXTURE" \
+        --master-schema "$OUT/master_cop_en.linkml.yaml" \
+        -o "$OUT/output.jsonld" \
+        --workdir "$OUT/morph_workdir"; then
+        ok "$OUT/output.jsonld  (materialized JSON-LD)"
+        JSONLD_OK=true
+    else
+        echo "  ⚠  run failed — check mapping and source data."
+        echo "     Skipping validation step."
+    fi
+else
+    info "Step 10 — Materialize JSON-LD (skipped — compile did not produce a mapping)"
+fi
+
+# ── Step 11: Validate JSON-LD ────────────────────────────────────────────────
 
 if $JSONLD_OK; then
-    info "Step 10 — Validate materialized output against SHACL shapes"
+    info "Step 11 — Validate materialized output against SHACL shapes"
 
     if run_cmd uv run rosetta validate \
-        --data "$OUT/output.jsonld" \
-        --shapes-dir "$SHAPES_DIR" \
-        --output "$OUT/validation-report.json"; then
+        "$OUT/output.jsonld" \
+        "$SHAPES_DIR" \
+        -o "$OUT/validation-report.json"; then
         ok "Validation passed — output conforms to SHACL shapes."
         ok "$OUT/validation-report.json"
     else
@@ -260,7 +279,7 @@ if $JSONLD_OK; then
         echo "      populate all properties required by the SHACL shapes.)"
     fi
 else
-    info "Step 10 — Validate (skipped — no JSON-LD produced)"
+    info "Step 11 — Validate (skipped — no JSON-LD produced)"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -270,13 +289,16 @@ echo ""
 echo "  Candidates  : $OUT/candidates.sssom.tsv"
 echo "  Review      : $OUT/review.sssom.tsv"
 echo "  Audit log   : $LOG"
-if $JSONLD_OK; then
+if $COMPILE_OK; then
+echo "  YARRRML     : $OUT/nor_to_mc.yarrrml.yaml"
 echo "  TransformSpec: $OUT/nor_to_mc.transform.yaml"
 echo "  Coverage    : $OUT/coverage.json"
+fi
+if $JSONLD_OK; then
 echo "  JSON-LD     : $OUT/output.jsonld"
 echo "  Validation  : $OUT/validation-report.json"
 fi
 echo ""
 echo "  Next steps:"
-echo "    uv run rosetta accredit --log '$LOG' dump     # export approved mappings"
-echo "    uv run rosetta suggest  ... --output candidates2.sssom.tsv  # re-run with boost/derank"
+echo "    uv run rosetta accredit --audit-log '$LOG' dump     # export approved mappings"
+echo "    uv run rosetta suggest  ... --audit-log '$LOG' -o candidates2.sssom.tsv  # re-run with boost/derank"

@@ -1,4 +1,4 @@
-"""Integration test for rosetta-suggest on inheritance schema (Phase 18-02)."""
+"""Integration test for rosetta suggest on inheritance schema (Phase 18-02)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Slow end-to-end test: NOR radar CSV → JSON-LD via rosetta-yarrrml-gen --run.
+"""Slow end-to-end test: NOR radar CSV → JSON-LD via rosetta compile/run.
 
 This test walks the full pipeline:
 
@@ -68,7 +68,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """Materialize a 3-row NOR CSV through the full rosetta-yarrrml-gen --run pipeline.
+    """Materialize a 3-row NOR CSV through the full rosetta compile/run pipeline.
 
     Asserts the contract in Plan 16-03 truths #1, #2, #3 (relaxed per docstring),
     and review truth #17 (compaction-tolerant key lookup with pytest.approx).

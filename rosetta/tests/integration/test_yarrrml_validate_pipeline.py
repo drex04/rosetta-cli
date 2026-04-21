@@ -216,7 +216,7 @@ def test_yarrrml_run_validate_violation_blocks_emission(
 
 
 # ---------------------------------------------------------------------------
-# Post-review: compile+run → disk JSON-LD → rosetta-validate chain
+# Post-review: compile+run → disk JSON-LD → rosetta validate chain
 # ---------------------------------------------------------------------------
 
 
@@ -228,7 +228,7 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """Two-stage chain: compile+run writes JSON-LD to disk; rosetta-validate reads it."""
+    """Two-stage chain: compile+run writes JSON-LD to disk; rosetta validate reads it."""
     from rosetta.cli.validate import cli as validate_cli
 
     nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(

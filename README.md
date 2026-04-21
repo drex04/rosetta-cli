@@ -77,15 +77,15 @@ Parses a schema file and emits a LinkML schema YAML (`.linkml.yaml`). Input form
 Nested objects are preserved as nested classes in the LinkML output.
 
 ```
-Usage: rosetta ingest [OPTIONS] INPUT_FILE
+Usage: rosetta ingest [OPTIONS] SCHEMA_FILE
 
 Arguments:
-  INPUT_FILE           Input schema file.
+  SCHEMA_FILE               Input schema file.
 
 Options:
-  -f, --schema-format TEXT   Force input format: csv, tsv, json-schema, openapi, xsd, json-sample, rdfs
-  -o, --output PATH          Output path for .linkml.yaml file (default: stdout)
-  -c, --config PATH          Path to rosetta.toml
+  -f, --schema-format TEXT  Force input format: csv, tsv, json-schema, openapi, xsd, json-sample, rdfs
+  -o, --output PATH         Output path for .linkml.yaml file (default: stdout)
+  -c, --config PATH         Path to rosetta.toml
 ```
 
 **Example:**
@@ -236,7 +236,7 @@ uv run rosetta suggest nor_emb.json usa_emb.json -o candidates.sssom.tsv
 
 ```
 # mapping_set_id: https://rosetta-cli/mappings
-# mapping_tool: rosetta-suggest
+# mapping_tool: rosetta suggest
 # license: https://creativecommons.org/licenses/by/4.0/
 # curie_map:
 #   skos: http://www.w3.org/2004/02/skos/core#
@@ -265,7 +265,7 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 
 `mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates. `subject_datatype` and `object_datatype` are re-derived at suggest time from the source and master LinkML schemas; they are not stored in the audit log (see [Audit log format](#audit-log-format)).
 
-**Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta-suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
+**Structural blending:** When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays (e.g., older files), scoring falls back to lexical-only automatically. When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
 **Audit log integration:** When `[accredit].log` is set in `rosetta.toml` (or `--audit-log` is passed) and the log file exists, `rosetta suggest` automatically:
 
@@ -427,7 +427,6 @@ Global options:
 Commands:
   append   Append ManualMappingCuration or HumanCuration rows to the audit log
   review   Output pending proposals (ManualMappingCuration with no decision yet)
-  status   Show current accreditation state per pair
   dump     Export current HumanCuration rows for pipeline use
 ```
 
@@ -450,18 +449,6 @@ Usage: rosetta accredit review [OPTIONS]
 Options:
   -o, --output PATH    Output file (default: stdout)
 ```
-
-**status:**
-
-```
-Usage: rosetta accredit status [OPTIONS]
-
-Options:
-  --source TEXT    Filter by subject_id (substring match)
-  --target TEXT    Filter by object_id (substring match)
-```
-
-Prints a JSON array with current state per pair to stdout.
 
 **dump:**
 
@@ -496,7 +483,7 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for exter
 
 > The audit log persists reviewer-asserted fields only. Schema-derived fields (`subject_datatype`, `object_datatype`) appear in `rosetta suggest` output but are not stored in the audit log; they are re-derived by downstream tools from the source/master LinkML schemas.
 
-> **Migration:** Pre-16-00 audit logs with 9 columns are automatically upgraded to the 13-column format on the first `rosetta-accredit append` call. No manual migration is required.
+> **Migration:** Pre-16-00 audit logs with 9 columns are automatically upgraded to the 13-column format on the first `rosetta accredit append` call. No manual migration is required.
 
 A complete history for an approved mapping:
 
@@ -553,10 +540,7 @@ uv run rosetta accredit review -o review.sssom.tsv
 # 7. Ingest decisions
 uv run rosetta accredit append review.sssom.tsv
 
-# 8. Check current state
-uv run rosetta accredit status
-
-# 9. Correct a previous decision
+# 8. Correct a previous decision
 # (edit update.sssom.tsv with corrected HumanCuration row)
 uv run rosetta accredit append update.sssom.tsv
 ```

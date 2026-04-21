@@ -1,4 +1,4 @@
-"""Phase 19 / Plan 19-01 / Task 4 — tests for rosetta-shacl-gen.
+"""Phase 19 / Plan 19-01 / Task 4 — tests for rosetta shacl-gen.
 
 Covers both the helper ``rosetta.core.shacl_generator.generate_shacl`` and the
 Click CLI ``rosetta.cli.shacl_gen.cli``. Six required tests, mirroring the plan.

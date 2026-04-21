@@ -203,7 +203,7 @@ def test_renamed_field_survives_as_alias(tmp_path: Path, monkeypatch: pytest.Mon
     """Source ``altitude_ft`` vs master ``altitude`` → suggest produces a row
     linking the two; the predicate is deterministic (``skos:relatedMatch``).
 
-    OBSERVED-BEHAVIOR NOTE: ``rosetta-suggest`` currently emits
+    OBSERVED-BEHAVIOR NOTE: ``rosetta suggest`` currently emits
     ``skos:relatedMatch`` for every row regardless of score magnitude.
     This test pins that predicate; if suggest's predicate-selection logic
     becomes score-dependent (e.g. ``skos:exactMatch`` for high scores,

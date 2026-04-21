@@ -1,4 +1,4 @@
-"""Integration tests for the ``rosetta-shacl-gen → rosetta-validate`` chain.
+"""Integration tests for the ``rosetta shacl-gen → rosetta validate`` chain.
 
 Phase 19 review follow-up: the 130KB generated ``master.shacl.ttl`` was
 committed but never exercised as a live ``--shapes`` / ``--shapes-dir`` target

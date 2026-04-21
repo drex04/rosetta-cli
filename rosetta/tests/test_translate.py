@@ -1,4 +1,4 @@
-"""Tests for rosetta-translate CLI — LinkML YAML input/output."""
+"""Tests for rosetta translate CLI — LinkML YAML input/output."""
 
 from __future__ import annotations
 

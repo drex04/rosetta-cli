@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+from contextlib import suppress
 
 import click
 
@@ -61,15 +62,27 @@ class LazyGroup(click.Group):
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     """Rosetta — composable CLI tools for semantic schema mapping."""
+    if verbose and quiet:
+        raise click.UsageError("--verbose and --quiet are mutually exclusive.")
     ctx.ensure_object(dict)
+    no_color = "NO_COLOR" in os.environ or not sys.stdout.isatty()
+    ctx.obj["no_color"] = no_color
     ctx.obj["verbose"] = verbose
     ctx.obj["quiet"] = quiet
+    if no_color:
+        ctx.color = False
 
 
 def main() -> None:
     try:
-        cli()
+        cli(standalone_mode=False)
     except BrokenPipeError:
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, sys.stdout.fileno())
+        with suppress(BrokenPipeError):
+            sys.stdout.close()
+        with suppress(BrokenPipeError):
+            sys.stderr.close()
         sys.exit(141)
+    except KeyboardInterrupt:
+        sys.exit(130)
+    except SystemExit:
+        raise

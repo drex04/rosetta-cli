@@ -1,4 +1,4 @@
-"""rosetta-suggest: Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
+"""rosetta suggest: Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
 
 import csv
 import io
@@ -21,7 +21,7 @@ from rosetta.core.similarity import apply_sssom_feedback, rank_suggestions
 
 _SSSOM_HEADER_LINES = [
     "# mapping_set_id: https://rosetta-cli/mappings",
-    "# mapping_tool: rosetta-suggest",
+    "# mapping_tool: rosetta suggest",
     "# license: https://creativecommons.org/licenses/by/4.0/",
     "# curie_map:",
     "#   skos: http://www.w3.org/2004/02/skos/core#",
@@ -47,7 +47,15 @@ _SSSOM_COLUMNS = [
 ]
 
 
-@click.command()
+@click.command(
+    epilog="""Examples:
+
+  rosetta suggest source.embeddings.json master.embeddings.json \\
+      --audit-log store/audit-log.sssom.tsv -o proposals.sssom.tsv
+
+  rosetta -v suggest source.embeddings.json master.embeddings.json \\
+      --audit-log store/audit-log.sssom.tsv --top-k 10"""
+)
 @click.argument("source", type=click.Path(exists=True))
 @click.argument("master", type=click.Path(exists=True))
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")

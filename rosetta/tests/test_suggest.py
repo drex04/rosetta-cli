@@ -1,4 +1,4 @@
-"""Tests for rosetta-suggest: similarity.py core + suggest CLI."""
+"""Tests for rosetta suggest: similarity.py core + suggest CLI."""
 
 from __future__ import annotations
 

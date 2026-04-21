@@ -212,7 +212,7 @@ def test_run_materialize_cleans_internal_workdir(tmp_path: Path) -> None:
         assert isinstance(graph, rdflib.Graph)
         # morph-kgc ran; mapping.yml must have existed somewhere. We can't easily
         # pluck it out, so instead assert that after exit no dangling dirs named
-        # rosetta-yarrrml-* exist in the temp location under this tmp_path's parent.
+        # rosetta compile/run exist in the temp location under this tmp_path's parent.
         # Simpler: nothing to capture inside — the cleanup check is performed after.
         _ = captured  # placeholder
     # Nothing to assert beyond "no exception and no leaked directory we created".

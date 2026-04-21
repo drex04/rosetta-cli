@@ -1,6 +1,6 @@
 # rosetta accredit
 
-Manages the two-role accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta-suggest` (boost/derank) and `rosetta-lint` (conflict checking).
+Manages the two-role accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta suggest` (boost/derank) and `rosetta lint` (conflict checking).
 
 For the conceptual flow and state machine, see [Accreditation workflow](../concepts/accreditation.md).
 
@@ -21,10 +21,6 @@ Validates each row against the state machine before writing. If *any* row violat
 ### `review`
 
 Outputs pending proposals — all `ManualMappingCuration` rows that have no corresponding `HumanCuration` decision yet — as SSSOM TSV. This is the Accreditor's work list.
-
-### `status`
-
-Prints a JSON array with the current accreditation state per pair. Filterable via `--source` / `--target` substring match on the URIs.
 
 ### `dump`
 
@@ -52,10 +48,7 @@ uv run rosetta accredit review -o review.sssom.tsv
 # 7. Ingest decisions
 uv run rosetta accredit append review.sssom.tsv
 
-# 8. Check state
-uv run rosetta accredit status
-
-# 9. Correct a prior decision
+# 8. Correct a prior decision
 uv run rosetta accredit append update.sssom.tsv
 ```
 
