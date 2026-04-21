@@ -17,7 +17,7 @@ Internally, this builds a `linkml-map` [`TransformationSpecification`](https://l
 ### Compile to YARRRML (stdout)
 
 ```bash
-rosetta compile store/audit-log.sssom.tsv \
+rosetta compile audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml
 ```
@@ -25,7 +25,7 @@ rosetta compile store/audit-log.sssom.tsv \
 ### Compile to file with coverage report
 
 ```bash
-rosetta compile store/audit-log.sssom.tsv \
+rosetta compile audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml \
   -o demo_out/nor_to_mc.yarrrml.yml \
@@ -35,7 +35,7 @@ rosetta compile store/audit-log.sssom.tsv \
 ### Also save the intermediate TransformSpec
 
 ```bash
-rosetta compile store/audit-log.sssom.tsv \
+rosetta compile audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml \
   -o demo_out/nor_to_mc.yarrrml.yml \

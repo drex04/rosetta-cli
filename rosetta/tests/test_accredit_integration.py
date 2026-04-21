@@ -184,7 +184,11 @@ def test_full_flow_reject_deranks_future_suggestion(tmp_path: Path, tmp_rosetta_
 
     # Baseline
     runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_file), str(master_file)])
+    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
+    dummy_log.write_text("")
+    baseline = runner.invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
+    )
     assert baseline.exit_code == 0, baseline.output
     baseline_rows = _parse_suggest_output(baseline.output)
     baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
@@ -217,7 +221,11 @@ def test_full_flow_correction_overrides_previous_decision(
 
     # Baseline
     runner = CliRunner()
-    baseline = runner.invoke(suggest_cli, [str(src_file), str(master_file)])
+    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
+    dummy_log.write_text("")
+    baseline = runner.invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
+    )
     assert baseline.exit_code == 0
     baseline_rows = _parse_suggest_output(baseline.output)
     baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)

@@ -39,7 +39,7 @@ from rosetta.core.models import SSSOMRow
 def cli(ctx: click.Context, log: str | None, config: str | None) -> None:
     """Manage mapping accreditation via append-only SSSOM audit log."""
     cfg = load_config(Path(config)) if config else load_config()
-    log_path_str = log or get_config_value(cfg, "accredit", "log") or "store/audit-log.sssom.tsv"
+    log_path_str = log or get_config_value(cfg, "accredit", "log") or "audit-log.sssom.tsv"
     ctx.ensure_object(dict)
     ctx.obj["log"] = Path(log_path_str)
 
@@ -74,7 +74,7 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
 
   rosetta accredit append proposals.sssom.tsv
 
-  rosetta -v accredit --audit-log store/audit-log.sssom.tsv append proposals.sssom.tsv""",
+  rosetta -v accredit --audit-log audit-log.sssom.tsv append proposals.sssom.tsv""",
 )
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 @click.pass_context

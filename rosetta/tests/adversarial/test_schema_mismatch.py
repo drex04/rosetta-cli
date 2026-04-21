@@ -132,9 +132,13 @@ def test_suggest_type_divergence_flagged_by_lint(
     r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
     assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
 
+    dummy_log = tmp_path / "audit-log.sssom.tsv"
+    dummy_log.write_text("")
+
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
-        suggest_cli, [str(src_emb), str(master_emb), "--output", str(sssom_out)]
+        suggest_cli,
+        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
     )
 
     # 1. Exit code — suggest succeeds
@@ -172,6 +176,8 @@ def test_suggest_type_divergence_flagged_by_lint(
             str(src_yaml),
             "--master-schema",
             str(master_yaml),
+            "--audit-log",
+            str(dummy_log),
         ],
     )
 
@@ -225,9 +231,13 @@ def test_renamed_field_survives_as_alias(tmp_path: Path, monkeypatch: pytest.Mon
     r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
     assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
 
+    dummy_log = tmp_path / "audit-log.sssom.tsv"
+    dummy_log.write_text("")
+
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
-        suggest_cli, [str(src_emb), str(master_emb), "--output", str(sssom_out)]
+        suggest_cli,
+        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
     )
 
     # 1. Exit code
