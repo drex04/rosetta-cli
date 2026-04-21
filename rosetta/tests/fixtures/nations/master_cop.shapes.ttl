@@ -1,0 +1,2826 @@
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix mc: <https://ontology.nato.int/core/MasterCOP#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix unit: <http://qudt.org/vocab/unit/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+mc:ADIZ a sh:NodeShape ;
+    rdfs:comment "Designated airspace in which identification, location, and control of civil and military aircraft is required in the interest of national security." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ] ;
+    sh:targetClass mc:ADIZ .
+
+mc:ADSBReport a sh:NodeShape ;
+    rdfs:comment "An Automatic Dependent Surveillance-Broadcast message from a civil or military aircraft." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:ADSBReport .
+
+mc:AEWPlatform a sh:NodeShape ;
+    rdfs:comment "Airborne Early Warning platform (e.g., E-3 Sentry, E-2 Hawkeye) providing airborne surveillance and C2 relay." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:AEWPlatform .
+
+mc:AEWUnit a sh:NodeShape ;
+    rdfs:comment "An airborne early warning unit providing extended radar coverage and airborne C2." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:AEWUnit .
+
+mc:AISReport a sh:NodeShape ;
+    rdfs:comment "An Automatic Identification System broadcast from a maritime vessel." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:AISReport .
+
+mc:AirDefenseUnit a sh:NodeShape ;
+    rdfs:comment "A unit whose primary mission is defense against air threats including missiles, aircraft, and UAS." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ] ;
+    sh:targetClass mc:AirDefenseUnit .
+
+mc:AirToAirMissile a sh:NodeShape ;
+    rdfs:comment "A missile fired from an airborne platform at an airborne target." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasNATOStockNumber ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ] ;
+    sh:targetClass mc:AirToAirMissile .
+
+mc:AirTrack a sh:NodeShape ;
+    rdfs:comment "An airborne track — fixed-wing aircraft, rotary-wing aircraft, UAV, or missile in flight." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:managedBy ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:detectedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Rate of climb or descent in feet per minute. Positive = climbing, negative = descending." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasVerticalRate ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasConfidence ],
+        [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 16 ;
+            sh:path mc:engagedBy ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 29 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasBearing ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:withinZone ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path mc:hasHeading ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasMode5 ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:FT-PER-MIN unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasRange ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path mc:hasIdentity ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path mc:correlatedWith ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasTrackQuality ] ;
+    sh:targetClass mc:AirTrack .
+
+mc:Aircraft a sh:NodeShape ;
+    rdfs:comment "An airborne platform — fighter, bomber, AWACS, tanker, transport, helicopter, or UAV." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:Aircraft .
+
+mc:BallisticTrack a sh:NodeShape ;
+    rdfs:comment "A track following a ballistic trajectory — typically a ballistic missile or large-calibre artillery round." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasBearing ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasRange ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 29 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasConfidence ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasSpeed ],
+        [ sh:in ( unit:FT-PER-MIN unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:managedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path mc:hasHeading ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 16 ;
+            sh:path mc:engagedBy ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:withinZone ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path mc:hasIdentity ],
+        [ sh:datatype xsd:double ;
+            sh:description "Rate of climb or descent in feet per minute. Positive = climbing, negative = descending." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasVerticalRate ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:reportedBy ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path mc:correlatedWith ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasMode5 ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:detectedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasAltitudeFt ] ;
+    sh:targetClass mc:BallisticTrack .
+
+mc:CommandPost a sh:NodeShape ;
+    rdfs:comment "A unit serving as a C2 node coordinating subordinate units and managing the COP." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ] ;
+    sh:targetClass mc:CommandPost .
+
+mc:Corridor a sh:NodeShape ;
+    rdfs:comment "A defined airspace lane reserved for the transit of specific friendly aircraft, providing deconfliction from engagement zones." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:Corridor .
+
+mc:CruiseMissileTrack a sh:NodeShape ;
+    rdfs:comment "A track exhibiting terrain-following or low-altitude sustained powered flight consistent with a cruise missile." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path mc:hasHeading ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasBearing ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:managedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Rate of climb or descent in feet per minute. Positive = climbing, negative = descending." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasVerticalRate ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path mc:correlatedWith ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 29 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:detectedBy ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 16 ;
+            sh:path mc:engagedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasMode5 ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path mc:hasIdentity ],
+        [ sh:in ( unit:FT-PER-MIN unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasRange ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasConfidence ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:withinZone ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:CruiseMissileTrack .
+
+mc:DirectedEnergyWeapon a sh:NodeShape ;
+    rdfs:comment "A laser or high-power microwave weapon used against airborne threats." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasNATOStockNumber ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:DirectedEnergyWeapon .
+
+mc:EWReport a sh:NodeShape ;
+    rdfs:comment "An electronic warfare emission report contributing to platform type identification." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:EWReport .
+
+mc:EWSystem a sh:NodeShape ;
+    rdfs:comment "An electronic warfare system providing emissions intelligence and jamming capability." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:EWSystem .
+
+mc:EngagementZone a sh:NodeShape ;
+    rdfs:comment "The volume of airspace within which a weapon system has both authority and capability to engage a threat." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ] ;
+    sh:targetClass mc:EngagementZone .
+
+mc:Entity a sh:NodeShape ;
+    rdfs:comment "Top-level class for any distinct object tracked or managed in the COP." ;
+    sh:closed true ;
+    sh:ignoredProperties ( mc:hasRange mc:hasTrackQuality mc:hasTrackNumber mc:hasBearing mc:assignedWeapon mc:hasMode1Code rdf:type mc:hasSpeed mc:hasMode5 mc:withinZone mc:hasThreatLevel mc:hasMode2Code mc:reportedBy mc:hasVerticalRate mc:hasIdentity mc:detectedBy mc:managedBy mc:correlatedWith mc:hasEngagementStatus mc:hasConfidence mc:hasPlatformType mc:hasHeading mc:engagedBy mc:hasNATOStockNumber mc:operatedBy mc:hasMode3Code mc:responsibleFor prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ] ;
+    sh:targetClass mc:Entity .
+
+mc:FireUnit a sh:NodeShape ;
+    rdfs:comment "An air defense unit equipped with interceptors or surface-to-air missiles with organic engagement authority." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ] ;
+    sh:targetClass mc:FireUnit .
+
+mc:FixedWingAircraft a sh:NodeShape ;
+    rdfs:comment "A conventional fixed-wing aircraft." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:FixedWingAircraft .
+
+mc:GroundBasedRadar a sh:NodeShape ;
+    rdfs:comment "A fixed or mobile ground-based radar system used for air surveillance or fire control." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:GroundBasedRadar .
+
+mc:GunSystem a sh:NodeShape ;
+    rdfs:comment "An anti-aircraft gun or close-in weapon system (CIWS)." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasNATOStockNumber ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ] ;
+    sh:targetClass mc:GunSystem .
+
+mc:IFFReport a sh:NodeShape ;
+    rdfs:comment "An Identification Friend or Foe transponder reply containing mode/code data." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:IFFReport .
+
+mc:KillBox a sh:NodeShape ;
+    rdfs:comment "Three-dimensional area reference used to facilitate the rapid attack of targets within a defined area of space." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ] ;
+    sh:targetClass mc:KillBox .
+
+mc:MissileSystem a sh:NodeShape ;
+    rdfs:comment "A surface-to-air missile launcher and associated fire control radar." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:MissileSystem .
+
+mc:NoFlyZone a sh:NodeShape ;
+    rdfs:comment "Airspace in which all flight is prohibited unless specifically authorized by the controlling authority." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:NoFlyZone .
+
+mc:RadarReturn a sh:NodeShape ;
+    rdfs:comment "A primary or secondary radar detection contributing to a track." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:RadarReturn .
+
+mc:RestrictedOperationsZone a sh:NodeShape ;
+    rdfs:comment "Airspace of defined dimensions imposed by the coordinating authority within which the operation of one or more airspace users is restricted." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:RestrictedOperationsZone .
+
+mc:RotaryWingAircraft a sh:NodeShape ;
+    rdfs:comment "A helicopter or other rotary-wing platform." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:RotaryWingAircraft .
+
+mc:SensorUnit a sh:NodeShape ;
+    rdfs:comment "A unit operating one or more sensors for surveillance, tracking, or targeting." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ] ;
+    sh:targetClass mc:SensorUnit .
+
+mc:SubsurfaceTrack a sh:NodeShape ;
+    rdfs:comment "A submerged track, typically a submarine." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:engagedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 13 ;
+            sh:path mc:hasHeading ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path mc:hasIdentity ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:correlatedWith ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasBearing ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path mc:withinZone ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasRange ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasMode5 ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:managedBy ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 14 ;
+            sh:path mc:detectedBy ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:in ( unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 16 ;
+            sh:path mc:hasConfidence ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasLongitude ] ;
+    sh:targetClass mc:SubsurfaceTrack .
+
+mc:SurfaceToAirMissile a sh:NodeShape ;
+    rdfs:comment "A missile fired from a ground or sea-based launcher to intercept airborne targets." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:string ;
+            sh:description "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasNATOStockNumber ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ] ;
+    sh:targetClass mc:SurfaceToAirMissile .
+
+mc:SurfaceTrack a sh:NodeShape ;
+    rdfs:comment "A track on the surface — land vehicle or surface vessel." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:engagedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasBearing ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:managedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 16 ;
+            sh:path mc:hasConfidence ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path mc:withinZone ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:in ( unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasRange ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasMode5 ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 14 ;
+            sh:path mc:detectedBy ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 13 ;
+            sh:path mc:hasHeading ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:correlatedWith ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasLongitude ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path mc:hasIdentity ] ;
+    sh:targetClass mc:SurfaceTrack .
+
+mc:UAVTrack a sh:NodeShape ;
+    rdfs:comment "An unmanned aerial vehicle track, including MALE, HALE, and Group 1-5 UAS." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 14 ;
+            sh:path mc:hasHeading ],
+        [ sh:datatype xsd:double ;
+            sh:description "Rate of climb or descent in feet per minute. Positive = climbing, negative = descending." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasVerticalRate ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:withinZone ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 29 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 10 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 13 ;
+            sh:path mc:correlatedWith ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:detectedBy ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasMode5 ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasBearing ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasSource ],
+        [ sh:in ( unit:FT-PER-MIN unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasConfidence ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 5 ;
+            sh:path mc:hasIdentity ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:managedBy ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 9 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasCallsign ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 3 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 16 ;
+            sh:path mc:engagedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasRange ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasLatitude ] ;
+    sh:targetClass mc:UAVTrack .
+
+mc:EngagementStatus a sh:NodeShape ;
+    rdfs:comment "The current engagement state of a track within the air battle." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:EngagementStatus .
+
+mc:IdentityCode a sh:NodeShape ;
+    rdfs:comment "Closed set of tactical identity values per APP-6 / MIL-STD-2525." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:IdentityCode .
+
+mc:Platform a sh:NodeShape ;
+    rdfs:comment "A physical asset capable of carrying sensors, weapons, or personnel." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:class mc:Unit ;
+            sh:description "The unit that operates this platform." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:operatedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ] ;
+    sh:targetClass mc:Platform .
+
+mc:SensorReport a sh:NodeShape ;
+    rdfs:comment "A single sensor detection or update from a radar, EW system, or other sensor contributing to track formation or update." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:SensorReport .
+
+mc:ThreatLevel a sh:NodeShape ;
+    rdfs:comment "Assessed threat level of a track to defended assets." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:targetClass mc:ThreatLevel .
+
+mc:Track a sh:NodeShape ;
+    rdfs:comment "An observed or reported contact maintained by a C2 system. May be correlated from one or more sensor reports." ;
+    sh:closed true ;
+    sh:ignoredProperties ( mc:hasVerticalRate rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:class mc:Track ;
+            sh:description "Another track that the fusion engine has associated as the same physical object." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 12 ;
+            sh:path mc:correlatedWith ],
+        [ sh:class mc:EngagementStatus ;
+            sh:description "Current engagement status of the track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 2 ;
+            sh:path mc:hasEngagementStatus ],
+        [ sh:class mc:Platform ;
+            sh:description "The sensor platform(s) that have contributed reports to this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 14 ;
+            sh:path mc:detectedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Fusion engine confidence score for this track (0.0–1.0)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 16 ;
+            sh:path mc:hasConfidence ],
+        [ sh:datatype xsd:boolean ;
+            sh:description "Whether a valid Mode 5 cryptographic IFF reply has been received for this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasMode5 ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 25 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 23 ;
+            sh:path mc:hasAltitude ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) the track currently occupies." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 1 ;
+            sh:path mc:withinZone ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 3/A (civil/military squawk) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasMode3Code ],
+        [ sh:in ( unit:DEG unit:NauticalMile unit:KN unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:class mc:ThreatLevel ;
+            sh:description "Assessed threat level of the track: LOW, MEDIUM, HIGH, or CRITICAL." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 8 ;
+            sh:path mc:hasThreatLevel ],
+        [ sh:datatype xsd:string ;
+            sh:description "Tactical track number assigned by the originating C2 system (e.g., H001, A042)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 17 ;
+            sh:path mc:hasTrackNumber ],
+        [ sh:class mc:Unit ;
+            sh:description "The fire unit currently assigned to engage this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 15 ;
+            sh:path mc:engagedBy ],
+        [ sh:class mc:Unit ;
+            sh:description "The C2 unit currently responsible for managing this track in the COP." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 11 ;
+            sh:path mc:managedBy ],
+        [ sh:datatype xsd:string ;
+            sh:description "Assessed platform type of the track (e.g., FIGHTER, BOMBER, HELICOPTER, MISSILE, UAS)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 18 ;
+            sh:path mc:hasPlatformType ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 27 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 28 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Bearing from the reporting sensor to the track in degrees true." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasBearing ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 22 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 1 (mission type) code, two-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 9 ;
+            sh:path mc:hasMode1Code ],
+        [ sh:class mc:Weapon ;
+            sh:description "The weapon round assigned to intercept this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 7 ;
+            sh:path mc:assignedWeapon ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 24 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "Slant range from the reporting sensor to the track in nautical miles." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 20 ;
+            sh:path mc:hasRange ],
+        [ sh:class mc:IdentityCode ;
+            sh:description "The tactical identity assigned to a track: FRIEND, HOSTILE, NEUTRAL, UNKNOWN, ASSUMED_FRIEND, PENDING, or SUSPECT." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 4 ;
+            sh:path mc:hasIdentity ],
+        [ sh:datatype xsd:string ;
+            sh:description "IFF Mode 2 (unit identification) code, four-digit octal string." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasMode2Code ],
+        [ sh:class mc:SensorReport ;
+            sh:description "The raw sensor reports fused to produce or update this track." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 10 ;
+            sh:path mc:reportedBy ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track speed over ground in knots." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 21 ;
+            sh:path mc:hasSpeed ],
+        [ sh:datatype xsd:integer ;
+            sh:description "Track quality score (0–15) indicating sensor fusion confidence in the track solution." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 19 ;
+            sh:path mc:hasTrackQuality ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 26 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Track heading in degrees true (0–360)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 13 ;
+            sh:path mc:hasHeading ] ;
+    sh:targetClass mc:Track .
+
+mc:Weapon a sh:NodeShape ;
+    rdfs:comment "A munition or weapon system employed against a target." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "NATO Stock Number (NSN) identifying the weapon type in the NATO supply catalogue." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasNATOStockNumber ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ] ;
+    sh:targetClass mc:Weapon .
+
+mc:Zone a sh:NodeShape ;
+    rdfs:comment "A defined airspace volume with a specific operational function." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 0 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasCallsign ] ;
+    sh:targetClass mc:Zone .
+
+mc:Unit a sh:NodeShape ;
+    rdfs:comment "A military organizational unit with a defined mission, commander, and assigned assets." ;
+    sh:closed true ;
+    sh:ignoredProperties ( rdf:type prov:wasGeneratedBy prov:wasAttributedTo dcterms:created dcterms:source qudt:hasUnit ) ;
+    sh:property [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic latitude in decimal degrees. Positive = north." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 5 ;
+            sh:path mc:hasLatitude ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in meters." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 2 ;
+            sh:path mc:hasAltitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The originating system or data link that produced this entity (e.g., LINK16, LINK11, MIDS, JREAP-C)." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 6 ;
+            sh:path mc:hasSource ],
+        [ sh:datatype xsd:dateTime ;
+            sh:description "UTC timestamp of the last update to this entity." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 7 ;
+            sh:path mc:hasTimestamp ],
+        [ sh:in ( unit:DEG unit:FT ) ;
+            sh:path qudt:hasUnit ],
+        [ sh:datatype xsd:double ;
+            sh:description "Altitude above mean sea level in feet." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 3 ;
+            sh:path mc:hasAltitudeFt ],
+        [ sh:class mc:Zone ;
+            sh:description "The airspace zone(s) for which this unit has air defense responsibility." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:BlankNodeOrIRI ;
+            sh:order 0 ;
+            sh:path mc:responsibleFor ],
+        [ sh:datatype xsd:double ;
+            sh:description "WGS-84 geodetic longitude in decimal degrees. Positive = east." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 1 ;
+            sh:path mc:hasLongitude ],
+        [ sh:datatype xsd:string ;
+            sh:description "The tactical callsign assigned to a unit or aircraft." ;
+            sh:maxCount 1 ;
+            sh:nodeKind sh:Literal ;
+            sh:order 4 ;
+            sh:path mc:hasCallsign ] ;
+    sh:targetClass mc:Unit .
+

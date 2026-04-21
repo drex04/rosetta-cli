@@ -212,6 +212,20 @@ def generate_linkml_fixtures() -> None:
     print(f"  {_MC_SCHEMA.name}")
 
 
+def generate_shacl_fixtures() -> None:
+    """Run rosetta-shacl-gen on master schema to produce SHACL shapes fixture."""
+    from click.testing import CliRunner
+
+    from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+
+    runner = CliRunner()
+    out = _NATIONS / "master_cop.shapes.ttl"
+    result = runner.invoke(shacl_gen_cli, ["--input", str(_MC_SCHEMA), "--output", str(out)])
+    if result.exit_code != 0:
+        raise RuntimeError(f"shacl-gen failed: {result.output}")
+    print(f"  {out.name}")
+
+
 def generate_embed_fixtures() -> None:
     """Run rosetta-embed on both schemas (requires sentence-transformers)."""
     from click.testing import CliRunner
@@ -242,6 +256,9 @@ def main() -> None:
     path = generate_approved_sssom()
     validate(path)
     print(f"  {path.name} ({len(parse_sssom_tsv(path))} rows, validated)")
+
+    print("Generating SHACL shapes fixture...")
+    generate_shacl_fixtures()
 
     if run_all or "--with-embed" in args:
         print("Generating embed fixtures...")

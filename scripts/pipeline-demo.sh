@@ -10,6 +10,7 @@
 #   → [accreditor edits review.sssom.tsv]
 #   → accredit ingest (accreditor decisions)
 #   → yarrrml-gen (TransformSpec + JSON-LD materialization)
+#   → shacl-gen (generate SHACL shapes from master schema)
 #   → validate (SHACL constraint checking)
 #
 # Usage: bash scripts/pipeline-demo.sh [OUTPUT_DIR]
@@ -73,7 +74,6 @@ OUT="${1:-demo_out}"
 SRC_FIXTURE="rosetta/tests/fixtures/nations/nor_radar.csv"
 MASTER_FIXTURE="rosetta/tests/fixtures/nations/master_cop_ontology.ttl"
 LOG="store/audit-log.sssom.tsv"
-SHAPES_DIR="rosetta/policies/shacl"
 
 mkdir -p "$OUT"
 mkdir -p "$(dirname "$LOG")"
@@ -82,7 +82,6 @@ echo ""
 echo "Pipeline demo"
 echo "  Output dir  : $OUT"
 echo "  Audit log   : $LOG"
-echo "  SHACL shapes: $SHAPES_DIR"
 
 # ── Step 1: Ingest ────────────────────────────────────────────────────────────
 
@@ -242,14 +241,23 @@ else
     echo "     Skipping validation step."
 fi
 
-# ── Step 10: Validate JSON-LD ────────────────────────────────────────────────
+# ── Step 10: Generate SHACL shapes ──────────────────────────────────────────
+
+info "Step 10 — Generate SHACL shapes from master schema"
+
+run_cmd uv run rosetta-shacl-gen \
+    --input "$OUT/master_cop_en.linkml.yaml" \
+    --output "$OUT/master_cop.shapes.ttl"
+ok "$OUT/master_cop.shapes.ttl"
+
+# ── Step 11: Validate JSON-LD ────────────────────────────────────────────────
 
 if $JSONLD_OK; then
-    info "Step 10 — Validate materialized output against SHACL shapes"
+    info "Step 11 — Validate materialized output against SHACL shapes"
 
     if run_cmd uv run rosetta-validate \
         --data "$OUT/output.jsonld" \
-        --shapes-dir "$SHAPES_DIR" \
+        --shapes "$OUT/master_cop.shapes.ttl" \
         --output "$OUT/validation-report.json"; then
         ok "Validation passed — output conforms to SHACL shapes."
         ok "$OUT/validation-report.json"
@@ -260,7 +268,7 @@ if $JSONLD_OK; then
         echo "      populate all properties required by the SHACL shapes.)"
     fi
 else
-    info "Step 10 — Validate (skipped — no JSON-LD produced)"
+    info "Step 11 — Validate (skipped — no JSON-LD produced)"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
@@ -270,6 +278,7 @@ echo ""
 echo "  Candidates  : $OUT/candidates.sssom.tsv"
 echo "  Review      : $OUT/review.sssom.tsv"
 echo "  Audit log   : $LOG"
+echo "  SHACL shapes: $OUT/master_cop.shapes.ttl"
 if $JSONLD_OK; then
 echo "  TransformSpec: $OUT/nor_to_mc.transform.yaml"
 echo "  Coverage    : $OUT/coverage.json"

@@ -1413,3 +1413,105 @@ def test_without_run_still_writes_transformspec_yaml(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
     assert out_yaml.is_file()
     assert "rosetta:source_format=csv" in out_yaml.read_text(encoding="utf-8")
+
+
+# ====== CLI cleanup-on-failure tests ======
+
+
+def test_run_failure_cleans_up_output_and_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When --run fails mid-transform, --output and --coverage-report are removed."""
+    data_file = tmp_path / "data.csv"
+    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
+    yaml_out = tmp_path / "spec.yaml"
+    cov_out = tmp_path / "coverage.json"
+
+    @contextlib.contextmanager
+    def _boom(*args: object, **kwargs: object) -> Iterator[rdflib.Graph]:
+        raise RuntimeError("materialize failed")
+        yield rdflib.Graph()  # pragma: no cover
+
+    monkeypatch.setattr("rosetta.cli.yarrrml_gen.run_materialize", _boom)
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            *_base_run_args(tmp_path, data_file),
+            "--output",
+            str(yaml_out),
+            "--coverage-report",
+            str(cov_out),
+        ],
+    )
+    assert result.exit_code == 1
+    assert not yaml_out.exists(), "--output should be removed on failure"
+    assert not cov_out.exists(), "--coverage-report should be removed on failure"
+
+
+def test_jsonld_write_failure_cleans_up_prior_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When --jsonld-output write fails, earlier outputs (--output) are cleaned up."""
+    data_file = tmp_path / "data.csv"
+    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
+    yaml_out = tmp_path / "spec.yaml"
+    jsonld_out = tmp_path / "no_such_dir" / "out.jsonld"
+    fixed_bytes = b'{"@context": {}, "@graph": []}'
+
+    monkeypatch.setattr(
+        "rosetta.cli.yarrrml_gen.run_materialize",
+        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
+    )
+    monkeypatch.setattr(
+        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
+        lambda *a, **kw: fixed_bytes,
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            *_base_run_args(tmp_path, data_file),
+            "--output",
+            str(yaml_out),
+            "--jsonld-output",
+            str(jsonld_out),
+        ],
+    )
+    assert result.exit_code == 1
+    assert not yaml_out.exists(), "--output should be removed when --jsonld-output fails"
+
+
+def test_successful_run_retains_all_output_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On success (exit 0), all output files are retained."""
+    data_file = tmp_path / "data.csv"
+    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
+    yaml_out = tmp_path / "spec.yaml"
+    jsonld_out = tmp_path / "out.jsonld"
+    cov_out = tmp_path / "coverage.json"
+    fixed_bytes = b'{"@context": {}, "@graph": []}'
+
+    monkeypatch.setattr(
+        "rosetta.cli.yarrrml_gen.run_materialize",
+        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
+    )
+    monkeypatch.setattr(
+        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
+        lambda *a, **kw: fixed_bytes,
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            *_base_run_args(tmp_path, data_file),
+            "--output",
+            str(yaml_out),
+            "--jsonld-output",
+            str(jsonld_out),
+            "--coverage-report",
+            str(cov_out),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert yaml_out.is_file()
+    assert jsonld_out.is_file()
+    assert cov_out.is_file()

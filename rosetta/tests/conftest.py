@@ -117,6 +117,16 @@ def master_schema_path() -> Path:
 
 
 @pytest.fixture()
+def master_shapes_path() -> Path:
+    return _NATIONS / "master_cop.shapes.ttl"
+
+
+@pytest.fixture()
+def bearing_override_path() -> Path:
+    return _NATIONS / "track_bearing_range.override.ttl"
+
+
+@pytest.fixture()
 def master_ontology_path() -> Path:
     return _NATIONS / "master_cop_ontology.ttl"
 

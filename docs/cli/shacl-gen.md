@@ -73,23 +73,21 @@ Slots whose name doesn't match a recognized pattern produce no unit shape — no
 
 ## Override workflow
 
-The canonical production layout splits generated and hand-authored shapes into sibling directories so regenerations are lossless:
+You can combine generated shapes with hand-authored overrides by placing them in a directory and using `--shapes-dir`:
 
 ```
-rosetta/policies/shacl/
-├── generated/
-│   └── master.shacl.ttl        ← written by rosetta-shacl-gen (rerunnable)
-└── overrides/
-    └── track_bearing_range.ttl  ← hand-authored tightening (never touched by regen)
+shapes/
+├── master.shacl.ttl        ← written by rosetta-shacl-gen (rerunnable)
+└── bearing_range.ttl       ← hand-authored tightening (never touched by regen)
 ```
 
-- **`generated/`** — the output of `rosetta-shacl-gen`. Treat it as a build artifact: check in to track drift, but do not edit it directly.
-- **`overrides/`** — any `.ttl` files here are merged on top of the generated shapes by `rosetta-validate --shapes-dir` and `rosetta-yarrrml-gen --validate --shapes-dir` (both walk the directory recursively). Use this directory for:
-    - Tightening a generated constraint (e.g., `mc:AirTrackBearingRangeShape` adds `0–360` range to the `mc:hasBearing` slot).
+- **Generated shapes** — the output of `rosetta-shacl-gen`. Treat as a build artifact: regenerate from the master LinkML schema at any time.
+- **Overrides** — additional `.ttl` files merged on top of the generated shapes by `rosetta-validate --shapes-dir` (walks the directory recursively). Use for:
+    - Tightening a generated constraint (e.g., adding `0–360` range to `mc:hasBearing`).
     - Cross-class constraints not expressible in LinkML.
     - Experimental shapes before deciding to teach the generator.
 
-**Regen safety:** `rosetta-shacl-gen --output generated/master.shacl.ttl` only writes its single `--output` target — it will never read, modify, or delete anything under `overrides/`. A byte-identity test (`test_override_survives_regen`) pins this invariant.
+**Regen safety:** `rosetta-shacl-gen` only writes its single `--output` target — it will never read, modify, or delete other files. A byte-identity test (`test_override_survives_regen`) pins this invariant.
 
 **Non-shape files** — if a `.ttl` in `--shapes-dir` contains no `sh:NodeShape` / `sh:PropertyShape` triples, the loader emits a stderr warning and merges it anyway (e.g., a vocabulary file used to resolve prefixes). This is intentional: silent skip would be more surprising than silent absorption.
 

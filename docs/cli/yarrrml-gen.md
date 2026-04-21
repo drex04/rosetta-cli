@@ -108,7 +108,7 @@ uv run rosetta-yarrrml-gen \
   --output transform.yaml \
   --jsonld-output out.jsonld \
   --validate \
-  --shapes-dir rosetta/policies/shacl/ \
+  --shapes master.shacl.ttl \
   --validate-report report.json
 ```
 

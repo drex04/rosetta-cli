@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import cast
 
@@ -273,128 +274,149 @@ def cli(
         click.echo(f"Error serializing TransformSpec: {exc}", err=True)
         sys.exit(1)
 
-    # 9. Write TransformSpec to stdout or --output
-    with open_output(output) as out:
-        out.write(yaml_text)
+    # --- Steps 9-15: file-creation phase; track outputs for cleanup on failure ---
+    _created_files: list[Path] = []
 
-    # 10. Optional coverage report
-    if coverage_report:
+    def _cleanup_created_files() -> None:
+        for f in _created_files:
+            with suppress(OSError):
+                f.unlink(missing_ok=True)
+
+    try:
+        # 9. Write TransformSpec to stdout or --output
+        if output and output != "-":
+            _created_files.append(Path(output))
+        with open_output(output) as out:
+            out.write(yaml_text)
+
+        # 10. Optional coverage report
+        if coverage_report:
+            cr_path = Path(coverage_report)
+            _created_files.append(cr_path)
+            try:
+                cr_path.write_text(coverage.model_dump_json(indent=2))
+            except OSError as exc:
+                click.echo(f"Error writing coverage report {coverage_report}: {exc}", err=True)
+                sys.exit(1)
+
+        # 11. Early return when --run is not set; --run flag combinations already
+        #     validated in step 0.
+        if not run:
+            sys.exit(0)
+        if data is None:  # belt-and-braces: step 0 already validated
+            raise click.ClickException("internal: --data required when --run is set")
+        data_path = Path(data)
+
+        # 12. Compile TransformSpec → YARRRML via forked linkml-map compiler.
         try:
-            Path(coverage_report).write_text(coverage.model_dump_json(indent=2))
-        except OSError as exc:
-            click.echo(f"Error writing coverage report {coverage_report}: {exc}", err=True)
+            from linkml_map.compiler.yarrrml_compiler import (
+                YarrrmlCompiler,  # type: ignore[import-untyped]
+            )
+
+            compiler = YarrrmlCompiler(
+                source_schemaview=SchemaView(str(Path(source_schema).resolve())),
+                target_schemaview=SchemaView(str(Path(master_schema).resolve())),
+            )
+            yarrrml_text: str = compiler.compile(spec).serialization  # pyright: ignore[reportUnknownMemberType]
+        except (OSError, PermissionError, FileNotFoundError, yaml.YAMLError, ValueError) as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
+        except Exception as exc:
+            click.echo(f"Error compiling YARRRML: {exc}", err=True)
             sys.exit(1)
 
-    # 11. Early return when --run is not set; --run flag combinations already
-    #     validated in step 0.
-    if not run:
-        sys.exit(0)
-    if data is None:  # belt-and-braces: step 0 already validated
-        raise click.ClickException("internal: --data required when --run is set")
-    data_path = Path(data)
+        # 13. Resolve workdir with writability probe.
+        resolved_workdir: Path | None
+        if workdir:
+            resolved_workdir = Path(workdir).resolve()
+            try:
+                resolved_workdir.mkdir(parents=True, exist_ok=True)
+                probe = resolved_workdir / ".writable_probe"
+                probe.touch()
+                probe.unlink()
+            except OSError as exc:
+                click.echo(f"Error: --workdir {resolved_workdir} not writable: {exc}", err=True)
+                sys.exit(1)
+        else:
+            resolved_workdir = None
 
-    # 12. Compile TransformSpec → YARRRML via forked linkml-map compiler.
-    try:
-        from linkml_map.compiler.yarrrml_compiler import (
-            YarrrmlCompiler,  # type: ignore[import-untyped]
-        )
-
-        compiler = YarrrmlCompiler(
-            source_schemaview=SchemaView(str(Path(source_schema).resolve())),
-            target_schemaview=SchemaView(str(Path(master_schema).resolve())),
-        )
-        yarrrml_text: str = compiler.compile(spec).serialization  # pyright: ignore[reportUnknownMemberType]
-    except (OSError, PermissionError, FileNotFoundError, yaml.YAMLError, ValueError) as exc:
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
-    except Exception as exc:
-        click.echo(f"Error compiling YARRRML: {exc}", err=True)
-        sys.exit(1)
-
-    # 13. Resolve workdir with writability probe.
-    resolved_workdir: Path | None
-    if workdir:
-        resolved_workdir = Path(workdir).resolve()
+        # 14. Materialize + (optionally validate) + frame as JSON-LD.
+        context_out_path = Path(context_output).resolve() if context_output else None
+        if context_out_path:
+            _created_files.append(context_out_path)
         try:
-            resolved_workdir.mkdir(parents=True, exist_ok=True)
-            probe = resolved_workdir / ".writable_probe"
-            probe.touch()
-            probe.unlink()
-        except OSError as exc:
-            click.echo(f"Error: --workdir {resolved_workdir} not writable: {exc}", err=True)
-            sys.exit(1)
-    else:
-        resolved_workdir = None
-
-    # 14. Materialize + (optionally validate) + frame as JSON-LD.
-    context_out_path = Path(context_output).resolve() if context_output else None
-    try:
-        with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
-            if len(graph) == 0:
-                click.echo(
-                    "Warning: materialization produced 0 triples; check data file and mappings",
-                    err=True,
-                )
-            # 14a. Optional SHACL validation BEFORE JSON-LD framing/emission so
-            #      a violation aborts with no partial output written anywhere.
-            if validate:
-                from rosetta.core.shacl_validate import validate_graph
-                from rosetta.core.shapes_loader import load_shapes_from_dir
-
-                if shapes_dir is None:  # belt-and-braces: step 0 already validated
-                    raise click.ClickException(
-                        "internal: --shapes-dir required when --validate is set"
-                    )
-                try:
-                    shapes_g = load_shapes_from_dir(Path(shapes_dir))
-                except ValueError as exc:
-                    raise click.UsageError(str(exc)) from exc
-                report = validate_graph(graph, shapes_g)
-                if not report.summary.conforms:
-                    report_json = report.model_dump_json(indent=2)
-                    if validate_report is not None:
-                        with open_output(validate_report) as fh:
-                            fh.write(report_json)
-                            fh.write("\n")
-                    else:
-                        click.echo(report_json, err=True)
+            with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
+                if len(graph) == 0:
                     click.echo(
-                        f"SHACL validation failed: "
-                        f"{report.summary.violation} violation(s), "
-                        f"{report.summary.warning} warning(s). "
-                        f"JSON-LD emission blocked.",
+                        "Warning: materialization produced 0 triples; check data file and mappings",
                         err=True,
                     )
-                    sys.exit(1)
-            jsonld_bytes = graph_to_jsonld(
-                graph, Path(master_schema), context_output=context_out_path
-            )
-    except SystemExit:
-        raise
-    except (
-        OSError,
-        PermissionError,
-        FileNotFoundError,
-        json.JSONDecodeError,
-        yaml.YAMLError,
-        UnicodeDecodeError,
-        RuntimeError,
-        ValueError,
-    ) as exc:
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
-    except Exception as exc:
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
+                # 14a. Optional SHACL validation BEFORE JSON-LD framing/emission so
+                #      a violation aborts with no partial output written anywhere.
+                if validate:
+                    from rosetta.core.shacl_validate import validate_graph
+                    from rosetta.core.shapes_loader import load_shapes_from_dir
 
-    # 15. Write JSON-LD to file or stdout.
-    if jsonld_output:
-        try:
-            Path(jsonld_output).write_bytes(jsonld_bytes)
-        except OSError as exc:
-            click.echo(f"Error writing JSON-LD output {jsonld_output}: {exc}", err=True)
+                    if shapes_dir is None:  # belt-and-braces: step 0 already validated
+                        raise click.ClickException(
+                            "internal: --shapes-dir required when --validate is set"
+                        )
+                    try:
+                        shapes_g = load_shapes_from_dir(Path(shapes_dir))
+                    except ValueError as exc:
+                        raise click.UsageError(str(exc)) from exc
+                    report = validate_graph(graph, shapes_g)
+                    if not report.summary.conforms:
+                        report_json = report.model_dump_json(indent=2)
+                        if validate_report is not None:
+                            with open_output(validate_report) as fh:
+                                fh.write(report_json)
+                                fh.write("\n")
+                        else:
+                            click.echo(report_json, err=True)
+                        click.echo(
+                            f"SHACL validation failed: "
+                            f"{report.summary.violation} violation(s), "
+                            f"{report.summary.warning} warning(s). "
+                            f"JSON-LD emission blocked.",
+                            err=True,
+                        )
+                        sys.exit(1)
+                jsonld_bytes = graph_to_jsonld(
+                    graph, Path(master_schema), context_output=context_out_path
+                )
+        except SystemExit:
+            raise
+        except (
+            OSError,
+            PermissionError,
+            FileNotFoundError,
+            json.JSONDecodeError,
+            yaml.YAMLError,
+            UnicodeDecodeError,
+            RuntimeError,
+            ValueError,
+        ) as exc:
+            click.echo(f"Error: {exc}", err=True)
             sys.exit(1)
-    else:
-        click.get_binary_stream("stdout").write(jsonld_bytes)
+        except Exception as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
 
-    sys.exit(0)
+        # 15. Write JSON-LD to file or stdout.
+        if jsonld_output:
+            _created_files.append(Path(jsonld_output))
+            try:
+                Path(jsonld_output).write_bytes(jsonld_bytes)
+            except OSError as exc:
+                click.echo(f"Error writing JSON-LD output {jsonld_output}: {exc}", err=True)
+                sys.exit(1)
+        else:
+            click.get_binary_stream("stdout").write(jsonld_bytes)
+
+        sys.exit(0)
+
+    except SystemExit as exc:
+        if exc.code != 0:
+            _cleanup_created_files()
+        raise
