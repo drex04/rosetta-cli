@@ -1318,3 +1318,39 @@ def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
     )
     assert result.exit_code == 2
     assert "master-schema" in result.output
+
+
+def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
+    """--audit-log omitted from CLI; rosetta.toml [accredit].log used as fallback."""
+    sssom = tmp_path / "clean.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    audit_log = _write_empty_audit_log(tmp_path)
+    src, mst = _write_minimal_schemas(tmp_path)
+
+    config = tmp_path / "rosetta.toml"
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(sssom),
+            "--config",
+            str(config),
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+        ],
+    )
+    assert result.exit_code == 0, result.output + str(result.exception)
