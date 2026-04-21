@@ -39,9 +39,8 @@ def test_ingest_malformed_json(adversarial_dir: Path, tmp_path: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "malformed_nested.json"),
-            "--format",
+            "--schema-format",
             "json-schema",
             "--output",
             str(out),
@@ -79,9 +78,8 @@ def test_ingest_truncated_xsd(adversarial_dir: Path, tmp_path: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "truncated_complex.xsd"),
-            "--format",
+            "--schema-format",
             "xsd",
             "--output",
             str(out),
@@ -119,9 +117,8 @@ def test_ingest_wrong_encoding_csv(adversarial_dir: Path, tmp_path: Path) -> Non
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(adversarial_dir / "wrong_encoding.csv"),
-            "--format",
+            "--schema-format",
             "csv",
             "--output",
             str(out),
@@ -162,7 +159,7 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
     out = tmp_path / "out.yaml"
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
-        ["--input", str(in_csv), "--format", "csv", "--output", str(out)],
+        [str(in_csv), "--schema-format", "csv", "--output", str(out)],
     )
 
     # 1. Exit code — ingestion succeeds.
@@ -225,7 +222,7 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     master_emb = tmp_path / "master.embed.json"
     runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(embed_cli, ["--input", str(master_yaml), "--output", str(master_emb)])
+    result = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
 
     # 1. Exit code
     assert result.exit_code == 1, (

@@ -38,9 +38,8 @@ def test_ingest_nested_json_schema(tmp_path: Path, stress_dir: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "nested_json_schema.json"),
-            "--format",
+            "--schema-format",
             "json-schema",
             "--output",
             str(out),
@@ -78,9 +77,8 @@ def test_ingest_complex_xsd(tmp_path: Path, stress_dir: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "complex_types.xsd"),
-            "--format",
+            "--schema-format",
             "xsd",
             "--output",
             str(out),
@@ -118,9 +116,8 @@ def test_ingest_csv_edge_cases(tmp_path: Path, stress_dir: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "csv_edge_cases.csv"),
-            "--format",
+            "--schema-format",
             "csv",
             "--output",
             str(out),

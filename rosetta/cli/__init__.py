@@ -52,8 +52,18 @@ class LazyGroup(click.Group):
 
 @click.group(cls=LazyGroup, lazy_subcommands=_LAZY_SUBCOMMANDS)
 @click.version_option(package_name="rosetta-cli", prog_name="rosetta")
-def cli() -> None:
+@click.option(
+    "-v", "--verbose", is_flag=True, default=False, help="Enable verbose output on stderr."
+)
+@click.option(
+    "-q", "--quiet", is_flag=True, default=False, help="Suppress all output except errors."
+)
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool, quiet: bool) -> None:
     """Rosetta — composable CLI tools for semantic schema mapping."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+    ctx.obj["quiet"] = quiet
 
 
 def main() -> None:

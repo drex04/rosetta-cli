@@ -40,9 +40,8 @@ def test_embed_on_nested_json(
     ingest_result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(stress_dir / "nested_json_schema.json"),
-            "--format",
+            "--schema-format",
             "json-schema",
             "--output",
             str(linkml_out),
@@ -62,9 +61,8 @@ def test_embed_on_nested_json(
     embed_result = CliRunner(mix_stderr=False).invoke(
         embed_cli,
         [
-            "--input",
             str(linkml_out),
-            "--output",
+            "-o",
             str(embed_out),
         ],
     )

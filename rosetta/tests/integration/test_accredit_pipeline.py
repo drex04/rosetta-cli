@@ -53,8 +53,8 @@ def _cell(row: SSSOMRow, col: str) -> str:
     return "" if val is None else str(val)
 
 
-def _write_sssom(tmp_path: Path, rows: list[dict[str, object]], name: str) -> Path:
-    built = [_build_row(r) for r in rows]
+def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
+    built = [_build_row(r) for r in rows]  # pyright: ignore[reportArgumentType]
     path = tmp_path / name
     with path.open("w", encoding="utf-8", newline="") as fh:
         fh.write(SSSOM_HEADER)

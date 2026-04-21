@@ -109,10 +109,21 @@ def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
             writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
 
 
-def _no_accredit_toml(tmp_path: Path) -> Path:
-    config = tmp_path / "rosetta.toml"
-    config.write_text("[suggest]\ntop_k = 5\n")
-    return config
+def _write_empty_audit_log(path: Path) -> None:
+    path.write_text(
+        _SSSOM_HEADER + "\t".join(_SSSOM_COLS) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_minimal_schema(path: Path, prefix: str, slots: list[str]) -> None:
+    slot_block = "\n".join(f"    {s}:\n      range: string" for s in slots)
+    path.write_text(
+        f"id: https://{prefix}.example.org\nname: {prefix}\nprefixes:\n"
+        f"  {prefix}: https://{prefix}.example.org/\n  linkml: https://w3id.org/linkml/\n"
+        f"default_range: string\nslots:\n{slot_block}\n",
+        encoding="utf-8",
+    )
 
 
 def test_lint_surfaces_recognized_but_unmapped_unit(tmp_path: Path) -> None:
@@ -130,23 +141,32 @@ def test_lint_surfaces_recognized_but_unmapped_unit(tmp_path: Path) -> None:
         sssom,
         [
             {
-                # subject field is recognized (dBm) but has no QUDT IRI mapping.
                 "subject_id": "ex:signal_dbm",
                 "predicate_id": "skos:exactMatch",
-                # target: another dBm field on the master side — keeps this row
-                # firmly in the "unit_not_detected on both sides" regime so we
-                # don't accidentally cross into a dimension-compat check.
                 "object_id": "ex:rx_dbm",
                 "mapping_justification": _MMC,
                 "confidence": "0.9",
             }
         ],
     )
-    config = _no_accredit_toml(tmp_path)
+    audit_log = tmp_path / "audit.sssom.tsv"
+    _write_empty_audit_log(audit_log)
+    src_schema = tmp_path / "src.yaml"
+    _write_minimal_schema(src_schema, "src", ["signal_dbm"])
+    master_schema = tmp_path / "master.yaml"
+    _write_minimal_schema(master_schema, "master", ["rx_dbm"])
 
     result = CliRunner(mix_stderr=False).invoke(
         lint_cli,
-        ["--sssom", str(sssom), "--config", str(config)],
+        [
+            str(sssom),
+            "--audit-log",
+            str(audit_log),
+            "--source-schema",
+            str(src_schema),
+            "--master-schema",
+            str(master_schema),
+        ],
     )
 
     # 1. Exit code — INFO-level findings do not raise exit to 1. Any BLOCK finding

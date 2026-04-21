@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from rosetta.core.io import open_output
 from rosetta.core.normalize import (
     check_prefix_collision,
     detect_format,
@@ -17,51 +18,53 @@ from rosetta.core.normalize import (
 
 
 @click.command()
+@click.argument("schema_file", type=click.Path(exists=True))
 @click.option(
-    "--input",
-    "input_path",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Input schema file.",
-)
-@click.option(
-    "--format",
+    "--schema-format",
+    "-f",
     "fmt",
     default=None,
     help="json-schema | openapi | xsd | csv | tsv | json-sample | rdfs",
 )
 @click.option(
-    "--schema-name",
+    "--output",
+    "-o",
     default=None,
-    help="Schema identifier (default: filename stem).",
+    type=click.Path(path_type=Path),
+    help="Output path for .linkml.yaml file (default: stdout).",
 )
 @click.option(
-    "--output",
-    required=True,
-    type=click.Path(path_type=Path),
-    help="Output path for .linkml.yaml file.",
+    "--config",
+    "-c",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to rosetta.toml config file.",
 )
 def cli(
-    input_path: Path,
+    schema_file: str,
     fmt: str | None,
-    schema_name: str | None,
-    output: Path,
+    output: Path | None,
+    config: str | None,
 ) -> None:
     """Normalise a schema file to LinkML YAML."""
     try:
         from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
 
+        input_path = Path(schema_file)
+        schema_name = input_path.stem
         resolved_fmt = fmt if fmt is not None else detect_format(input_path)
         schema_def = normalize_schema(input_path, fmt=resolved_fmt, schema_name=schema_name)
         stamp_source_format(schema_def, resolved_fmt)
         stamp_slot_paths(schema_def, resolved_fmt)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            check_prefix_collision(output, schema_def)
-        except ValueError as exc:
-            click.echo(f"Error: {exc}", err=True)
-            sys.exit(1)
-        output.write_text(yaml_dumper.dumps(schema_def))
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                check_prefix_collision(output, schema_def)
+            except ValueError as exc:
+                click.echo(f"Error: {exc}", err=True)
+                sys.exit(1)
+        with open_output(output) as fh:
+            fh.write(yaml_dumper.dumps(schema_def))
     except SystemExit:
         raise
     except Exception as exc:  # noqa: BLE001

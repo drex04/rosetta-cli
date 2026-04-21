@@ -71,13 +71,11 @@ def test_embed_suggest_yarrrml_gen_format_compatibility(
 
     # 1. Embed both schemas
     src_embed = tmp_path / "src.embed.json"
-    result = runner.invoke(embed_cli, ["--input", str(nor_linkml_path), "--output", str(src_embed)])
+    result = runner.invoke(embed_cli, [str(nor_linkml_path), "--output", str(src_embed)])
     assert result.exit_code == 0, f"embed(src) failed: {result.stderr}"
 
     mst_embed = tmp_path / "master.embed.json"
-    result = runner.invoke(
-        embed_cli, ["--input", str(master_schema_path), "--output", str(mst_embed)]
-    )
+    result = runner.invoke(embed_cli, [str(master_schema_path), "--output", str(mst_embed)])
     assert result.exit_code == 0, f"embed(master) failed: {result.stderr}"
 
     # 2. Verify embed output keys use CURIE format (colon separator)
@@ -151,9 +149,9 @@ def _run_embed_suggest(
 ) -> Path:
     """Shared helper: embed both schemas, run suggest, return suggest SSSOM path."""
     src_embed = tmp_path / "src.embed.json"
-    runner.invoke(embed_cli, ["--input", str(nor_linkml_path), "--output", str(src_embed)])
+    runner.invoke(embed_cli, [str(nor_linkml_path), "--output", str(src_embed)])
     mst_embed = tmp_path / "master.embed.json"
-    runner.invoke(embed_cli, ["--input", str(master_schema_path), "--output", str(mst_embed)])
+    runner.invoke(embed_cli, [str(master_schema_path), "--output", str(mst_embed)])
     suggest_sssom = tmp_path / "suggest.sssom.tsv"
     result = runner.invoke(
         suggest_cli,
@@ -202,12 +200,24 @@ def test_suggest_to_lint(
     runner = CliRunner(mix_stderr=False)
     suggest_sssom = _run_embed_suggest(runner, tmp_path, nor_linkml_path, master_schema_path)
 
+    audit_log = tmp_path / "audit-log.sssom.tsv"
+    from rosetta.core.accredit import append_log
+
+    append_log([], audit_log)
     no_accredit_toml = tmp_path / "rosetta.toml"
-    no_accredit_toml.write_text("[suggest]\ntop_k = 5\n")
+    no_accredit_toml.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
 
     result = runner.invoke(
         lint_cli,
-        ["--sssom", str(suggest_sssom), "--config", str(no_accredit_toml)],
+        [
+            str(suggest_sssom),
+            "--config",
+            str(no_accredit_toml),
+            "--source-schema",
+            str(nor_linkml_path),
+            "--master-schema",
+            str(master_schema_path),
+        ],
     )
     assert result.exit_code == 0, (
         f"lint failed on suggest output: {result.stderr}\n"
@@ -240,12 +250,12 @@ def test_ingest_to_embed(
     linkml = tmp_path / "nor_radar.linkml.yaml"
     result = runner.invoke(
         ingest_cli,
-        ["--input", str(nor_csv_path), "--format", "csv", "--output", str(linkml)],
+        [str(nor_csv_path), "--schema-format", "csv", "--output", str(linkml)],
     )
     assert result.exit_code == 0, f"ingest failed: {result.stderr}"
 
     embed_out = tmp_path / "embed.json"
-    result = runner.invoke(embed_cli, ["--input", str(linkml), "--output", str(embed_out)])
+    result = runner.invoke(embed_cli, [str(linkml), "--output", str(embed_out)])
     assert result.exit_code == 0, f"embed failed on ingest output: {result.stderr}"
 
     keys = list(json.loads(embed_out.read_text()).keys())
@@ -276,7 +286,7 @@ def test_ingest_translate_embed(
     linkml = tmp_path / "nor_radar.linkml.yaml"
     result = runner.invoke(
         ingest_cli,
-        ["--input", str(nor_csv_path), "--format", "csv", "--output", str(linkml)],
+        [str(nor_csv_path), "--schema-format", "csv", "--output", str(linkml)],
     )
     assert result.exit_code == 0, f"ingest failed: {result.stderr}"
 
@@ -284,7 +294,6 @@ def test_ingest_translate_embed(
     result = runner.invoke(
         translate_cli,
         [
-            "--input",
             str(linkml),
             "--source-lang",
             "NO",
@@ -297,7 +306,7 @@ def test_ingest_translate_embed(
     assert result.exit_code == 0, f"translate failed: {result.stderr}"
 
     embed_out = tmp_path / "embed.json"
-    result = runner.invoke(embed_cli, ["--input", str(translated), "--output", str(embed_out)])
+    result = runner.invoke(embed_cli, [str(translated), "--output", str(embed_out)])
     assert result.exit_code == 0, f"embed failed on translate output: {result.stderr}"
 
     keys = list(json.loads(embed_out.read_text()).keys())
@@ -324,18 +333,14 @@ def test_shacl_gen_to_validate(
     runner = CliRunner(mix_stderr=False)
 
     shapes = tmp_path / "shapes.ttl"
-    result = runner.invoke(
-        shacl_gen_cli, ["--input", str(master_schema_path), "--output", str(shapes)]
-    )
+    result = runner.invoke(shacl_gen_cli, [str(master_schema_path), "--output", str(shapes)])
     assert result.exit_code == 0, f"shacl-gen failed: {result.stderr}"
     assert shapes.stat().st_size > 0, "shacl-gen produced empty shapes file"
 
     result = runner.invoke(
         validate_cli,
         [
-            "--data",
             str(master_ontology_path),
-            "--shapes",
             str(shapes),
         ],
     )
@@ -380,7 +385,7 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
 
     # 1. Generate SHACL shapes from master schema
     shapes = tmp_path / "shapes.ttl"
-    result = runner.invoke(shacl_gen_cli, ["--input", str(mc_schema), "--output", str(shapes)])
+    result = runner.invoke(shacl_gen_cli, [str(mc_schema), "--output", str(shapes)])
     assert result.exit_code == 0, f"shacl-gen failed: {result.stderr}"
 
     # 2. Compile SSSOM → YARRRML
@@ -429,11 +434,7 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
     result = runner.invoke(
         validate_cli,
         [
-            "--data",
             str(jsonld_out),
-            "--data-format",
-            "json-ld",
-            "--shapes",
             str(shapes),
         ],
     )

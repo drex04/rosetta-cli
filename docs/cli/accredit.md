@@ -1,4 +1,4 @@
-# rosetta-accredit
+# rosetta accredit
 
 Manages the two-role accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta-suggest` (boost/derank) and `rosetta-lint` (conflict checking).
 
@@ -9,7 +9,7 @@ For the conceptual flow and state machine, see [Accreditation workflow](../conce
 ::: mkdocs-click
     :module: rosetta.cli.accredit
     :command: cli
-    :prog_name: rosetta-accredit
+    :prog_name: rosetta accredit
     :depth: 2
 
 ## Subcommand semantics
@@ -33,30 +33,30 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV — suitable for ex
 ## Example session
 
 ```bash
-# 1. Generate candidates (log read automatically from rosetta.toml)
-uv run rosetta-suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
+# 1. Generate candidates (audit-log read automatically from rosetta.toml)
+uv run rosetta suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
 
 # 2. Analyst edits candidates.sssom.tsv, marking ManualMappingCuration rows.
 
 # 3. Lint check
-uv run rosetta-lint --sssom candidates.sssom.tsv
+uv run rosetta lint candidates.sssom.tsv
 
 # 4. Stage analyst proposals
-uv run rosetta-accredit append candidates.sssom.tsv
+uv run rosetta accredit append candidates.sssom.tsv
 
 # 5. Generate accreditor work list
-uv run rosetta-accredit review -o review.sssom.tsv
+uv run rosetta accredit review -o review.sssom.tsv
 
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows.
 
 # 7. Ingest decisions
-uv run rosetta-accredit append review.sssom.tsv
+uv run rosetta accredit append review.sssom.tsv
 
 # 8. Check state
-uv run rosetta-accredit status
+uv run rosetta accredit status
 
 # 9. Correct a prior decision
-uv run rosetta-accredit append update.sssom.tsv
+uv run rosetta accredit append update.sssom.tsv
 ```
 
 ## Exit codes

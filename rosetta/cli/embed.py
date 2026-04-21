@@ -22,19 +22,22 @@ from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 
 
 @click.command()
-@click.option(
-    "--input",
-    "input_path",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Input .linkml.yaml schema file.",
-)
+@click.argument("schema_file", type=click.Path(exists=True, path_type=Path))
 @click.option("--model", default=None, help="Sentence-transformer model name.")
 @click.option(
+    "-o",
     "--output",
     default=None,
     type=click.Path(path_type=Path),
     help="Output JSON path (default: stdout).",
+)
+@click.option(
+    "-c",
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to rosetta.toml config file.",
 )
 @click.option(
     "--include-definitions",
@@ -61,9 +64,10 @@ from rosetta.core.models import EmbeddingReport, EmbeddingVectors
     help="Append direct is_a child class names to embedded text.",
 )
 def cli(
-    input_path: Path,
+    schema_file: Path,
     model: str | None,
     output: Path | None,
+    config_path: Path | None,
     include_definitions: bool,
     include_parents: bool,
     include_ancestors: bool,
@@ -71,14 +75,14 @@ def cli(
 ) -> None:
     """Embed a LinkML schema using a sentence-transformer model."""
     try:
-        config = load_config(None)
+        config = load_config(config_path)
         model_name: str = (
             model or get_config_value(config, "embed", "model") or "intfloat/e5-large-v2"
         )
 
         schema = _cast(
             SchemaDefinition,
-            yaml_loader.load(str(input_path), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
+            yaml_loader.load(str(schema_file), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
         )
         pairs = extract_text_inputs_linkml(
             schema,

@@ -121,7 +121,6 @@ def test_override_survives_regen(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         shacl_gen_cli,
         [
-            "--input",
             str(MASTER_SCHEMA),
             "--output",
             str(regen_output),

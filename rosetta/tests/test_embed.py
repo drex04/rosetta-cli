@@ -267,9 +267,8 @@ def test_embed_linkml_cli(tmp_path: Path, mock_sentence_transformer: pytest.Fixt
     result = CliRunner().invoke(
         cli,
         [
-            "--input",
             str(schema_file),
-            "--output",
+            "-o",
             str(output_file),
         ],
     )
@@ -320,9 +319,8 @@ def test_embed_cli_datatype_propagation(
     result = CliRunner().invoke(
         cli,
         [
-            "--input",
             str(schema_file),
-            "--output",
+            "-o",
             str(output_file),
         ],
     )

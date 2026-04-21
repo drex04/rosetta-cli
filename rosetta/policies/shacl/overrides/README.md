@@ -1,6 +1,6 @@
 # SHACL overrides
 
-Hand-authored SHACL shapes. Files here are never modified by `rosetta-shacl-gen` and are merged with `../generated/` when validation runs against `--shapes-dir rosetta/policies/shacl/`.
+Hand-authored SHACL shapes. Files here are never modified by `rosetta shacl-gen` and are merged with `../generated/` when validation runs against `rosetta validate <data> rosetta/policies/shacl/`.
 
 ## Naming convention
 

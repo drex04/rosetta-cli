@@ -48,7 +48,7 @@ def test_run_without_source_file_exits_2(
 
 
 def test_ingest_nonexistent_input_file(tmp_path: Path) -> None:
-    """`rosetta-ingest --input <nonexistent>` → Click exits 2 ("does not exist").
+    """`rosetta ingest <nonexistent>` → Click exits 2 ("does not exist").
 
     Click's `Path(exists=True)` is the gate. We use an absolute path that does
     not exist so the error is unambiguous across platforms.
@@ -60,9 +60,8 @@ def test_ingest_nonexistent_input_file(tmp_path: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         ingest_cli,
         [
-            "--input",
             str(missing),
-            "--format",
+            "--schema-format",
             "csv",
             "--output",
             str(output),

@@ -182,9 +182,8 @@ def generate_linkml_fixtures() -> None:
     result = runner.invoke(
         ingest_cli,
         [
-            "--input",
             str(_NATIONS / "nor_radar.csv"),
-            "--format",
+            "--schema-format",
             "csv",
             "--output",
             str(_NOR_SCHEMA),
@@ -197,12 +196,9 @@ def generate_linkml_fixtures() -> None:
     result = runner.invoke(
         ingest_cli,
         [
-            "--input",
             str(_NATIONS / "master_cop_ontology.ttl"),
-            "--format",
+            "--schema-format",
             "rdfs",
-            "--schema-name",
-            "mc",
             "--output",
             str(_MC_SCHEMA),
         ],
@@ -224,7 +220,7 @@ def generate_embed_fixtures() -> None:
         (_MC_SCHEMA, "master_cop.embed.json"),
     ):
         out = _NATIONS / name
-        result = runner.invoke(embed_cli, ["--input", str(schema), "--output", str(out)])
+        result = runner.invoke(embed_cli, [str(schema), "--output", str(out)])
         if result.exit_code != 0:
             raise RuntimeError(f"embed failed: {result.output}")
         print(f"  {out.name}")

@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import cast
 
 import click
 
+from rosetta.core.config import get_config_value, load_config
+
 
 @click.command()
-@click.option(
-    "--input",
-    "input_path",
-    required=True,
-    type=click.Path(exists=True, path_type=Path),
-    help="Input .linkml.yaml schema file.",
-)
+@click.argument("schema_file", type=click.Path(exists=True))
 @click.option(
     "--source-lang",
     default="auto",
@@ -24,10 +21,20 @@ import click
     help="Source language code (e.g. DE, FR) or 'auto'. Use 'EN' to skip translation.",
 )
 @click.option(
+    "-o",
     "--output",
-    required=True,
-    type=click.Path(path_type=Path),
-    help="Output path for translated .linkml.yaml file.",
+    "output",
+    default=None,
+    type=click.Path(),
+    help="Output path for translated .linkml.yaml file (default: stdout).",
+)
+@click.option(
+    "-c",
+    "--config",
+    "config_path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to rosetta.toml config file.",
 )
 @click.option(
     "--deepl-key",
@@ -35,9 +42,10 @@ import click
     help="DeepL API key (overrides DEEPL_API_KEY env var).",
 )
 def cli(
-    input_path: Path,
+    schema_file: str,
     source_lang: str,
-    output: Path,
+    output: str | None,
+    config_path: str | None,
     deepl_key: str | None,
 ) -> None:
     """Translate class and slot titles in a LinkML schema to English using DeepL."""
@@ -48,14 +56,21 @@ def cli(
 
         from rosetta.core.translation import translate_schema
 
-        key = deepl_key or os.environ.get("DEEPL_API_KEY")
-        if not key and not source_lang.upper().startswith("EN"):
+        cfg = load_config(Path(config_path) if config_path else None)
+
+        resolved_key = (
+            deepl_key
+            or os.environ.get("DEEPL_API_KEY")
+            or get_config_value(cfg, "translate", "deepl_key")
+        )
+        if not resolved_key and not source_lang.upper().startswith("EN"):
             click.echo(
                 "Error: DeepL API key required. Set DEEPL_API_KEY or use --deepl-key.",
                 err=True,
             )
             raise SystemExit(1)
 
+        input_path = Path(schema_file)
         schema = cast(
             "SchemaDefinition",
             yaml_loader.load(str(input_path), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
@@ -64,11 +79,18 @@ def cli(
             schema,
             source_lang=source_lang,
             target_lang="EN-US",
-            deepl_key=key,
+            deepl_key=resolved_key,
         )
-        output.parent.mkdir(parents=True, exist_ok=True)
         yaml_text: str = yaml_dumper.dumps(result)  # pyright: ignore[reportUnknownMemberType]
-        output.write_text(yaml_text)
+
+        if output is None:
+            sys.stdout.write(yaml_text)
+        else:
+            out_path = Path(output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(yaml_text)
+    except SystemExit:
+        raise
     except Exception as exc:  # noqa: BLE001
         click.echo(f"Error: {exc}", err=True)
         raise SystemExit(1) from exc

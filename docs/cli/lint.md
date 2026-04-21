@@ -1,13 +1,13 @@
-# rosetta-lint
+# rosetta lint
 
-Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].log`) to check for conflicts with existing decisions.
+Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].audit_log` or `--audit-log`) to check for conflicts with existing decisions.
 
 ## Command reference
 
 ::: mkdocs-click
     :module: rosetta.cli.lint
     :command: cli
-    :prog_name: rosetta-lint
+    :prog_name: rosetta lint
     :depth: 2
 
 ## Lint rules
@@ -49,19 +49,19 @@ Both flags must be provided together; supplying only one is an error.
 ## Example
 
 ```bash
-# Validate analyst proposals
-uv run rosetta-lint --sssom candidates.sssom.tsv
-
-# Structural check — verify slot/class mapping consistency against schemas
-uv run rosetta-lint --sssom candidates.sssom.tsv \
+# Validate analyst proposals (--source-schema and --master-schema required)
+uv run rosetta lint candidates.sssom.tsv \
   --source-schema nor_radar_en.linkml.yaml \
   --master-schema master_cop_en.linkml.yaml
 
 # Strict mode — WARNINGs become BLOCKs (CI-friendly)
-uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json
+uv run rosetta lint candidates.sssom.tsv \
+  --source-schema nor_radar_en.linkml.yaml \
+  --master-schema master_cop_en.linkml.yaml \
+  --strict --output lint.json
 
 # Stage for accreditor review if clean
-uv run rosetta-accredit append candidates.sssom.tsv
+uv run rosetta accredit append candidates.sssom.tsv
 ```
 
 ## Exit codes

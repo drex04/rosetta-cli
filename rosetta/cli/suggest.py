@@ -52,8 +52,16 @@ _SSSOM_COLUMNS = [
 @click.argument("master", type=click.Path(exists=True))
 @click.option("--top-k", default=None, type=int, help="Max suggestions per field")
 @click.option("--min-score", default=None, type=float, help="Minimum cosine score")
-@click.option("--output", default=None, type=click.Path(), help="Output file (default: stdout)")
-@click.option("--config", default="rosetta.toml", show_default=True)
+@click.option(
+    "-o", "--output", default=None, type=click.Path(), help="Output file (default: stdout)"
+)
+@click.option("-c", "--config", default="rosetta.toml", show_default=True)
+@click.option(
+    "--audit-log",
+    default=None,
+    type=click.Path(),
+    help="Path to SSSOM audit log.",
+)
 def cli(
     source: str,
     master: str,
@@ -61,6 +69,7 @@ def cli(
     min_score: float | None,
     output: str | None,
     config: str,
+    audit_log: str | None,
 ) -> None:
     """Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
     cfg = load_config(Path(config))
@@ -69,13 +78,17 @@ def cli(
         get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
     )
 
-    # Load audit log if configured
-    log_path_str: str | None = get_config_value(cfg, "accredit", "log", cli_value=None)
+    # Resolve audit log path: CLI flag > config fallback > error
+    log_path_str: str | None = audit_log or get_config_value(cfg, "accredit", "log", cli_value=None)
+    if not log_path_str:
+        raise click.UsageError("Audit log not found — run rosetta accredit append first")
     log: list[SSSOMRow] = []
-    if log_path_str:
-        lp = Path(log_path_str)
-        if lp.exists():
-            log = load_log(lp)
+    lp = Path(log_path_str)
+    if not lp.exists():
+        raise click.UsageError(
+            f"Audit log not found — run rosetta accredit append first: {log_path_str}"
+        )
+    log = load_log(lp)
 
     try:
         src_raw = json.loads(Path(source).read_text())

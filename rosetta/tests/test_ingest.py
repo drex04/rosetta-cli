@@ -19,7 +19,6 @@ def test_ingest_json_schema_cli(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "deu_patriot.json"),
             "--output",
             str(out),
@@ -44,7 +43,6 @@ def test_ingest_rdfs_cli(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(ttl_file),
             "--output",
             str(out),
@@ -54,24 +52,21 @@ def test_ingest_rdfs_cli(tmp_path: Path) -> None:
     assert out.exists()
 
 
-def test_ingest_schema_name_override(tmp_path: Path) -> None:
-    """--schema-name custom → output YAML has name: custom."""
+def test_ingest_schema_name_derived_from_stem(tmp_path: Path) -> None:
+    """Schema name is derived from the input file stem (no --schema-name option)."""
     runner = CliRunner()
     out = tmp_path / "out.linkml.yaml"
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "deu_patriot.json"),
-            "--schema-name",
-            "custom",
             "--output",
             str(out),
         ],
     )
     assert result.exit_code == 0, f"CLI failed: {result.output}"
     data = yaml.safe_load(out.read_text())
-    assert data.get("name") == "custom"
+    assert data.get("name") == "deu_patriot"
 
 
 def test_ingest_no_nation_flag(tmp_path: Path) -> None:
@@ -81,7 +76,6 @@ def test_ingest_no_nation_flag(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "deu_patriot.json"),
             "--nation",
             "DEU",
@@ -93,13 +87,41 @@ def test_ingest_no_nation_flag(tmp_path: Path) -> None:
     assert "No such option" in result.output or "Error" in result.output
 
 
+def test_ingest_stdout(tmp_path: Path) -> None:
+    """No --output → writes to stdout, exit 0."""
+    result = CliRunner().invoke(
+        cli,
+        [str(FIXTURES / "deu_patriot.json")],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert "classes:" in result.output or "slots:" in result.output
+
+
+def test_ingest_short_flags(tmp_path: Path) -> None:
+    """-f and -o short flags work correctly."""
+    runner = CliRunner()
+    out = tmp_path / "out.linkml.yaml"
+    result = runner.invoke(
+        cli,
+        [
+            str(FIXTURES / "nor_radar.csv"),
+            "-f",
+            "csv",
+            "-o",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert out.exists()
+
+
 # ---------------------------------------------------------------------------
 # Task 6 — Prefix collision lint
 # ---------------------------------------------------------------------------
 
 
 def test_ingest_prefix_collision_default_prefix(tmp_path: Path) -> None:
-    """Two ingests into the same directory with the same --schema-name fail on the second."""
+    """Two ingests of the same file into the same directory fail on the second."""
     runner = CliRunner()
     out_dir = tmp_path / "nor_schema"
     out_dir.mkdir()
@@ -108,34 +130,28 @@ def test_ingest_prefix_collision_default_prefix(tmp_path: Path) -> None:
     result1 = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "nor_schema",
             "--output",
             str(out_dir / "nor.linkml.yaml"),
         ],
     )
     assert result1.exit_code == 0, f"First ingest failed: {result1.output}"
 
-    # Second ingest with same schema-name into same dir should fail.
+    # Second ingest with same input (same stem → same schema name) into same dir should fail.
     result2 = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "nor_schema",
             "--output",
             str(out_dir / "other.linkml.yaml"),
         ],
     )
     assert result2.exit_code == 1
-    assert "nor_schema" in result2.output or "nor_schema" in (result2.output or "")
+    assert "nor_radar" in result2.output or "nor_radar" in (result2.output or "")
 
 
 def test_ingest_prefix_collision_allows_unique_names(tmp_path: Path) -> None:
-    """Two ingests with different --schema-name into the same directory both succeed."""
+    """Two ingests with different input stems into the same directory both succeed."""
     runner = CliRunner()
     out_dir = tmp_path / "schemas"
     out_dir.mkdir()
@@ -143,10 +159,7 @@ def test_ingest_prefix_collision_allows_unique_names(tmp_path: Path) -> None:
     result1 = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "schema_alpha",
             "--output",
             str(out_dir / "alpha.linkml.yaml"),
         ],
@@ -156,10 +169,7 @@ def test_ingest_prefix_collision_allows_unique_names(tmp_path: Path) -> None:
     result2 = runner.invoke(
         cli,
         [
-            "--input",
-            str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "schema_beta",
+            str(FIXTURES / "deu_patriot.json"),
             "--output",
             str(out_dir / "beta.linkml.yaml"),
         ],
@@ -178,17 +188,14 @@ def test_ingest_prefix_collision_id_field(tmp_path: Path) -> None:
     result1 = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "nor_schema",
             "--output",
             str(out1),
         ],
     )
     assert result1.exit_code == 0, f"First ingest failed: {result1.output}"
 
-    clashing_id = yaml.safe_load(out1.read_text()).get("id", "https://example.org/nor_schema")
+    clashing_id = yaml.safe_load(out1.read_text()).get("id", "https://example.org/nor_radar")
 
     # Write a handcrafted sibling with a different default_prefix but the same id.
     sibling = out_dir / "handcrafted.linkml.yaml"
@@ -196,14 +203,11 @@ def test_ingest_prefix_collision_id_field(tmp_path: Path) -> None:
         f"id: {clashing_id}\nname: other_schema\ndefault_prefix: completely_different\n"
     )
 
-    # Now ingest with a different prefix but the same id should fail.
+    # Now ingest with the same input (same id) into the same dir should fail.
     result2 = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "nor_schema",
             "--output",
             str(out_dir / "second.linkml.yaml"),
         ],
@@ -225,10 +229,7 @@ def test_ingest_prefix_collision_malformed_sibling_warns(tmp_path: Path) -> None
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
-            "--schema-name",
-            "nor_schema",
             "--output",
             str(out_dir / "nor.linkml.yaml"),
         ],
@@ -250,7 +251,6 @@ def test_ingest_stamps_rosetta_source_format_csv(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
             "--output",
             str(out),
@@ -269,7 +269,6 @@ def test_ingest_stamps_rosetta_csv_column_per_slot(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "nor_radar.csv"),
             "--output",
             str(out),
@@ -295,7 +294,6 @@ def test_ingest_rdfs_normalizes_xsd_datetime_to_linkml(tmp_path: Path) -> None:
     result = runner.invoke(
         cli,
         [
-            "--input",
             str(FIXTURES / "master_cop_ontology.ttl"),
             "--output",
             str(out),
@@ -323,7 +321,7 @@ def test_ingest_rdfs_ingest_does_not_stamp_source_format(tmp_path: Path) -> None
     out = tmp_path / "out.linkml.yaml"
     result = runner.invoke(
         cli,
-        ["--input", str(ttl_file), "--output", str(out)],
+        [str(ttl_file), "--output", str(out)],
     )
     assert result.exit_code == 0, f"CLI failed: {result.output}"
     data = yaml.safe_load(out.read_text())
