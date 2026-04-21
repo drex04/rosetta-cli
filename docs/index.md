@@ -17,7 +17,7 @@ Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot
 - **Lints** analyst proposals against physical-unit dimensionality, datatype compatibility, and audit-log conflicts — *before* a human reviewer ever sees them.
 - **Records** every decision in an append-only [SSSOM](https://mapping-commons.github.io/sssom/) audit log that feeds straight back into the next `suggest` run.
 - **Generates** a [YARRRML](https://rml.io/yarrrml/) mapping from the approved log, compiles it, and materializes it against real source data via [morph-kgc](https://morph-kgc.readthedocs.io/) — producing JSON-LD framed against your master ontology's `@context`.
-- **Validates** the RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes and stamps it with [PROV-O](https://www.w3.org/TR/prov-o/) provenance so every artifact is traceable to an agent, a timestamp, and a version.
+- **Validates** the RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes — exit `0` conformant, `1` violations — so the pipeline composes cleanly into CI gates.
 
 ---
 

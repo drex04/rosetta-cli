@@ -1,9 +1,9 @@
 """Adversarial tests for rosetta-accredit SSSOM ingest mistakes (Phase 18-03, Task 4).
 
-These tests pin the observable error behaviour of `rosetta-accredit ingest` against
+These tests pin the observable error behaviour of `rosetta-accredit append` against
 malformed SSSOM inputs:
 
-- Duplicate MMC rows in a single file (in-file pre-scan at `rosetta/cli/accredit.py`)
+- Duplicate MMC rows in a single file (in-file pre-scan at `rosetta/cli/accredit.py::append_cmd`)
 - Too-few-column TSV (observed behaviour documented per test)
 - Phantom derank (HC with owl:differentFrom when no prior MMC exists) — rejected via
   `check_ingest_row`'s HC→MMC transition guard in `rosetta/core/accredit.py`
@@ -105,7 +105,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "ingest", str(tsv_file)],
+        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
     )
 
     # 1. Exit code.
@@ -115,7 +115,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     assert "nor:alt_m" in result.stderr
     assert "mc:altitude" in result.stderr
     # 3. Behavioural invariant: nothing was appended to the audit log.
-    assert not log_path.exists(), "log file must not be created on a rejected ingest"
+    assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
 def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
@@ -139,7 +139,7 @@ def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> 
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "ingest", str(tsv_file)],
+        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
     )
 
     # 1. Exit code — explicit failure from the new header guard.
@@ -150,7 +150,7 @@ def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> 
     assert "missing required" in result.stderr.lower()
     assert "confidence" in result.stderr or "mapping_justification" in result.stderr
     # 3. Behavioural invariant: no audit-log file was created.
-    assert not log_path.exists(), "log file must not be created on a rejected ingest"
+    assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
 def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
@@ -186,7 +186,7 @@ def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "ingest", str(tsv_file)],
+        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
     )
 
     # 1. Exit code.
@@ -200,10 +200,10 @@ def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None
     assert "nor:spd" in result.stderr
     assert "mc:speed" in result.stderr
     # 3. Behavioural invariant: no log write.
-    assert not log_path.exists(), "log file must not be created on a rejected ingest"
+    assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_clean_ingest_baseline(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_clean_append_baseline(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     """Positive control: a single valid MMC row ingests cleanly.
 
     Guarantees the above negative tests fail for the *right* reason — a valid TSV
@@ -228,13 +228,13 @@ def test_accredit_clean_ingest_baseline(tmp_path: Path, tmp_rosetta_toml: Path) 
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "ingest", str(tsv_file)],
+        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
     )
 
     # 1. Exit code.
-    assert result.exit_code == 0, f"clean ingest should succeed; stderr: {result.stderr}"
+    assert result.exit_code == 0, f"clean append should succeed; stderr: {result.stderr}"
     # 2. No error on stderr.
     assert "Error" not in result.stderr
     # 3. Behavioural invariant: log file exists and is non-empty.
-    assert log_path.exists(), "log file must be created on a successful ingest"
+    assert log_path.exists(), "log file must be created on a successful append"
     assert log_path.stat().st_size > 0

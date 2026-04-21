@@ -33,7 +33,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
+from rosetta.cli.compile import cli as compile_cli
+from rosetta.cli.run import cli as run_cli
 
 pytestmark = [pytest.mark.integration, pytest.mark.e2e, pytest.mark.slow]
 
@@ -95,34 +96,46 @@ def test_e2e_nor_radar_csv_to_jsonld(
     )
 
     wd = tmp_path / "wd"
-    spec_out = tmp_path / "spec.yaml"
+    yarrrml_out = tmp_path / "mapping.yarrrml.yaml"
+    jsonld_out = tmp_path / "output.jsonld"
 
-    result = CliRunner(mix_stderr=False).invoke(
-        yarrrml_gen_cli,
+    # Step 1: compile SSSOM → YARRRML
+    compile_result = CliRunner(mix_stderr=False).invoke(
+        compile_cli,
         [
-            "--sssom",
             str(sssom),
             "--source-schema",
             str(nor_schema),
             "--master-schema",
             str(mc_schema),
-            "--output",
-            str(spec_out),
-            "--force",
-            "--run",
-            "--data",
+            "-o",
+            str(yarrrml_out),
+        ],
+    )
+    assert compile_result.exit_code == 0, (
+        f"compile exited {compile_result.exit_code}; stderr=\n{compile_result.stderr}\n"
+        f"exception={compile_result.exception!r}"
+    )
+
+    # Step 2: run YARRRML → JSON-LD
+    result = CliRunner(mix_stderr=False).invoke(
+        run_cli,
+        [
+            str(yarrrml_out),
             str(csv),
+            "--master-schema",
+            str(mc_schema),
+            "-o",
+            str(jsonld_out),
             "--workdir",
             str(wd),
         ],
     )
     assert result.exit_code == 0, (
-        f"CLI exited {result.exit_code}; stderr=\n{result.stderr}\nexception={result.exception!r}"
+        f"run exited {result.exit_code}; stderr=\n{result.stderr}\nexception={result.exception!r}"
     )
 
-    # With --output set, the TransformSpec YAML lands in spec.yaml and stdout
-    # receives only the JSON-LD payload (see SPEC §4.2 stdout matrix).
-    payload = json.loads(result.stdout)
+    payload = json.loads(jsonld_out.read_bytes())
 
     # Assertion A: @context present and contains master default_prefix 'mc'.
     dumped = json.dumps(payload)

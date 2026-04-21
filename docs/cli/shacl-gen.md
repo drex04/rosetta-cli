@@ -102,4 +102,4 @@ shapes/
 ## See also
 
 - [`rosetta-validate`](validate.md) — consume the generated shapes against a data graph (`--shapes` or `--shapes-dir`).
-- [`rosetta-yarrrml-gen`](yarrrml-gen.md) — materialize a pipeline and validate inline with `--validate --shapes-dir`.
+- [`rosetta run`](run.md) — materialize a pipeline and validate inline with `--validate <shapes-dir>`.

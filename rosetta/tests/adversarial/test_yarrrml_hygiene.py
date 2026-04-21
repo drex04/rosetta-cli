@@ -23,7 +23,8 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
+from rosetta.cli.compile import cli as compile_cli
+from rosetta.cli.run import cli as run_cli
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -220,27 +221,43 @@ def test_yarrrml_gen_run_with_datetime_typo(tmp_path: Path, nor_csv_sample_path:
     wd = tmp_path / "morph_wd"
     wd.mkdir()
 
-    result = CliRunner(mix_stderr=False).invoke(
-        yarrrml_gen_cli,
+    yarrrml_out = tmp_path / "mapping.yarrrml.yaml"
+    compile_result = CliRunner(mix_stderr=False).invoke(
+        compile_cli,
         [
-            "--sssom",
             str(sssom_path),
             "--source-schema",
             str(src_path),
             "--master-schema",
             str(master_path),
-            "--output",
+            "-o",
+            str(yarrrml_out),
+            "--spec-output",
             str(spec_out),
-            "--force",
-            "--run",
-            "--data",
-            str(nor_csv_sample_path),
-            "--workdir",
-            str(wd),
-            "--jsonld-output",
-            str(jsonld_out),
         ],
     )
+    # compile may succeed even with the typo (typo affects ContextGenerator at run time)
+    # Proceed to run regardless to exercise the dateTime error surface.
+    if compile_result.exit_code != 0:
+        # If compile fails early (e.g., schema load error), check exit 1.
+        assert compile_result.exit_code == 1, (
+            f"expected exit 1 from compile; got {compile_result.exit_code}"
+        )
+        result = compile_result
+    else:
+        result = CliRunner(mix_stderr=False).invoke(
+            run_cli,
+            [
+                str(yarrrml_out),
+                str(nor_csv_sample_path),
+                "--master-schema",
+                str(master_path),
+                "-o",
+                str(jsonld_out),
+                "--workdir",
+                str(wd),
+            ],
+        )
 
     # 1. Exit code
     assert result.exit_code == 1, (

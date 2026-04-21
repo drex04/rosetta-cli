@@ -34,7 +34,7 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
                                 │
                                 ▼
            ┌─────────────────────────────────────┐
-           │  rosetta-accredit ingest            │
+           │  rosetta-accredit append            │
            │  (ManualMappingCuration → log)      │
            └─────────────┬───────────────────────┘
                          │
@@ -55,7 +55,7 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
                          │
                          ▼
            ┌─────────────────────────────────────┐
-           │  rosetta-accredit ingest            │
+           │  rosetta-accredit append            │
            │  (HumanCuration → log)              │
            └─────────────────────────────────────┘
 ```
@@ -65,8 +65,8 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
 | Rule | Enforced by |
 |------|-------------|
 | Max 1 `ManualMappingCuration` per (subject_id, object_id) | `rosetta-lint` |
-| Cannot re-propose a pair with **any** `HumanCuration` in the log | `rosetta-accredit ingest` + `rosetta-lint` |
-| `HumanCuration` requires a `ManualMappingCuration` predecessor | `rosetta-accredit ingest` |
+| Cannot re-propose a pair with **any** `HumanCuration` in the log | `rosetta-accredit append` + `rosetta-lint` |
+| `HumanCuration` requires a `ManualMappingCuration` predecessor | `rosetta-accredit append` |
 | Once rejected, only an Accreditor can un-reject | Workflow convention |
 | Approved pairs boost subsequent `rosetta-suggest` scores | `rosetta-suggest` (log integration) |
 | Rejected pairs (`owl:differentFrom`) derank subsequent candidates | `rosetta-suggest` (log integration) |
@@ -85,7 +85,7 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
 
 ## Audit-log format
 
-`audit-log.sssom.tsv` is an append-only SSSOM TSV with **13 columns**. Two are stamped at ingest time (`mapping_date`, `record_id`); the other eleven come from the ingested SSSOM row.
+`audit-log.sssom.tsv` is an append-only SSSOM TSV with **13 columns**. Two are stamped at append time (`mapping_date`, `record_id`); the other eleven come from the ingested SSSOM row.
 
 | Column | Description |
 |--------|-------------|
@@ -107,7 +107,7 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
     `subject_datatype` and `object_datatype` appear in `rosetta-suggest` output but are *not* stored in the audit log. Downstream tools re-derive them from the source and master LinkML schemas, so the log remains the single reviewer-asserted record.
 
 !!! info "Migration"
-    Pre-Phase-16 audit logs with 9 columns are auto-upgraded to the 13-column format on the first `rosetta-accredit ingest`. No manual migration required.
+    Pre-Phase-16 audit logs with 9 columns are auto-upgraded to the 13-column format on the first `rosetta-accredit append`. No manual migration required.
 
 ## Composite mappings
 
@@ -125,7 +125,7 @@ See the [SSSOM composite-entity spec](https://mapping-commons.github.io/sssom/sp
 
 ## Correcting decisions
 
-To override a prior decision, the Accreditor manually creates a file with a new `HumanCuration` row for the target pair and runs `rosetta-accredit ingest` again. The log is append-only; the latest entry wins for state-machine purposes.
+To override a prior decision, the Accreditor manually creates a file with a new `HumanCuration` row for the target pair and runs `rosetta-accredit append` again. The log is append-only; the latest entry wins for state-machine purposes.
 
 ## Example session
 
@@ -139,7 +139,7 @@ uv run rosetta-suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
 uv run rosetta-lint --sssom candidates.sssom.tsv
 
 # 4. Stage analyst proposals
-uv run rosetta-accredit ingest candidates.sssom.tsv
+uv run rosetta-accredit append candidates.sssom.tsv
 
 # 5. Generate accreditor work list
 uv run rosetta-accredit review -o review.sssom.tsv
@@ -147,7 +147,7 @@ uv run rosetta-accredit review -o review.sssom.tsv
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows.
 
 # 7. Ingest decisions
-uv run rosetta-accredit ingest review.sssom.tsv
+uv run rosetta-accredit append review.sssom.tsv
 
 # 8. Check current state
 uv run rosetta-accredit status

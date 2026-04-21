@@ -2,7 +2,7 @@
 
 Every command is auto-documented from its Click definition — options, arguments, help text, and command tree are pulled from the source. If the `--help` output drifts, the docs drift with it.
 
-## The nine tools
+## The tools
 
 | Tool | Purpose |
 |------|---------|
@@ -13,8 +13,8 @@ Every command is auto-documented from its Click definition — options, argument
 | [`rosetta-lint`](lint.md) | Validate analyst proposals against unit and log constraints |
 | [`rosetta-accredit`](accredit.md) | Manage the two-role accreditation state machine |
 | [`rosetta-validate`](validate.md) | SHACL-validate RDF data (Turtle or JSON-LD) |
-| [`rosetta-yarrrml-gen`](yarrrml-gen.md) | Compile approved mappings to YARRRML and materialise JSON-LD |
-| [`rosetta-provenance`](provenance.md) | Stamp and query PROV-O records on Turtle artifacts |
+| [`rosetta compile`](compile.md) | Compile approved mappings to YARRRML |
+| [`rosetta run`](run.md) | Materialise a YARRRML mapping into JSON-LD |
 
 ## Conventions
 

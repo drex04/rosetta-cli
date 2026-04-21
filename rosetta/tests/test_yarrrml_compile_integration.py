@@ -17,7 +17,7 @@ from linkml_runtime.linkml_model import ClassDefinition, SchemaDefinition, SlotD
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView
 
-from rosetta.cli.yarrrml_gen import cli as yarrrml_gen_cli
+from rosetta.cli.compile import cli as yarrrml_gen_cli
 from rosetta.core.accredit import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec
 
@@ -221,18 +221,16 @@ def test_yarrrml_compile_cli_end_to_end(
     result = runner.invoke(  # noqa: FURB184
         yarrrml_gen_cli,
         [
-            "--sssom",
             str(sssom_nor_path),
             "--source-schema",
             str(nor_linkml_path),
             "--master-schema",
             str(master_schema_path),
-            "--output",
+            "--spec-output",
             str(spec_out),
-            "--force",
         ],
     )
-    assert result.exit_code == 0, f"rosetta-yarrrml-gen failed:\n{result.output}" + (
+    assert result.exit_code == 0, f"rosetta compile failed:\n{result.output}" + (
         f"\n{result.exception}" if result.exception else ""
     )
     assert spec_out.exists(), "spec.yaml not written"
@@ -292,18 +290,16 @@ def test_yarrrml_compile_cli_self_describing(
     result = runner.invoke(  # noqa: FURB184
         yarrrml_gen_cli,
         [
-            "--sssom",
             str(sssom_nor_path),
             "--source-schema",
             str(nor_linkml_path),
             "--master-schema",
             str(master_schema_path),
-            "--output",
+            "--spec-output",
             str(spec_out),
-            "--force",
         ],
     )
-    assert result.exit_code == 0, f"rosetta-yarrrml-gen failed:\n{result.output}" + (
+    assert result.exit_code == 0, f"rosetta compile failed:\n{result.output}" + (
         f"\n{result.exception}" if result.exception else ""
     )
 

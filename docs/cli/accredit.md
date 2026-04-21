@@ -14,7 +14,7 @@ For the conceptual flow and state machine, see [Accreditation workflow](../conce
 
 ## Subcommand semantics
 
-### `ingest FILE`
+### `append FILE`
 
 Validates each row against the state machine before writing. If *any* row violates a rule, all errors are printed to stderr and **nothing is written** — no partial writes. Accepts both `ManualMappingCuration` and `HumanCuration` rows.
 
@@ -42,7 +42,7 @@ uv run rosetta-suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
 uv run rosetta-lint --sssom candidates.sssom.tsv
 
 # 4. Stage analyst proposals
-uv run rosetta-accredit ingest candidates.sssom.tsv
+uv run rosetta-accredit append candidates.sssom.tsv
 
 # 5. Generate accreditor work list
 uv run rosetta-accredit review -o review.sssom.tsv
@@ -50,13 +50,13 @@ uv run rosetta-accredit review -o review.sssom.tsv
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows.
 
 # 7. Ingest decisions
-uv run rosetta-accredit ingest review.sssom.tsv
+uv run rosetta-accredit append review.sssom.tsv
 
 # 8. Check state
 uv run rosetta-accredit status
 
 # 9. Correct a prior decision
-uv run rosetta-accredit ingest update.sssom.tsv
+uv run rosetta-accredit append update.sssom.tsv
 ```
 
 ## Exit codes

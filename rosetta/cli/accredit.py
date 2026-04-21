@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import sys
 from pathlib import Path
 from typing import IO
@@ -24,7 +23,7 @@ from rosetta.core.accredit import (
 )
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
-from rosetta.core.models import SSSOMRow, StatusEntry
+from rosetta.core.models import SSSOMRow
 
 
 @click.group()
@@ -63,11 +62,11 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
         writer.writerow([_row_to_tsv_cell(row, col) for col in AUDIT_LOG_COLUMNS])
 
 
-@cli.command("ingest")
+@cli.command("append")
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 @click.pass_context
-def ingest(ctx: click.Context, file: Path) -> None:
-    """Ingest an SSSOM TSV file into the audit log."""
+def append_cmd(ctx: click.Context, file: Path) -> None:
+    """Append an SSSOM TSV file into the audit log."""
     log_path: Path = ctx.obj["log"]
 
     try:
@@ -118,7 +117,7 @@ def ingest(ctx: click.Context, file: Path) -> None:
 
     append_log(passing_rows, log_path)
     click.echo(
-        f"Ingested {len(passing_rows)} rows, skipped {skipped} CompositeMatching rows, "
+        f"Appended {len(passing_rows)} rows, skipped {skipped} CompositeMatching rows, "
         f"{skipped_dupes} duplicate MMC rows",
         err=True,
     )
@@ -135,56 +134,6 @@ def review(ctx: click.Context, output: str | None) -> None:
 
     with open_output(output) as out:
         _write_sssom_tsv(pending, out)
-
-
-@cli.command("status")
-@click.option("--source", default=None, help="Filter by subject_id substring")
-@click.option("--target", default=None, help="Filter by object_id substring")
-@click.pass_context
-def status(ctx: click.Context, source: str | None, target: str | None) -> None:
-    """Show accreditation status as JSON array."""
-    log_path: Path = ctx.obj["log"]
-    log = load_log(log_path)
-
-    if not log:
-        click.echo("[]")
-        return
-
-    # Collect unique pairs
-    pairs: set[tuple[str, str]] = {(r.subject_id, r.object_id) for r in log}
-
-    entries: list[StatusEntry] = []
-    for subject_id, object_id in sorted(pairs):
-        if source is not None and source not in subject_id:
-            continue
-        if target is not None and target not in object_id:
-            continue
-
-        latest = current_state_for_pair(log, subject_id, object_id)
-        if latest is None:
-            continue
-
-        if latest.mapping_justification == MMC_JUSTIFICATION:
-            state = "pending"
-        elif latest.mapping_justification == HC_JUSTIFICATION:
-            if latest.predicate_id == "owl:differentFrom":
-                state = "rejected"
-            else:
-                state = "approved"
-        else:
-            continue  # unknown justification — skip
-
-        entries.append(
-            StatusEntry(
-                subject_id=subject_id,
-                object_id=object_id,
-                state=state,
-                predicate_id=latest.predicate_id,
-                mapping_date=latest.mapping_date.isoformat() if latest.mapping_date else None,
-            )
-        )
-
-    click.echo(json.dumps([e.model_dump(mode="json") for e in entries]))
 
 
 @cli.command("dump")

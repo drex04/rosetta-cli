@@ -609,7 +609,7 @@ def build_spec(
 ) -> tuple[TransformationSpecification, CoverageReport]:
     """Top-level orchestrator. Pure-function style; all I/O is caller's job.
 
-    --force bypasses unresolvable-CURIE errors only. Mixed-kind mappings,
+    force=True bypasses unresolvable-CURIE errors only. Mixed-kind mappings,
     missing class-level mappings, and inconsistent composite expressions are
     ALWAYS fatal — data-integrity errors, not coverage issues.
 

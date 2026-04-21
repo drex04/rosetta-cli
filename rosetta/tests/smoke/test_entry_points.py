@@ -22,8 +22,8 @@ _ALL_SUBCOMMANDS = [
     "suggest",
     "lint",
     "validate",
-    "yarrrml-gen",
-    "provenance",
+    "compile",
+    "run",
     "accredit",
     "shacl-gen",
 ]

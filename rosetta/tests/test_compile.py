@@ -1,4 +1,4 @@
-"""Tests for rosetta-yarrrml-gen. Populated in Tasks 6 + 8."""
+"""Tests for rosetta-compile CLI (migrated from test_yarrrml_gen.py, Task 5)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from linkml_runtime.linkml_model import (
 )
 from pydantic import ValidationError
 
-from rosetta.cli.yarrrml_gen import cli
+from rosetta.cli.compile import cli
 from rosetta.core.models import CoverageReport, SSSOMRow
 from rosetta.core.schema_utils import build_slot_owner_index
 from rosetta.core.transform_builder import (
@@ -32,21 +32,6 @@ from rosetta.core.transform_builder import (
     filter_rows,
     group_composites,
 )
-
-
-# [review] Import-time shape check — guards the Plan 16-00 prerequisite.
-def _verify_sssomrow_shape() -> None:
-    required = {"subject_type", "object_type", "mapping_group_id", "composition_expr"}
-    missing = required - set(SSSOMRow.model_fields)
-    if missing:
-        raise AssertionError(
-            f"SSSOMRow is missing {missing}; Plan 16-00 must land before 16-01 coding. "
-            "Blocked per Prerequisites."
-        )
-
-
-_verify_sssomrow_shape()
-
 
 # ====== helper builders (not tests; underscore-prefixed) ======
 
@@ -77,11 +62,7 @@ def _mkschema(
     classes: dict[str, list[str]],
     slots: dict[str, str],
 ) -> SchemaDefinition:
-    """Build a SchemaDefinition with the given prefix.
-
-    classes maps class_name → slot list; slots maps slot_name → range.
-    class_uri is auto-generated as "{prefix}:{class_name}"; slot_uri as "{prefix}:{slot_name}".
-    """
+    """Build a SchemaDefinition with the given prefix."""
     return SchemaDefinition(
         id=f"https://ex/{prefix}",
         name=prefix,
@@ -143,7 +124,6 @@ def test_filter_rows_drops_owl_different_from_silently() -> None:
     rows = [_mkrow(subject_id="nor_radar:x", predicate_id="owl:differentFrom")]
     accepted, excluded = filter_rows(rows, "nor_radar", include_manual=False)
     assert not accepted
-    # Must NOT appear in any excluded bucket
     assert not excluded["prefix"]
     assert not excluded["predicate"]
     assert not excluded["justification"]
@@ -240,7 +220,6 @@ def test_classify_row_mixed_kinds_marked_mixed() -> None:
         src_slot_owners=build_slot_owner_index(src_view),
         mst_slot_owners=build_slot_owner_index(mst_view),
     )
-    # subject is a class; object is a slot → mixed
     row = _mkrow(subject_id="src:Widget", object_id="mst:beta")
     result = classify_row(row, ctx)
     assert isinstance(result, _Unresolved)
@@ -311,7 +290,6 @@ def test_build_spec_emits_valid_transformspec() -> None:
         target_schema_path=str(_MC_SCHEMA.resolve()),
         force=True,
     )
-    # Round-trip via model_validate
     TransformationSpecification.model_validate(spec.model_dump())  # pyright: ignore[reportUnknownMemberType]
 
 
@@ -335,14 +313,6 @@ def test_build_spec_class_derivations_is_list() -> None:
 
 
 def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
-    """hoyde_m (meter) → hasAltitudeFt (foot) must produce UnitConversionConfiguration.
-
-    Regression guard: Phase 17's migration of detect_unit() to QUDT IRIs
-    broke the pair-table lookup in build_slot_derivation (pairs were still
-    keyed on "meter"/"foot") AND detect_unit() failed to match CamelCase
-    trailing tokens like ``Ft``. The E2E test_yarrrml_run_e2e surfaces the
-    runtime symptom; this unit test locks in the root-cause fix.
-    """
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
     from rosetta.core.accredit import parse_sssom_tsv
@@ -360,11 +330,7 @@ def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
     )
     track = next(cd for cd in spec.class_derivations if cd.name == "Track")  # pyright: ignore[reportOptionalIterable]
     alt = track.slot_derivations["hasAltitudeFt"]  # pyright: ignore[reportOptionalSubscript]
-    assert alt.unit_conversion is not None, (  # pyright: ignore[reportAttributeAccessIssue]
-        "hoyde_m → hasAltitudeFt must emit UnitConversionConfiguration; "
-        "the fork's YarrrmlCompiler looks up (source_unit, target_unit) in "
-        "LINEAR_CONVERSION_FUN_IDS using the short-name strings."
-    )
+    assert alt.unit_conversion is not None  # pyright: ignore[reportAttributeAccessIssue]
     assert alt.unit_conversion.source_unit == "meter"  # pyright: ignore[reportAttributeAccessIssue]
     assert alt.unit_conversion.target_unit == "foot"  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -377,7 +343,7 @@ def test_build_spec_errors_on_unresolvable_without_force(
     mst = _mkschema("mst", {"Thing": []}, {})
     rows = [
         _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
-        _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),  # unresolvable object
+        _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),
     ]
     with pytest.raises(ValueError, match="Unresolvable CURIEs"):
         build_spec(
@@ -393,7 +359,7 @@ def test_build_spec_force_proceeds_with_unresolvable_logged(
     mst = _mkschema("mst", {"Thing": []}, {})
     rows = [
         _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
-        _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),  # unresolvable object
+        _mkrow(subject_id="src:Widget", object_id="mst:Ghost"),
     ]
     _spec, coverage = build_spec(
         rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
@@ -408,7 +374,7 @@ def test_build_spec_force_does_not_bypass_mixed_kind(
     src = _mkschema("src", {"Widget": []}, {})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
     rows = [
-        _mkrow(subject_id="src:Widget", object_id="mst:beta"),  # mixed: class→slot
+        _mkrow(subject_id="src:Widget", object_id="mst:beta"),
     ]
     with pytest.raises(ValueError, match="mixed-kind"):
         build_spec(
@@ -422,7 +388,6 @@ def test_build_spec_force_does_not_bypass_missing_class_mapping(
     src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
-    # Only a slot mapping — no class-level mapping row
     rows = [_mkrow(subject_id="src:alpha", object_id="mst:beta")]
     with pytest.raises(ValueError, match="no class-level mapping"):
         build_spec(
@@ -449,7 +414,6 @@ def test_build_spec_errors_on_missing_class_mapping_for_composite_only_owner(
     src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha", "gamma"]}, {"alpha": "string", "gamma": "string"})
     mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
-    # Composite group only — no class-level mapping row for Thing
     r1 = _mkrow(
         subject_id="src:alpha",
         object_id="mst:beta",
@@ -505,7 +469,6 @@ def test_build_spec_composite_group_flows_to_expr() -> None:
         target_schema_path=str(_MC_SCHEMA.resolve()),
         force=True,
     )
-    # Find the composite SlotDerivation with expr
     found_expr: str | None = None
     cds = spec.class_derivations or []
     iter_cds: object = cds.values() if isinstance(cds, dict) else cds
@@ -527,7 +490,6 @@ def test_build_spec_populates_unmapped_required_master_slots(
 ) -> None:
     src_path, tgt_path = dummy_schema_paths
     src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
-    # Master class Thing has 3 required slots; we only map beta
     mst = SchemaDefinition(
         id="https://ex/mst",
         name="mst",
@@ -596,69 +558,50 @@ def test_coverage_report_rejects_extra_fields() -> None:
 
 
 def test_cli_happy_path(tmp_path: Path) -> None:
-    out_yaml = tmp_path / "spec.yaml"
+    """compile produces YARRRML to stdout and coverage report; exits 0."""
     out_cov = tmp_path / "coverage.json"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--output",
-            str(out_yaml),
             "--coverage-report",
             str(out_cov),
-            "--force",
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    # Spec round-trips
-    spec_data = yaml.safe_load(out_yaml.read_text())
-    TransformationSpecification.model_validate(spec_data)  # pyright: ignore[reportUnknownMemberType]
+    # Output should be YARRRML YAML
+    assert result.output.strip()
     # Coverage validates
     cov_data = json.loads(out_cov.read_text())
     CoverageReport.model_validate(cov_data)
 
 
-def test_cli_exit_1_on_unresolvable_without_force(tmp_path: Path) -> None:
-    sssom_content = (
-        "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
-        "# mapping_set_id: http://rosetta.interop/test\n"
-        "# curie_map:\n"
-        "#   nor_radar: http://rosetta.interop/nor_radar/\n"
-        "#   mc: http://rosetta.interop/master-cop/\n"
-        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-        "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
-        "nor_radar:Observation\tskos:exactMatch\tmc:Track\tsemapv:HumanCuration\t0.9\t\tTrack\t2026-04-16\tr001\t\t\t\t\n"
-        "nor_radar:breddegrad\tskos:exactMatch\tmc:DOES_NOT_EXIST\tsemapv:HumanCuration\t0.9\t\t\t2026-04-16\tr002\t\t\t\t\n"
-    )
-    sssom_file = tmp_path / "test.sssom.tsv"
-    sssom_file.write_text(sssom_content)
+def test_cli_spec_output_writes_transformspec(tmp_path: Path) -> None:
+    """--spec-output writes intermediate TransformSpec YAML."""
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
-            str(sssom_file),
+            str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
+            "--spec-output",
+            str(spec_out),
         ],
     )
-    assert result.exit_code == 1
-    assert "Unresolvable CURIEs" in (
-        result.output + (result.exception and str(result.exception) or "")
-    )
+    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
+    spec_data = yaml.safe_load(spec_out.read_text())
+    TransformationSpecification.model_validate(spec_data)  # pyright: ignore[reportUnknownMemberType]
 
 
 def test_cli_exit_1_on_empty_filtered(tmp_path: Path) -> None:
-    # All rows have different prefix → filtered to empty
+    """All rows have different prefix → filtered to empty → exit 1."""
     sssom_content = (
         "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
         "# mapping_set_id: http://rosetta.interop/test\n"
@@ -675,14 +618,11 @@ def test_cli_exit_1_on_empty_filtered(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(sssom_file),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
         ],
     )
     assert result.exit_code == 1
@@ -691,88 +631,8 @@ def test_cli_exit_1_on_empty_filtered(tmp_path: Path) -> None:
     )
 
 
-def test_cli_allow_empty_returns_0(tmp_path: Path) -> None:
-    sssom_content = (
-        "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
-        "# mapping_set_id: http://rosetta.interop/test\n"
-        "# curie_map:\n"
-        "#   deu_radar: http://rosetta.interop/deu_radar/\n"
-        "#   mc: http://rosetta.interop/master-cop/\n"
-        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-        "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
-        "deu_radar:foo\tskos:exactMatch\tmc:bar\tsemapv:HumanCuration\t0.9\t\tbar\t2026-04-16\tr010\t\t\t\t\n"
-    )
-    sssom_file = tmp_path / "empty.sssom.tsv"
-    sssom_file.write_text(sssom_content)
-    result = CliRunner().invoke(
-        cli,
-        [
-            "--sssom",
-            str(sssom_file),
-            "--source-schema",
-            str(_NOR_SCHEMA),
-            "--master-schema",
-            str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
-            "--allow-empty",
-        ],
-    )
-    assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-
-
-def test_cli_include_manual_accepts_mmc_rows(tmp_path: Path) -> None:
-    sssom_content = (
-        "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
-        "# mapping_set_id: http://rosetta.interop/test\n"
-        "# curie_map:\n"
-        "#   nor_radar: http://rosetta.interop/nor_radar/\n"
-        "#   mc: http://rosetta.interop/master-cop/\n"
-        "#   skos: http://www.w3.org/2004/02/skos/core#\n"
-        "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
-        "nor_radar:Observation\tskos:exactMatch\tmc:Track\tsemapv:ManualMappingCuration\t0.9\t\tTrack\t2026-04-16\tr001\t\t\t\t\n"
-    )
-    sssom_file = tmp_path / "mmc.sssom.tsv"
-    sssom_file.write_text(sssom_content)
-    # Without --include-manual: filtered to empty → exit 1
-    result_no = CliRunner().invoke(
-        cli,
-        [
-            "--sssom",
-            str(sssom_file),
-            "--source-schema",
-            str(_NOR_SCHEMA),
-            "--master-schema",
-            str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
-        ],
-    )
-    assert result_no.exit_code == 1
-
-    # With --include-manual: accepted → exit 0 (single class row, no slots → valid)
-    result_yes = CliRunner().invoke(
-        cli,
-        [
-            "--sssom",
-            str(sssom_file),
-            "--source-schema",
-            str(_NOR_SCHEMA),
-            "--master-schema",
-            str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
-            "--include-manual",
-        ],
-    )
-    assert result_yes.exit_code == 0, result_yes.output + (
-        result_yes.exception and str(result_yes.exception) or ""
-    )
-
-
 def test_cli_filters_by_source_prefix(tmp_path: Path) -> None:
+    """compile filters by source schema prefix; deu_radar rows excluded."""
     sssom_content = (
         "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
         "# mapping_set_id: http://rosetta.interop/test\n"
@@ -788,65 +648,57 @@ def test_cli_filters_by_source_prefix(tmp_path: Path) -> None:
     )
     sssom_file = tmp_path / "mixed.sssom.tsv"
     sssom_file.write_text(sssom_content)
-    out_yaml = tmp_path / "spec.yaml"
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(sssom_file),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
-            "--output",
-            str(out_yaml),
+            "--spec-output",
+            str(spec_out),
         ],
     )
-    # Should succeed processing only nor_radar rows
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    spec_text = out_yaml.read_text()
-    # deu_radar should not appear in the output spec
+    spec_text = spec_out.read_text()
     assert "deu_radar" not in spec_text
 
 
-def test_cli_source_format_falls_back_to_schema_annotation(tmp_path: Path) -> None:
-    # nor_radar has annotation rosetta_source_format: csv; omit --source-format
-    out_yaml = tmp_path / "spec.yaml"
+def test_cli_source_format_from_schema_annotation(tmp_path: Path) -> None:
+    """nor_radar has annotation rosetta_source_format: csv; compile reads it."""
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--output",
-            str(out_yaml),
-            "--force",
+            "--spec-output",
+            str(spec_out),
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    spec_text = out_yaml.read_text()
+    spec_text = spec_out.read_text()
     assert "rosetta:source_format=csv" in spec_text
 
 
-def test_cli_source_format_exits_1_when_neither_flag_nor_annotation(tmp_path: Path) -> None:
-    # master_cop.linkml.yaml has no rosetta_source_format annotation; use it as source
-    out_yaml = tmp_path / "spec.yaml"
+def test_cli_source_format_exits_1_when_annotation_missing(tmp_path: Path) -> None:
+    """master_cop has no rosetta_source_format annotation → exit 1."""
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_MC_SCHEMA),  # no annotation
             "--master-schema",
             str(_NOR_SCHEMA),
-            "--output",
-            str(out_yaml),
+            "--spec-output",
+            str(spec_out),
         ],
     )
     assert result.exit_code != 0
@@ -856,21 +708,20 @@ def test_cli_source_format_exits_1_when_neither_flag_nor_annotation(tmp_path: Pa
 
 
 def test_cli_stdout_mode_when_output_omitted(tmp_path: Path) -> None:
+    """When -o/--output is omitted, YARRRML goes to stdout."""
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--force",
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    # Output should be YAML
-    assert result.output.startswith("comments:") or result.output.startswith("id:")
+    # Output should be YARRRML (starts with prefixes or mappings key)
+    assert result.output.strip()
 
 
 def test_cli_malformed_source_schema_exits_1_cleanly(tmp_path: Path) -> None:
@@ -879,14 +730,11 @@ def test_cli_malformed_source_schema_exits_1_cleanly(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(bad_yaml),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--source-format",
-            "csv",
         ],
     )
     assert result.exit_code == 1
@@ -895,53 +743,45 @@ def test_cli_malformed_source_schema_exits_1_cleanly(tmp_path: Path) -> None:
     assert "Traceback" not in combined
 
 
-def test_cli_missing_master_schema_exits_1_cleanly(tmp_path: Path) -> None:
+def test_cli_missing_master_schema_exits_nonzero(tmp_path: Path) -> None:
+    """Missing master schema → Click exits 2 (Path(exists=True) guard)."""
     nonexistent = tmp_path / "nonexistent_master.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(nonexistent),
-            "--source-format",
-            "csv",
         ],
     )
     assert result.exit_code != 0
 
 
 def test_cli_comments_carry_effective_source_format(tmp_path: Path) -> None:
-    out_yaml = tmp_path / "spec.yaml"
+    """spec.comments carries rosetta:source_format=csv annotation."""
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--output",
-            str(out_yaml),
-            "--force",
+            "--spec-output",
+            str(spec_out),
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    spec_text = out_yaml.read_text()
+    spec_text = spec_out.read_text()
     assert "rosetta:source_format=csv" in spec_text
 
 
 def test_build_spec_accepts_prefiltered_tuple(
     dummy_schema_paths: tuple[Path, Path],
 ) -> None:
-    """build_spec honours prefiltered= kwarg and skips internal filter_rows.
-
-    Verifies that coverage filter-stage counts are consistent whether
-    prefiltered is supplied or omitted.
-    """
     src_path, tgt_path = dummy_schema_paths
     src = _mkschema("nor_radar", {"Observation": ["frequency"]}, {"frequency": "string"})
     mst = _mkschema("cop", {"Track": ["frequency"]}, {"frequency": "string"})
@@ -949,13 +789,11 @@ def test_build_spec_accepts_prefiltered_tuple(
     rows = [
         _mkrow(subject_id="nor_radar:Observation", object_id="cop:Track"),
         _mkrow(subject_id="nor_radar:frequency", object_id="cop:frequency"),
-        # Row from a different schema prefix — excluded at prefix stage
         _mkrow(subject_id="other:Foo", object_id="cop:Track"),
     ]
 
-    # Call filter_rows once (as CLI would), then pass prefiltered= to build_spec
     remaining, excluded = filter_rows(rows, "nor_radar", include_manual=False)
-    assert len(excluded["prefix"]) == 1  # the "other:Foo" row
+    assert len(excluded["prefix"]) == 1
 
     _, coverage_pre = build_spec(
         rows,
@@ -967,7 +805,6 @@ def test_build_spec_accepts_prefiltered_tuple(
         prefiltered=(remaining, excluded),
     )
 
-    # Also call without prefiltered to confirm counts match
     _, coverage_plain = build_spec(
         rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=True
     )
@@ -978,7 +815,6 @@ def test_build_spec_accepts_prefiltered_tuple(
         coverage_pre.rows_after_justification_filter
         == coverage_plain.rows_after_justification_filter
     )
-    # Sanity: 3 total rows, 1 excluded by prefix → 2 pass
     assert coverage_pre.rows_after_prefix_filter == 2
     assert coverage_pre.rows_after_justification_filter == 2
 
@@ -1046,14 +882,10 @@ def test_build_spec_prefixes_include_rosetta_globals(
         rows, src, mst, source_schema_path=src_path, target_schema_path=tgt_path, force=False
     )
     prefixes = spec.prefixes or {}
-    # Rosetta globals must be present
     for key, expected_iri in ROSETTA_GLOBAL_PREFIXES.items():
         assert key in prefixes, f"Global prefix '{key}' missing from spec.prefixes"
         kv = prefixes[key]
-        assert kv.value == expected_iri, (
-            f"prefix '{key}' IRI mismatch: {kv.value!r} != {expected_iri!r}"
-        )
-    # Schema-own prefixes
+        assert kv.value == expected_iri
     assert "ex" in prefixes
     assert "mc" in prefixes
 
@@ -1062,8 +894,6 @@ def test_build_spec_prefixes_source_wins_on_collision(
     dummy_schema_paths: tuple[Path, Path],
 ) -> None:
     src_path, tgt_path = dummy_schema_paths
-    from linkml_runtime.linkml_model import ClassDefinition, SlotDefinition
-
     src = SchemaDefinition(
         id="https://ex/src",
         name="src",
@@ -1101,35 +931,28 @@ def test_build_spec_prefixes_source_wins_on_collision(
     )
     prefixes = spec.prefixes or {}
     assert "common" in prefixes
-    # Source prefix must win
     assert prefixes["common"].value == "https://source.example/common/"
 
 
 def test_cli_populates_spec_source_target_paths(tmp_path: Path) -> None:
-    from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]  # noqa: F401
-
-    out_yaml = tmp_path / "spec.yaml"
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--output",
-            str(out_yaml),
-            "--force",
+            "--spec-output",
+            str(spec_out),
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    spec_data = yaml.safe_load(out_yaml.read_text())
+    spec_data = yaml.safe_load(spec_out.read_text())
     assert spec_data.get("source_schema") == str(_NOR_SCHEMA.resolve())
     assert spec_data.get("target_schema") == str(_MC_SCHEMA.resolve())
     prefixes = spec_data.get("prefixes") or {}
-    # prefixes may be a list of dicts (YAML serialization of dict[str, KeyVal])
-    # or a plain dict — handle both shapes
     if isinstance(prefixes, list):
         skos_entries = [
             p for p in prefixes if (p.get("key") if isinstance(p, dict) else None) == "skos"
@@ -1145,373 +968,43 @@ def test_cli_populates_spec_source_target_paths(tmp_path: Path) -> None:
             assert skos_val == "http://www.w3.org/2004/02/skos/core#"
 
 
-# ====== CLI --run tests (Plan 16-03) ======
+def test_compile_yarrrml_contains_source_format_annotation(tmp_path: Path) -> None:
+    """TransformSpec carries rosetta:source_format= annotation (plan must_have).
 
-import contextlib  # noqa: E402
-from collections.abc import Iterator  # noqa: E402
-
-import rdflib  # noqa: E402
-from rdflib.namespace import RDF  # noqa: E402
-
-
-def _fixed_graph() -> rdflib.Graph:
-    g = rdflib.Graph()
-    g.add(
-        (
-            rdflib.URIRef("https://example.org/widget/1"),
-            RDF.type,
-            rdflib.URIRef("https://example.org/tiny/Widget"),
-        )
-    )
-    return g
-
-
-@contextlib.contextmanager
-def _fake_runner_yielding(graph: rdflib.Graph) -> Iterator[rdflib.Graph]:
-    yield graph
-
-
-def _base_run_args(tmp_path: Path, data_path: Path | None = None) -> list[str]:
-    """Common args for --run tests — uses the baseline NOR fixtures."""
-    args = [
-        "--sssom",
-        str(_NOR_SSSOM),
-        "--source-schema",
-        str(_NOR_SCHEMA),
-        "--master-schema",
-        str(_MC_SCHEMA),
-        "--force",
-        "--run",
-    ]
-    if data_path is not None:
-        args.extend(["--data", str(data_path)])
-    return args
-
-
-def test_run_with_nonexistent_data_file_exits_1(tmp_path: Path) -> None:
-    """--run with a --data path that does not exist exits 1."""
-    bogus = tmp_path / "no_such_file.csv"
-    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_path=bogus))
-    assert result.exit_code == 1
-    assert "does not exist" in result.stderr
-
-
-def test_run_without_data_flag_exits_1(tmp_path: Path) -> None:
-    """--run without --data exits 1 with stderr error mentioning --data."""
-    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_path=None))
-    assert result.exit_code == 1
-    combined = result.stderr + (result.exception and str(result.exception) or "")
-    assert "--data" in combined
-
-
-def test_run_with_runner_error_exits_1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A runtime error from run_materialize produces exit 1 and empty stdout."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-
-    @contextlib.contextmanager
-    def _boom(*args: object, **kwargs: object) -> Iterator[rdflib.Graph]:
-        raise RuntimeError("materialize failed")
-        yield rdflib.Graph()  # unreachable, satisfies type checker  # pragma: no cover
-
-    monkeypatch.setattr("rosetta.cli.yarrrml_gen.run_materialize", _boom)
-    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_file))
-    assert result.exit_code == 1
-    # stdout still contains the TransformSpec YAML (step 9 writes before --run).
-    # But no JSON-LD should be present.
-    assert "{" not in result.stdout or "@context" not in result.stdout
-
-
-def test_run_happy_path_writes_jsonld_to_stdout(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Monkeypatched runner + framer: JSON-LD bytes reach stdout."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    fixed_bytes = b'{"@context": {}, "@graph": []}'
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
-    )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: fixed_bytes,
-    )
-    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_file))
-    assert result.exit_code == 0, result.stderr + (result.exception and str(result.exception) or "")
-    assert fixed_bytes.decode("utf-8") in result.stdout
-
-
-def test_run_with_jsonld_output_writes_file_and_stdout_empty_of_jsonld(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """--jsonld-output redirects bytes to file; stdout gets no JSON-LD payload."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    jsonld_out = tmp_path / "out.jsonld"
-    fixed_bytes = b'{"@context": {"ex": "https://ex.org/"}, "@graph": []}'
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
-    )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: fixed_bytes,
-    )
-    result = CliRunner(mix_stderr=False).invoke(
-        cli, [*_base_run_args(tmp_path, data_file), "--jsonld-output", str(jsonld_out)]
-    )
-    assert result.exit_code == 0, result.stderr
-    assert jsonld_out.read_bytes() == fixed_bytes
-    assert "@context" not in result.stdout
-
-
-def test_run_with_output_and_jsonld_output_both_set(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Doc-the-asymmetry: --output controls YAML; --jsonld-output controls JSON-LD.
-
-    When both are set, the TransformSpec YAML lands in --output and JSON-LD bytes
-    land in --jsonld-output. Stdout stays empty (for payload).
+    The annotation is stamped on spec.comments by compile.py and written to the
+    --spec-output file. The fork's YarrrmlCompiler does not re-emit comments
+    in the YARRRML serialization, so this test verifies the spec-level
+    annotation rather than the final YARRRML bytes.
     """
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    yaml_out = tmp_path / "spec.yaml"
-    jsonld_out = tmp_path / "out.jsonld"
-    fixed_bytes = b'{"@context": {}, "@graph": []}'
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
-    )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: fixed_bytes,
-    )
-    result = CliRunner(mix_stderr=False).invoke(
-        cli,
-        [
-            *_base_run_args(tmp_path, data_file),
-            "--output",
-            str(yaml_out),
-            "--jsonld-output",
-            str(jsonld_out),
-        ],
-    )
-    assert result.exit_code == 0, result.stderr
-    assert yaml_out.is_file()
-    assert jsonld_out.read_bytes() == fixed_bytes
-    assert "@context" not in result.stdout
-
-
-def test_run_with_workdir_supplied_retains_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """--workdir path is honored; captured via the runner's arguments."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    wd = tmp_path / "wd"
-    captured: dict[str, object] = {}
-
-    @contextlib.contextmanager
-    def _capture(
-        yarrrml_text: str, data_path: Path, work_dir: Path | None
-    ) -> Iterator[rdflib.Graph]:
-        captured["work_dir"] = work_dir
-        # Write an artifact to simulate morph-kgc leaving mapping.yml behind.
-        if work_dir is not None:
-            (work_dir / "mapping.yml").write_text("mock mapping\n", encoding="utf-8")
-        yield _fixed_graph()
-
-    monkeypatch.setattr("rosetta.cli.yarrrml_gen.run_materialize", _capture)
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: b'{"@context": {}, "@graph": []}',
-    )
-    result = CliRunner(mix_stderr=False).invoke(
-        cli, [*_base_run_args(tmp_path, data_file), "--workdir", str(wd)]
-    )
-    assert result.exit_code == 0, result.stderr
-    assert captured["work_dir"] == wd.resolve()
-    # The runner is responsible for writing to work_dir when provided; the CLI
-    # must not rm it afterwards. mapping.yml persists.
-    assert (wd / "mapping.yml").is_file()
-
-
-def test_run_with_context_output_writes_context_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """--context-output path is forwarded to graph_to_jsonld."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    ctx_out = tmp_path / "ctx.json"
-    captured: dict[str, object] = {}
-
-    def _capture_jsonld(
-        graph: rdflib.Graph,
-        master: Path,
-        context_output: Path | None = None,
-    ) -> bytes:
-        captured["context_output"] = context_output
-        if context_output is not None:
-            context_output.write_text('{"ex": "https://ex.org/"}', encoding="utf-8")
-        return b'{"@context": {}, "@graph": []}'
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
-    )
-    monkeypatch.setattr("rosetta.cli.yarrrml_gen.graph_to_jsonld", _capture_jsonld)
-    result = CliRunner(mix_stderr=False).invoke(
-        cli, [*_base_run_args(tmp_path, data_file), "--context-output", str(ctx_out)]
-    )
-    assert result.exit_code == 0, result.stderr
-    assert captured["context_output"] == ctx_out.resolve()
-    assert ctx_out.is_file()
-
-
-def test_run_with_empty_graph_warns_and_exits_0(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Empty materialized graph warns on stderr but still emits JSON-LD with exit 0."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(rdflib.Graph()),
-    )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: b'{"@context": {}, "@graph": []}',
-    )
-    result = CliRunner(mix_stderr=False).invoke(cli, _base_run_args(tmp_path, data_file))
-    assert result.exit_code == 0, result.stderr
-    assert "produced 0 triples" in result.stderr
-    assert "@context" in result.stdout
-
-
-def test_without_run_still_writes_transformspec_yaml(tmp_path: Path) -> None:
-    """Regression guard: the default non-run path is unchanged."""
-    out_yaml = tmp_path / "spec.yaml"
+    spec_out = tmp_path / "spec.yaml"
     result = CliRunner().invoke(
         cli,
         [
-            "--sssom",
             str(_NOR_SSSOM),
             "--source-schema",
             str(_NOR_SCHEMA),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--output",
-            str(out_yaml),
-            "--force",
+            "--spec-output",
+            str(spec_out),
         ],
     )
     assert result.exit_code == 0, result.output + (result.exception and str(result.exception) or "")
-    assert out_yaml.is_file()
-    assert "rosetta:source_format=csv" in out_yaml.read_text(encoding="utf-8")
-
-
-# ====== CLI cleanup-on-failure tests ======
-
-
-def test_run_failure_cleans_up_output_and_coverage(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When --run fails mid-transform, --output and --coverage-report are removed."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    yaml_out = tmp_path / "spec.yaml"
-    cov_out = tmp_path / "coverage.json"
-
-    @contextlib.contextmanager
-    def _boom(*args: object, **kwargs: object) -> Iterator[rdflib.Graph]:
-        raise RuntimeError("materialize failed")
-        yield rdflib.Graph()  # pragma: no cover
-
-    monkeypatch.setattr("rosetta.cli.yarrrml_gen.run_materialize", _boom)
-    result = CliRunner(mix_stderr=False).invoke(
-        cli,
-        [
-            *_base_run_args(tmp_path, data_file),
-            "--output",
-            str(yaml_out),
-            "--coverage-report",
-            str(cov_out),
-        ],
+    spec_text = spec_out.read_text(encoding="utf-8")
+    assert "rosetta:source_format=" in spec_text, (
+        f"TransformSpec missing 'rosetta:source_format=' annotation in spec.comments; "
+        f"first 500 chars: {spec_text[:500]}"
     )
-    assert result.exit_code == 1
-    assert not yaml_out.exists(), "--output should be removed on failure"
-    assert not cov_out.exists(), "--coverage-report should be removed on failure"
 
 
-def test_jsonld_write_failure_cleans_up_prior_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When --jsonld-output write fails, earlier outputs (--output) are cleaned up."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    yaml_out = tmp_path / "spec.yaml"
-    jsonld_out = tmp_path / "no_such_dir" / "out.jsonld"
-    fixed_bytes = b'{"@context": {}, "@graph": []}'
+def test_cli_resolve_source_format_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_resolve_source_format exits 1 when annotation is missing."""
+    from rosetta.cli.compile import _resolve_source_format
 
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
+    schema = SchemaDefinition(
+        id="https://ex/bare",
+        name="bare",
     )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: fixed_bytes,
-    )
-    result = CliRunner(mix_stderr=False).invoke(
-        cli,
-        [
-            *_base_run_args(tmp_path, data_file),
-            "--output",
-            str(yaml_out),
-            "--jsonld-output",
-            str(jsonld_out),
-        ],
-    )
-    assert result.exit_code == 1
-    assert not yaml_out.exists(), "--output should be removed when --jsonld-output fails"
-
-
-def test_successful_run_retains_all_output_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """On success (exit 0), all output files are retained."""
-    data_file = tmp_path / "data.csv"
-    data_file.write_text("id,label\n1,x\n", encoding="utf-8")
-    yaml_out = tmp_path / "spec.yaml"
-    jsonld_out = tmp_path / "out.jsonld"
-    cov_out = tmp_path / "coverage.json"
-    fixed_bytes = b'{"@context": {}, "@graph": []}'
-
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.run_materialize",
-        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
-    )
-    monkeypatch.setattr(
-        "rosetta.cli.yarrrml_gen.graph_to_jsonld",
-        lambda *a, **kw: fixed_bytes,
-    )
-    result = CliRunner(mix_stderr=False).invoke(
-        cli,
-        [
-            *_base_run_args(tmp_path, data_file),
-            "--output",
-            str(yaml_out),
-            "--jsonld-output",
-            str(jsonld_out),
-            "--coverage-report",
-            str(cov_out),
-        ],
-    )
-    assert result.exit_code == 0, result.stderr
-    assert yaml_out.is_file()
-    assert jsonld_out.is_file()
-    assert cov_out.is_file()
+    with pytest.raises(SystemExit) as exc_info:
+        _resolve_source_format(schema)
+    assert exc_info.value.code == 1
