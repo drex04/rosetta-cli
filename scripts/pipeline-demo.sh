@@ -87,12 +87,12 @@ echo "  Audit log   : $LOG"
 
 info "Step 1 — Ingest schemas → LinkML YAML"
 
-run_cmd uv run rosetta-ingest \
+run_cmd uv run rosetta ingest \
     --input  "$SRC_FIXTURE" \
     --output "$OUT/nor_radar.linkml.yaml"
 ok "$OUT/nor_radar.linkml.yaml"
 
-run_cmd uv run rosetta-ingest \
+run_cmd uv run rosetta ingest \
     --input  "$MASTER_FIXTURE" \
     --format rdfs \
     --output "$OUT/master_cop.linkml.yaml"
@@ -102,13 +102,13 @@ ok "$OUT/master_cop.linkml.yaml"
 
 info "Step 2 — Translate schemas to English"
 
-run_cmd uv run rosetta-translate \
+run_cmd uv run rosetta translate \
     --input       "$OUT/nor_radar.linkml.yaml" \
     --output      "$OUT/nor_radar_en.linkml.yaml" \
     --source-lang NB
 ok "$OUT/nor_radar_en.linkml.yaml"
 
-run_cmd uv run rosetta-translate \
+run_cmd uv run rosetta translate \
     --input       "$OUT/master_cop.linkml.yaml" \
     --output      "$OUT/master_cop_en.linkml.yaml" \
     --source-lang EN
@@ -119,12 +119,12 @@ ok "$OUT/master_cop_en.linkml.yaml"
 info "Step 3 — Embed schemas"
 echo "  (First run downloads the model ~1.2 GB from HuggingFace; subsequent runs use cache)"
 
-run_cmd uv run rosetta-embed \
+run_cmd uv run rosetta embed \
     --input  "$OUT/nor_radar_en.linkml.yaml" \
     --output "$OUT/nor_radar_emb.json"
 ok "$OUT/nor_radar_emb.json"
 
-run_cmd uv run rosetta-embed \
+run_cmd uv run rosetta embed \
     --input  "$OUT/master_cop_en.linkml.yaml" \
     --output "$OUT/master_cop_emb.json"
 ok "$OUT/master_cop_emb.json"
@@ -133,7 +133,7 @@ ok "$OUT/master_cop_emb.json"
 
 info "Step 4 — Generate mapping candidates"
 
-run_cmd uv run rosetta-suggest \
+run_cmd uv run rosetta suggest \
     "$OUT/nor_radar_emb.json" \
     "$OUT/master_cop_emb.json" \
     --output "$OUT/candidates.sssom.tsv"
@@ -159,7 +159,7 @@ confirm "Done editing? (yes to continue, skip to proceed without edits)" \
 info "Step 5 — Lint SSSOM proposals"
 
 while true; do
-    if run_cmd uv run rosetta-lint --sssom "$OUT/candidates.sssom.tsv" \
+    if run_cmd uv run rosetta lint --sssom "$OUT/candidates.sssom.tsv" \
         --source-schema "$OUT/nor_radar_en.linkml.yaml" \
         --master-schema "$OUT/master_cop_en.linkml.yaml"; then
         ok "Lint passed — no errors."
@@ -185,13 +185,13 @@ done
 
 info "Step 6 — Stage analyst proposals into audit log"
 
-run_cmd uv run rosetta-accredit --log "$LOG" ingest "$OUT/candidates.sssom.tsv"
+run_cmd uv run rosetta accredit --log "$LOG" ingest "$OUT/candidates.sssom.tsv"
 
 # ── Step 7: Generate accreditor work list ─────────────────────────────────────
 
 info "Step 7 — Generate accreditor review list"
 
-run_cmd uv run rosetta-accredit --log "$LOG" review --output "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta accredit --log "$LOG" review --output "$OUT/review.sssom.tsv"
 ok "$OUT/review.sssom.tsv"
 
 # ── Pause: Accreditor edits review ───────────────────────────────────────────
@@ -211,7 +211,7 @@ confirm "Done editing? (yes to ingest decisions, skip to finish without ingestin
 
 info "Step 8 — Ingest accreditor decisions"
 
-run_cmd uv run rosetta-accredit --log "$LOG" ingest "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta accredit --log "$LOG" ingest "$OUT/review.sssom.tsv"
 
 # ── Step 9: Generate TransformSpec + Materialize JSON-LD ─────────────────────
 
@@ -219,7 +219,7 @@ info "Step 9 — Generate TransformSpec + materialize JSON-LD"
 echo "  (Requires approved mappings in the audit log from steps 6–8)"
 
 JSONLD_OK=false
-if run_cmd uv run rosetta-yarrrml-gen \
+if run_cmd uv run rosetta yarrrml-gen \
     --sssom "$LOG" \
     --source-schema "$OUT/nor_radar_en.linkml.yaml" \
     --master-schema "$OUT/master_cop_en.linkml.yaml" \
@@ -255,7 +255,7 @@ ok "$OUT/master_cop.shapes.ttl"
 if $JSONLD_OK; then
     info "Step 11 — Validate materialized output against SHACL shapes"
 
-    if run_cmd uv run rosetta-validate \
+    if run_cmd uv run rosetta validate \
         --data "$OUT/output.jsonld" \
         --shapes "$OUT/master_cop.shapes.ttl" \
         --output "$OUT/validation-report.json"; then
@@ -287,6 +287,5 @@ echo "  Validation  : $OUT/validation-report.json"
 fi
 echo ""
 echo "  Next steps:"
-echo "    uv run rosetta-accredit --log '$LOG' status   # view all decisions"
-echo "    uv run rosetta-accredit --log '$LOG' dump     # export approved mappings"
-echo "    uv run rosetta-suggest  ... --output candidates2.sssom.tsv  # re-run with boost/derank"
+echo "    uv run rosetta accredit --log '$LOG' dump     # export approved mappings"
+echo "    uv run rosetta suggest  ... --output candidates2.sssom.tsv  # re-run with boost/derank"

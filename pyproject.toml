@@ -24,16 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
-rosetta-ingest     = "rosetta.cli.ingest:cli"
-rosetta-embed      = "rosetta.cli.embed:cli"
-rosetta-suggest    = "rosetta.cli.suggest:cli"
-rosetta-lint       = "rosetta.cli.lint:cli"
-rosetta-validate   = "rosetta.cli.validate:cli"
-rosetta-yarrrml-gen = "rosetta.cli.yarrrml_gen:cli"
-rosetta-provenance = "rosetta.cli.provenance:cli"
-rosetta-accredit   = "rosetta.cli.accredit:cli"
-rosetta-translate  = "rosetta.cli.translate:cli"
-rosetta-shacl-gen  = "rosetta.cli.shacl_gen:cli"
+rosetta = "rosetta.cli:main"
 
 [project.optional-dependencies]
 dev = [

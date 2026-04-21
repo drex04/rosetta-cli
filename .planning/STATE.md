@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: SHACL validation refactor
-status: complete
-last_updated: "2026-04-18T19:45:00.000Z"
+milestone: v3.0
+milestone_name: CLI UX Refactor
+status: in_progress
+last_updated: "2026-04-21T08:00:00.000Z"
 progress:
-  total_phases: 19
+  total_phases: 20
   completed_phases: 19
-  total_plans: 27
+  total_plans: 31
   completed_plans: 27
 ---
 
@@ -15,9 +15,9 @@ progress:
 
 ## Current Position
 
-- **Phase:** 19 (SHACL validation refactor) — **complete**
-- **Plan:** 19-03 (`--validate` wiring + JSON-LD input) — complete
-- **Status:** All 3 plans shipped 2026-04-19. 457/457 fast tests pass (+28 new across the phase). v2 SHACL pipeline live end-to-end: auto-generate shapes from master LinkML, hand-edit overrides in `policies/shacl/overrides/`, validate JSON-LD output of `rosetta-validate`, OR validate in-memory graph inline via `rosetta-yarrrml-gen --run --validate`. All deferred-risk failure modes hardened in-plan (no follow-ups outstanding).
+- **Phase:** 20 (UX Refactor — CLI Standardization) — **in progress**
+- **Plan:** 20-01 (Entry point unification) — ready
+- **Status:** 4 plans created. Design approved 2026-04-21. Single `rosetta` parent group, compile/run split, option standardization, pipeline citizenship.
 
 ## Phase Progress
 
@@ -42,6 +42,7 @@ progress:
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
 | 18 | Integration & E2E Test Hardening | Complete |
 | 19 | SHACL validation refactor | Complete |
+| 20 | UX Refactor — CLI Standardization | In Progress |
 
 ## Phase 1 Completion
 
