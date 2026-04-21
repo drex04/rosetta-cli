@@ -145,12 +145,27 @@ def test_suggest_type_divergence_flagged_by_lint(
 
     # Lint only checks user-confirmed mappings (MMC/HC), so patch the
     # system-generated justification to MMC to simulate the accredit step.
+    # Keep only one mapping per subject to avoid triggering the
+    # max_one_mmc_per_subject BLOCK rule.
     patched = (
         sssom_out.read_text()
         .replace("semapv:LexicalMatching", "semapv:ManualMappingCuration")
         .replace("semapv:CompositeMatching", "semapv:ManualMappingCuration")
     )
-    sssom_out.write_text(patched)
+    header, body = [], []
+    for ln in patched.splitlines():
+        if ln.startswith(("#", "subject_id")):
+            header.append(ln)
+        elif ln:
+            body.append(ln)
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for row in body:
+        subj = row.split("\t")[0]
+        if subj not in seen:
+            seen.add(subj)
+            deduped.append(row)
+    sssom_out.write_text("\n".join(header + deduped) + "\n")
 
     # Run lint over the SSSOM output
     lint_result = runner.invoke(lint_cli, ["--sssom", str(sssom_out)])
