@@ -945,8 +945,8 @@ def test_suggest_cli_audit_log_config_fallback(tmp_path: Path) -> None:
     assert data_rows
 
 
-def test_suggest_cli_audit_log_missing_file_error(tmp_path: Path) -> None:
-    """--audit-log pointing to nonexistent file → UsageError with clear message."""
+def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
+    """--audit-log pointing to nonexistent file → treated as empty log, suggest succeeds."""
     from rosetta.cli.suggest import cli as suggest_cli
 
     src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
@@ -959,13 +959,22 @@ def test_suggest_cli_audit_log_missing_file_error(tmp_path: Path) -> None:
     missing = tmp_path / "does-not-exist.sssom.tsv"
     config = tmp_path / "rosetta.toml"
     config.write_text("[suggest]\ntop_k = 5\n")
+    out = tmp_path / "candidates.sssom.tsv"
 
     result = CliRunner().invoke(
         suggest_cli,
-        [str(src_f), str(mst_f), "--config", str(config), "--audit-log", str(missing)],
+        [
+            str(src_f),
+            str(mst_f),
+            "--config",
+            str(config),
+            "--audit-log",
+            str(missing),
+            "-o",
+            str(out),
+        ],
     )
-    assert result.exit_code == 2
-    assert "Audit log not found" in result.output
+    assert result.exit_code == 0, f"expected exit 0, got {result.exit_code}: {result.output}"
 
 
 def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:

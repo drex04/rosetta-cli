@@ -282,15 +282,13 @@ def cli(
     """Lint a SSSOM proposal TSV for unit/datatype compatibility and structural rules."""
     cfg = load_config(Path(config)) if config else load_config()
 
-    # Resolve audit log: CLI flag > config > error
+    # Resolve audit log: CLI flag > config > empty
     resolved_log_path: str | None = audit_log or get_config_value(cfg, "accredit", "log")
-    if resolved_log_path is None:
-        raise click.UsageError("Audit log not found — run rosetta accredit append first")
-    if not Path(resolved_log_path).exists():
-        raise click.UsageError("Audit log not found — run rosetta accredit append first")
+    log: list[SSSOMRow] = []
+    if resolved_log_path and Path(resolved_log_path).exists():
+        log = load_log(Path(resolved_log_path))
 
     rows = parse_sssom_tsv(Path(sssom_file))
-    log = load_log(Path(resolved_log_path))
 
     findings: list[LintFinding] = []
 
