@@ -36,7 +36,7 @@ The script pauses at each human-in-the-loop step so you can inspect and edit int
 3. **Embed** — produce per-slot vectors for each schema.
 4. **Suggest** — rank candidate mappings by cosine similarity.
 5. **Lint** — validate analyst proposals for unit dimensionality and audit-log conflicts.
-6. **Accredit** — ingest analyst proposals, generate the accreditor work list, ingest decisions.
+6. **Accredit** — append analyst proposals, generate the accreditor work list, append decisions.
 7. **Generate & materialise** — `rosetta-yarrrml-gen --run` compiles an approved SSSOM log into a YARRRML mapping and produces JSON-LD aligned to the master ontology.
 
 ## Minimal pipeline

@@ -5,10 +5,10 @@
 #   ingest → translate → embed → suggest
 #   → [analyst edits candidates.sssom.tsv]
 #   → lint (with retry loop)
-#   → accredit ingest (analyst proposals)
+#   → accredit append (analyst proposals)
 #   → accredit review
 #   → [accreditor edits review.sssom.tsv]
-#   → accredit ingest (accreditor decisions)
+#   → accredit append (accreditor decisions)
 #   → yarrrml-gen (TransformSpec + JSON-LD materialization)
 #   → validate (SHACL constraint checking)
 #
@@ -182,11 +182,11 @@ while true; do
     fi
 done
 
-# ── Step 6: Accredit ingest (analyst proposals) ───────────────────────────────
+# ── Step 6: Accredit append (analyst proposals) ───────────────────────────────
 
 info "Step 6 — Stage analyst proposals into audit log"
 
-run_cmd uv run rosetta accredit --log "$LOG" ingest "$OUT/candidates.sssom.tsv"
+run_cmd uv run rosetta accredit --log "$LOG" append "$OUT/candidates.sssom.tsv"
 
 # ── Step 7: Generate accreditor work list ─────────────────────────────────────
 
@@ -205,14 +205,14 @@ box "ACCREDITOR STEP — Edit $OUT/review.sssom.tsv" \
     "" \
     "Leave unedited rows as-is — they will remain pending."
 
-confirm "Done editing? (yes to ingest decisions, skip to finish without ingesting, quit to abort)" \
-    || { echo "  Skipping accreditor ingest."; exit 0; }
+confirm "Done editing? (yes to append decisions, skip to finish without appending, quit to abort)" \
+    || { echo "  Skipping accreditor append."; exit 0; }
 
-# ── Step 8: Accredit ingest (accreditor decisions) ────────────────────────────
+# ── Step 8: Accredit append (accreditor decisions) ────────────────────────────
 
-info "Step 8 — Ingest accreditor decisions"
+info "Step 8 — Append accreditor decisions"
 
-run_cmd uv run rosetta accredit --log "$LOG" ingest "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta accredit --log "$LOG" append "$OUT/review.sssom.tsv"
 
 # ── Step 9: Generate TransformSpec + Materialize JSON-LD ─────────────────────
 

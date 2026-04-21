@@ -17,7 +17,7 @@ Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot
 - **Lints** analyst proposals against physical-unit dimensionality, datatype compatibility, and audit-log conflicts — *before* a human reviewer ever sees them.
 - **Records** every decision in an append-only [SSSOM](https://mapping-commons.github.io/sssom/) audit log that feeds straight back into the next `suggest` run.
 - **Generates** a [YARRRML](https://rml.io/yarrrml/) mapping from the approved log, compiles it, and materialises it against concrete source data via [morph-kgc](https://morph-kgc.readthedocs.io/) — producing JSON-LD framed against your master ontology's `@context`.
-- **Validates** the resulting RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes and stamps it with [PROV-O](https://www.w3.org/TR/prov-o/) provenance so every artifact is traceable to an agent, a timestamp, and a version.
+- **Validates** the resulting RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes — exit `0` conformant, `1` violations — so the pipeline composes cleanly into CI gates.
 
 ## Why this way
 
@@ -35,7 +35,7 @@ Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot
 
 - Coalition data architects aligning partner-nation schemas to a shared operational picture.
 - Ontology engineers who need a repeatable, reviewable mapping pipeline — not a one-off notebook.
-- Defense integrators producing accreditable, provenance-stamped RDF for downstream C2, sensor-fusion, or intelligence systems.
+- Defense integrators producing accreditable RDF for downstream C2, sensor-fusion, or intelligence systems.
 - Anyone who has tried to reconcile a dozen CSVs to one schema by hand and sworn *never again*.
 
 ---
@@ -95,14 +95,14 @@ uv run rosetta-ingest --input rosetta/tests/fixtures/nations/usa_c2.yaml --outpu
 uv run rosetta-ingest --input rosetta/tests/fixtures/nations/deu_radar_sample.json --format json-sample --output deu_radar_sample.linkml.yaml
 ```
 
-**Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta-yarrrml-gen`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
+**Prefix collision detection:** If a `.linkml.yaml` file already exists in the same output directory with the same `default_prefix` or `id` (namespace IRI), `rosetta-ingest` exits 1 with an error message naming the conflicting file. This prevents downstream tools (e.g., `rosetta compile`) from producing ambiguous mappings when filtering by source schema prefix. Use a unique `--schema-name` for each schema in a shared directory.
 
 **Source-format and path annotations:** Every generated `.linkml.yaml` is stamped with:
 
 - `annotations.rosetta_source_format` — the detected or forced input format (e.g., `csv`, `json-schema`, `xsd`).
 - Per-slot path annotations — `rosetta_csv_column` (CSV/TSV), `rosetta_jsonpath` (JSON Schema / JSON sample), or `rosetta_xpath` (XSD) — recording the original field path in the source schema.
 
-These annotations are consumed by the upcoming `rosetta-yarrrml-gen` command (Plan 16-01) to generate source-format-aware RML/YARRRML mapping templates automatically.
+These annotations are consumed by `rosetta compile` to generate source-format-aware YARRRML mapping templates automatically.
 
 **Exit codes:** 0 on success, 1 on parse, I/O, or prefix-collision error.
 
@@ -254,7 +254,7 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 | `subject_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
 | `object_type` | SSSOM entity type; `"composed entity expression"` for composite mappings, else empty |
 | `mapping_group_id` | Optional identifier shared across rows that compose one logical mapping |
-| `composition_expr` | Python/GREL expression that composes fields for 1:N decomposition or N:1 aggregation; consumed by `rosetta-yarrrml-gen` (Phase 16-01+) |
+| `composition_expr` | Python/GREL expression that composes fields for 1:N decomposition or N:1 aggregation; consumed by `rosetta compile` |
 
 `mapping_date` and `record_id` are populated only for rows carried over from the audit log; they are empty for freshly computed candidates. `subject_datatype` and `object_datatype` are re-derived at suggest time from the source and master LinkML schemas; they are not stored in the audit log (see [Audit log format](#audit-log-format)).
 
@@ -325,7 +325,7 @@ uv run rosetta-lint --sssom candidates.sssom.tsv \
 uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json
 
 # Then stage for accreditor review if clean
-uv run rosetta-accredit ingest candidates.sssom.tsv
+uv run rosetta-accredit append candidates.sssom.tsv
 ```
 
 **Exit codes:** 0 if no BLOCKs, 1 if at least one BLOCK found.
@@ -350,7 +350,7 @@ rosetta-suggest → candidates.sssom.tsv
               rosetta-lint --sssom candidates.sssom.tsv
               (fix errors if exit 1, re-run lint)
                         │
-              rosetta-accredit ingest candidates.sssom.tsv
+              rosetta-accredit append candidates.sssom.tsv
               (ManualMappingCuration rows → audit log)
                         │
               rosetta-accredit review -o review.sssom.tsv
@@ -359,7 +359,7 @@ rosetta-suggest → candidates.sssom.tsv
               change HumanCuration + update predicate_id
               (owl:differentFrom = reject)
                         │
-              rosetta-accredit ingest review.sssom.tsv
+              rosetta-accredit append review.sssom.tsv
               (HumanCuration rows → audit log)
                         │
               Next rosetta-suggest run reads updated log
@@ -373,15 +373,15 @@ rosetta-suggest → candidates.sssom.tsv
 
 3. **Lint validates** — `rosetta-lint --sssom candidates.sssom.tsv` checks for structural errors (duplicate proposals, conflicts with existing decisions, invalid predicates). Errors are printed to stderr; analyst fixes and re-runs.
 
-4. **Stage proposals** — `rosetta-accredit ingest candidates.sssom.tsv` reads `ManualMappingCuration` rows, validates them against the state machine, and appends them to the audit log with a `mapping_date` timestamp and `record_id`.
+4. **Stage proposals** — `rosetta-accredit append candidates.sssom.tsv` reads `ManualMappingCuration` rows, validates them against the state machine, and appends them to the audit log with a `mapping_date` timestamp and `record_id`.
 
 5. **Accreditor reviews** — `rosetta-accredit review -o review.sssom.tsv` generates a work list of all pending proposals (ManualMappingCuration rows with no decision yet). The accreditor edits `review.sssom.tsv`:
     - **Approve**: change `mapping_justification` → `semapv:HumanCuration` (keep or refine `predicate_id`)
     - **Reject**: change `mapping_justification` → `semapv:HumanCuration`, set `predicate_id` → `owl:differentFrom`
 
-6. **Ingest decisions** — `rosetta-accredit ingest review.sssom.tsv` validates each `HumanCuration` row has a `ManualMappingCuration` predecessor, then appends to the audit log.
+6. **Ingest decisions** — `rosetta-accredit append review.sssom.tsv` validates each `HumanCuration` row has a `ManualMappingCuration` predecessor, then appends to the audit log.
 
-7. **Correct a decision** — To override a prior decision, the accreditor manually creates a file with a new `HumanCuration` row and runs `rosetta-accredit ingest` again. The latest entry wins.
+7. **Correct a decision** — To override a prior decision, the accreditor manually creates a file with a new `HumanCuration` row and runs `rosetta-accredit append` again. The latest entry wins.
 
 #### Business rules
 
@@ -389,8 +389,8 @@ rosetta-suggest → candidates.sssom.tsv
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Max 1 `ManualMappingCuration` per (subject_id, object_id)                                       | `rosetta-lint --sssom`                             |
 | Max 1 confirmed mapping per subject (no subject maps to multiple targets)                       | `rosetta-lint --sssom`                             |
-| Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected)             | `rosetta-accredit ingest` + `rosetta-lint --sssom` |
-| `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists            | `rosetta-accredit ingest`                          |
+| Cannot re-propose a pair with **any** `HumanCuration` in log (approved or rejected)             | `rosetta-accredit append` + `rosetta-lint --sssom` |
+| `HumanCuration` can only be ingested if a `ManualMappingCuration` predecessor exists            | `rosetta-accredit append`                          |
 | Once rejected, only the Accreditor can un-reject (by ingesting a corrected `HumanCuration` row) | Workflow convention                                |
 | Approved mappings boost future `rosetta-suggest` results                                        | `rosetta-suggest` (log integration)                |
 | Rejected mappings (`owl:differentFrom`) derank future `rosetta-suggest` results                 | `rosetta-suggest` (log integration)                |
@@ -417,16 +417,16 @@ Global options:
   -c, --config PATH
 
 Commands:
-  ingest   Append ManualMappingCuration or HumanCuration rows to the audit log
+  append   Append ManualMappingCuration or HumanCuration rows to the audit log
   review   Output pending proposals (ManualMappingCuration with no decision yet)
   status   Show current accreditation state per pair
   dump     Export current HumanCuration rows for pipeline use
 ```
 
-**ingest:**
+**append:**
 
 ```
-Usage: rosetta-accredit ingest FILE
+Usage: rosetta-accredit append FILE
 
 Arguments:
   FILE    SSSOM TSV file containing ManualMappingCuration or HumanCuration rows
@@ -468,7 +468,7 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for exter
 
 #### Audit log format
 
-`audit-log.sssom.tsv` is an append-only SSSOM TSV file with 13 columns. Two columns are stamped at ingest time; the remaining 11 come from the ingested SSSOM row.
+`audit-log.sssom.tsv` is an append-only SSSOM TSV file with 13 columns. Two columns are stamped at append time; the remaining 11 come from the appended SSSOM row.
 
 | Column | Description |
 | ------ | ----------- |
@@ -488,7 +488,7 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV. Suitable for exter
 
 > The audit log persists reviewer-asserted fields only. Schema-derived fields (`subject_datatype`, `object_datatype`) appear in `rosetta-suggest` output but are not stored in the audit log; they are re-derived by downstream tools from the source/master LinkML schemas.
 
-> **Migration:** Pre-16-00 audit logs with 9 columns are automatically upgraded to the 13-column format on the first `rosetta-accredit ingest` call. No manual migration is required.
+> **Migration:** Pre-16-00 audit logs with 9 columns are automatically upgraded to the 13-column format on the first `rosetta-accredit append` call. No manual migration is required.
 
 A complete history for an approved mapping:
 
@@ -533,7 +533,7 @@ uv run rosetta-suggest nor_emb.json master_emb.json -o candidates.sssom.tsv
 uv run rosetta-lint --sssom candidates.sssom.tsv
 
 # 4. Stage analyst proposals
-uv run rosetta-accredit ingest candidates.sssom.tsv
+uv run rosetta-accredit append candidates.sssom.tsv
 
 # 5. Generate accreditor work list
 uv run rosetta-accredit review -o review.sssom.tsv
@@ -541,14 +541,14 @@ uv run rosetta-accredit review -o review.sssom.tsv
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows
 
 # 7. Ingest decisions
-uv run rosetta-accredit ingest review.sssom.tsv
+uv run rosetta-accredit append review.sssom.tsv
 
 # 8. Check current state
 uv run rosetta-accredit status
 
 # 9. Correct a previous decision
 # (edit update.sssom.tsv with corrected HumanCuration row)
-uv run rosetta-accredit ingest update.sssom.tsv
+uv run rosetta-accredit append update.sssom.tsv
 ```
 
 **Exit codes:** 0 on success, 1 on state-machine violation or I/O error.
@@ -629,214 +629,51 @@ uv run rosetta-shacl-gen --input master.linkml.yaml --open --output master.open.
 
 ---
 
-### rosetta-yarrrml-gen
+### rosetta compile
 
-Generates a linkml-map `TransformationSpecification` YAML from an approved SSSOM audit log plus source and master LinkML schemas. With `--run`, the same invocation compiles the spec to YARRRML (via the forked `linkml_map.compiler.yarrrml_compiler.YarrrmlCompiler`), materializes it against a concrete data file via [morph-kgc](https://morph-kgc.readthedocs.io/), and frames the resulting RDF as JSON-LD using a `@context` derived from the master LinkML schema.
-
-Single-source data binding only. JSON-LD `@frame` output and multi-source binding are deferred.
-
-```
-Usage: rosetta-yarrrml-gen [OPTIONS]
-
-Spec-generation options:
-  --sssom PATH           Approved SSSOM audit log (13+ column TSV). [required]
-  --source-schema PATH   Source LinkML schema (from rosetta-ingest). [required]
-  --master-schema PATH   Master ontology LinkML schema. [required]
-  --source-format [json|csv|xml]
-                         Source data format. If omitted, read from source
-                         schema's annotations.rosetta_source_format; exit 1
-                         if neither is present.
-  --output PATH          Output TransformSpec YAML path. Default: stdout.
-                         Note: --output controls only the TransformSpec YAML.
-                         When combined with --run the JSON-LD is still written
-                         to stdout (or to --jsonld-output if given).
-  --coverage-report PATH Emit a CoverageReport JSON alongside the TransformSpec.
-  --include-manual       Additionally accept semapv:ManualMappingCuration rows
-                         (default: only semapv:HumanCuration).
-  --allow-empty          Exit 0 on empty filtered SSSOM (default: exit 1).
-  --force                Downgrade unresolvable-CURIE errors to warnings and
-                         continue. Does NOT bypass mixed-kind mappings,
-                         missing class-level mappings, or inconsistent
-                         composite expressions — those are always fatal.
-
-Materialization options (Phase 16-03):
-  --run                  After writing the TransformSpec, compile to YARRRML
-                         and materialize JSON-LD via morph-kgc.
-  --data PATH            Source data file. Required with --run.
-  --jsonld-output PATH   Write JSON-LD to file instead of stdout.
-  --workdir PATH         Directory to retain morph-kgc artifacts (mapping.yml,
-                         intermediates) for debugging. Ephemeral tempdir if
-                         omitted; caller-supplied dirs are never cleaned up.
-  --context-output PATH  Optional JSON-LD @context dump path.
-
-Inline-validation options (Phase 19-03):
-  --validate             Validate the materialized graph against SHACL shapes
-                         BEFORE emitting JSON-LD. On violation: exit 1, write
-                         the validation report (to stderr or --validate-report),
-                         and suppress JSON-LD emission entirely (no partial
-                         output). Requires --run AND --shapes-dir.
-  --shapes-dir PATH      Directory of SHACL shape .ttl files (recursive walk,
-                         symlink-safe; non-shape Turtle files emit a stderr
-                         warning and are still merged). Required with --validate.
-  --validate-report PATH Write the SHACL ValidationReport JSON to this path.
-                         Use "-" for stdout. Defaults to stderr on violation.
-```
-
-**Behavioral matrix (stdout)**
-
-| `--run` | `--output` | `--jsonld-output` | stdout contents                      |
-| ------- | ---------- | ----------------- | ------------------------------------ |
-| off     | —          | n/a               | TransformSpec YAML                   |
-| off     | set        | n/a               | (empty; YAML to file)                |
-| on      | —          | —                 | TransformSpec YAML, then JSON-LD     |
-| on      | —          | set               | TransformSpec YAML only              |
-| on      | set        | —                 | JSON-LD (YAML to file)               |
-| on      | set        | set               | (empty; YAML to file, JSON-LD to file) |
-
-With `--run + --jsonld-output` (and no `--output`) the CLI still writes the YAML to stdout; pass `--output` to redirect it cleanly.
-
-**Example — spec only**
+Compiles an approved SSSOM audit log plus source and master LinkML schemas into a YARRRML mapping file. Internally builds a linkml-map `TransformationSpecification` YAML, then compiles it to YARRRML via the forked `YarrrmlCompiler`.
 
 ```bash
-uv run rosetta-yarrrml-gen \
-  --sssom store/audit-log.sssom.tsv \
+# Compile to YARRRML (stdout)
+rosetta compile store/audit-log.sssom.tsv \
+  --source-schema demo_out/nor_radar.linkml.yaml \
+  --master-schema demo_out/master_cop.linkml.yaml
+
+# Compile to file with coverage report and intermediate TransformSpec
+rosetta compile store/audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml \
-  --output demo_out/nor_to_mc.transform.yaml \
-  --coverage-report demo_out/nor_to_mc.coverage.json
+  -o demo_out/nor_to_mc.yarrrml.yml \
+  --coverage-report demo_out/nor_to_mc.coverage.json \
+  --spec-output demo_out/nor_to_mc.transform.yaml
 ```
 
-Spec output (excerpt):
+**Exit codes:** 0 on success, 1 on error (malformed input, unresolvable CURIEs, empty SSSOM, missing source format annotation), 2 on Click usage error.
 
-```yaml
-comments:
-- rosetta:source_format=csv
-id: https://rosetta.interop/transform/nor_radar-to-mc
-class_derivations:
-- name: Track
-  populated_from: Observation
-  slot_derivations:
-    hasLatitude:
-      name: hasLatitude
-      populated_from: breddegrad
-```
+**Coverage report:** When `--coverage-report` is provided, a JSON file with the `CoverageReport` model is written. Fields: row-stage counts, resolved/unresolved class + slot mappings, datatype mismatches, composite-group resolution status, and required master slots that remain unmapped.
 
-**Example — full pipeline (NOR radar CSV → JSON-LD)**
-
-```bash
-uv run rosetta-yarrrml-gen \
-  --sssom store/audit-log.sssom.tsv \
-  --source-schema demo_out/nor_radar.linkml.yaml \
-  --master-schema demo_out/master_cop.linkml.yaml \
-  --output demo_out/nor_to_mc.transform.yaml \
-  --run \
-  --data demo_out/nor_radar.csv \
-  --jsonld-output demo_out/nor_tracks.jsonld \
-  --workdir demo_out/morph_artifacts
-```
-
-JSON-LD output (excerpt):
-
-```json
-{
-  "@context": { "mc": "https://ontology.nato.int/core/MasterCOP#", ... },
-  "@graph": [
-    { "@id": "nor_radar:Observation/NOR-001",
-      "@type": "Track",
-      "hasAltitude": 4100.0,
-      "hasLatitude": 60.1892 }
-  ]
-}
-```
-
-**Example — end-to-end with inline SHACL validation**
-
-```bash
-# End-to-end with inline SHACL validation
-uv run rosetta-yarrrml-gen \
-  --sssom approved.sssom.tsv \
-  --master-schema master.linkml.yaml \
-  --source-schema nor.linkml.yaml \
-  --run --data nor.csv \
-  --output transform.yaml --jsonld-output out.jsonld \
-  --validate --shapes-dir rosetta/policies/shacl/
-# JSON-LD only emitted if SHACL validation passes; otherwise exit 1.
-```
-
-**Exit codes**
-
-- `0` — success (TransformSpec written; JSON-LD emitted if `--run`).
-- `1` — any of: malformed input file; unresolvable CURIEs (without `--force`); mixed-kind mapping; missing class-level mapping for a mapped slot; inconsistent `composition_expr`; empty filtered SSSOM (without `--allow-empty`); source schema has no `default_prefix`; `--source-format` not provided and no `annotations.rosetta_source_format`; `--run` without `--data`; `--workdir` not writable; YARRRML compilation error; morph-kgc materialization error; `@context` generation error; JSON-LD serialization error; placeholder `$(DATA_FILE)` missing from compiled YARRRML; write error on `--jsonld-output` or `--context-output`.
-- `2` — Click validation error (e.g. missing required option).
-
-Empty materialized graph (0 triples) is NOT an error: a warning is written to stderr and an empty-graph JSON-LD is emitted on stdout with exit 0.
-
-**Coverage report**
-
-When `--coverage-report` is provided, a JSON file with the `CoverageReport` model is written. Fields: row-stage counts, resolved/unresolved class + slot mappings, datatype mismatches, composite-group resolution status, and required master slots that remain unmapped.
-
-**Source format resolution (GA4 hybrid)**
-
-`--source-format` is OPTIONAL. If omitted, the builder reads `annotations.rosetta_source_format` from the source schema (stamped by `rosetta-ingest` on every generated schema since 16-00). Either must be present — otherwise exit 1.
+**Source format resolution:** The source format is read from `annotations.rosetta_source_format` on the source schema (stamped by `rosetta ingest`). Exit 1 if missing.
 
 ---
 
-### rosetta-provenance
+### rosetta run
 
-Records and queries PROV-O provenance metadata stamped onto Turtle artifacts. Each stamp increments a version counter.
-
-```
-Usage: rosetta-provenance [OPTIONS] COMMAND
-
-Global options:
-  -c, --config PATH   Path to rosetta.toml
-
-Commands:
-  stamp   Stamp PROV-O metadata onto a Turtle artifact
-  query   Query provenance records stamped onto a Turtle artifact
-```
-
-**stamp:**
-
-```
-Usage: rosetta-provenance stamp [OPTIONS] INPUT
-
-Options:
-  -o, --output PATH   Output path (omit to overwrite INPUT in-place; use '-' for stdout)
-  --agent TEXT        Agent URI  [default: http://rosetta.interop/ns/agent/rosetta-cli]
-  -l, --label TEXT    Human-readable label for this stamp event
-  --format TEXT       Stderr summary format: text, json  [default: text]
-```
-
-**query:**
-
-```
-Usage: rosetta-provenance query [OPTIONS] INPUT
-
-Options:
-  --format TEXT   Output format: text, json  [default: text]
-```
-
-**Example:**
+Materializes a YARRRML mapping against a concrete data file via [morph-kgc](https://morph-kgc.readthedocs.io/) and frames the resulting RDF as JSON-LD using a `@context` derived from the master LinkML schema.
 
 ```bash
-# Stamp in-place
-uv run rosetta-provenance stamp mapping.rml.ttl --label "Initial NOR→USA mapping"
+# Basic materialization (JSON-LD to stdout)
+rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+  --master-schema demo_out/master_cop.linkml.yaml
 
-# Stamp to new file
-uv run rosetta-provenance stamp mapping.rml.ttl -o mapping.rml.v2.ttl --label "Reviewed"
-
-# Query provenance history (text)
-uv run rosetta-provenance query mapping.rml.ttl
-# v1  2026-04-13T12:00:00+00:00  http://rosetta.interop/ns/agent/rosetta-cli  Initial NOR→USA mapping
-
-# Query as JSON
-uv run rosetta-provenance query mapping.rml.ttl --format json
+# Write to file with inline SHACL validation
+rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+  --master-schema demo_out/master_cop.linkml.yaml \
+  -o demo_out/nor_tracks.jsonld \
+  --validate rosetta/policies/shacl/ \
+  --validate-report report.json
 ```
 
-The artifact URI is derived from the input filename stem: `mapping.rml.ttl` → `rose:mapping.rml`.
-
-**Exit codes:** 0 on success, 1 on error.
+**Exit codes:** 0 on success, 1 on runtime or SHACL validation error, 2 on Click usage error. Empty materialized graph (0 triples) is not an error — a warning prints to stderr.
 
 ---
 

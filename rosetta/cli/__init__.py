@@ -15,8 +15,8 @@ _LAZY_SUBCOMMANDS: dict[str, str] = {
     "suggest": "rosetta.cli.suggest",
     "lint": "rosetta.cli.lint",
     "validate": "rosetta.cli.validate",
-    "yarrrml-gen": "rosetta.cli.yarrrml_gen",
-    "provenance": "rosetta.cli.provenance",
+    "compile": "rosetta.cli.compile",
+    "run": "rosetta.cli.run",
     "accredit": "rosetta.cli.accredit",
     "shacl-gen": "rosetta.cli.shacl_gen",
 }

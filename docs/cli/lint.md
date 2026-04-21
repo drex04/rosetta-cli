@@ -61,7 +61,7 @@ uv run rosetta-lint --sssom candidates.sssom.tsv \
 uv run rosetta-lint --strict --sssom candidates.sssom.tsv --output lint.json
 
 # Stage for accreditor review if clean
-uv run rosetta-accredit ingest candidates.sssom.tsv
+uv run rosetta-accredit append candidates.sssom.tsv
 ```
 
 ## Exit codes

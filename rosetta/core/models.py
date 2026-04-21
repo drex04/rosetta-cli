@@ -107,28 +107,14 @@ class SSSOMRow(BaseModel):
     confidence: float
     subject_label: str = ""
     object_label: str = ""
-    mapping_date: datetime | None = None  # stamped by accredit ingest
-    record_id: str | None = None  # UUID4 stamped by accredit ingest
+    mapping_date: datetime | None = None  # stamped by accredit append
+    record_id: str | None = None  # UUID4 stamped by accredit append
     subject_datatype: str | None = None
     object_datatype: str | None = None
     subject_type: str | None = None
     object_type: str | None = None
     mapping_group_id: str | None = None
     composition_expr: str | None = None
-
-
-# --- Provenance ---
-
-
-class ProvenanceRecord(BaseModel):
-    model_config = _STRICT
-
-    activity_uri: str
-    agent_uri: str
-    label: str | None = None
-    started_at: str  # ISO 8601 datetime string
-    ended_at: str  # ISO 8601 datetime string
-    version: int  # current rose:version of the artifact at query time
 
 
 # --- Validate ---
@@ -158,19 +144,6 @@ class ValidationReport(BaseModel):
 
     findings: list[ValidationFinding]
     summary: ValidationSummary
-
-
-# --- Accreditation ---
-
-
-class StatusEntry(BaseModel):
-    model_config = _STRICT
-
-    subject_id: str
-    object_id: str
-    state: Literal["pending", "approved", "rejected"]
-    predicate_id: str
-    mapping_date: str | None
 
 
 # --- YARRRML Generation (coverage) ---

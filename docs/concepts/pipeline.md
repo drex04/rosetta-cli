@@ -1,6 +1,6 @@
 # The pipeline
 
-`rosetta-cli` is nine small commands. This page shows how they compose into one continuous flow from raw partner schemas to a validated, provenance-stamped RDF graph.
+`rosetta-cli` is a set of composable commands. This page shows how they compose into one continuous flow from raw partner schemas to a validated RDF graph.
 
 ## Overview
 
@@ -18,8 +18,8 @@
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  Analyst edits → rosetta-lint → rosetta-accredit ingest      │
-│  Accreditor reviews → rosetta-accredit ingest                │
+│  Analyst edits → rosetta-lint → rosetta-accredit append      │
+│  Accreditor reviews → rosetta-accredit append                │
 │                           │                                  │
 │                           ▼                                  │
 │                  audit-log.sssom.tsv  (append-only)          │
@@ -33,8 +33,8 @@
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  rosetta-validate (SHACL)  →  rosetta-provenance stamp       │
-│     Conformant, versioned, PROV-O-stamped RDF artifact       │
+│  rosetta-validate (SHACL)                                    │
+│     Conformant, validated RDF artifact                       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,15 +66,11 @@
 
 ### 7. Generate — compile approved mappings into RML
 
-[`rosetta-yarrrml-gen`](../cli/yarrrml-gen.md) reads the audit log, produces a linkml-map `TransformationSpecification` YAML, and — with `--run` — compiles it to YARRRML, materialises it against concrete source data via morph-kgc, and frames the result as JSON-LD using a `@context` derived from the master LinkML schema.
+[`rosetta compile`](../cli/compile.md) reads the audit log and produces a YARRRML mapping file. [`rosetta run`](../cli/run.md) materialises the YARRRML against concrete source data via morph-kgc and frames the result as JSON-LD using a `@context` derived from the master LinkML schema.
 
 ### 8. Validate — SHACL conformance
 
 [`rosetta-validate`](../cli/validate.md) runs the materialised RDF against SHACL shapes. Exit `0` conformant, `1` violations — compose it into CI.
-
-### 9. Stamp — PROV-O provenance
-
-[`rosetta-provenance`](../cli/provenance.md) stamps every Turtle artifact with a PROV-O record: agent, activity, timestamp, version. Query the history with `rosetta-provenance query` and you get a full audit trail per artifact.
 
 ## Composability
 

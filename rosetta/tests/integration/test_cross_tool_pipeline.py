@@ -26,6 +26,7 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.accredit import cli as accredit_cli
+from rosetta.cli.compile import cli as yarrrml_cli
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.lint import cli as lint_cli
@@ -33,7 +34,6 @@ from rosetta.cli.shacl_gen import cli as shacl_gen_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.cli.translate import cli as translate_cli
 from rosetta.cli.validate import cli as validate_cli
-from rosetta.cli.yarrrml_gen import cli as yarrrml_cli
 from rosetta.core.accredit import AUDIT_LOG_COLUMNS, SSSOM_HEADER, parse_sssom_tsv
 from rosetta.core.models import LintReport
 
@@ -124,17 +124,15 @@ def test_embed_suggest_yarrrml_gen_format_compatibility(
                 ]
             )
 
-    # 6. Feed to yarrrml-gen -- prefix filter must accept the format
+    # 6. Feed to compile -- prefix filter must accept the format
     result = runner.invoke(
         yarrrml_cli,
         [
-            "--sssom",
             str(approved),
             "--source-schema",
             str(nor_linkml_path),
             "--master-schema",
             str(master_schema_path),
-            "--force",
         ],
     )
     combined = result.output + result.stderr
@@ -165,14 +163,14 @@ def _run_embed_suggest(
     return suggest_sssom
 
 
-def test_suggest_to_accredit_ingest(
+def test_suggest_to_accredit_append(
     tmp_path: Path,
     nor_linkml_path: Path,
     master_schema_path: Path,
     tmp_rosetta_toml: Path,
     mock_model: None,
 ) -> None:
-    """Suggest SSSOM output can be ingested by accredit without errors.
+    """Suggest SSSOM output can be appended by accredit without errors.
 
     Tests the suggest -> accredit seam: column format, header parsing,
     and justification values must be compatible.
@@ -182,10 +180,10 @@ def test_suggest_to_accredit_ingest(
 
     result = runner.invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "ingest", str(suggest_sssom)],
+        ["--config", str(tmp_rosetta_toml), "append", str(suggest_sssom)],
     )
     assert result.exit_code == 0, (
-        f"accredit ingest failed on suggest output: {result.stderr}\n"
+        f"accredit append failed on suggest output: {result.stderr}\n"
         "This indicates a format mismatch between suggest SSSOM and accredit parser."
     )
 
@@ -385,22 +383,36 @@ def test_yarrrml_gen_jsonld_validated_by_shacl(
     result = runner.invoke(shacl_gen_cli, ["--input", str(mc_schema), "--output", str(shapes)])
     assert result.exit_code == 0, f"shacl-gen failed: {result.stderr}"
 
-    # 2. Materialize CSV → JSON-LD via yarrrml-gen --run
-    jsonld_out = tmp_path / "output.jsonld"
-    result = runner.invoke(
+    # 2. Compile SSSOM → YARRRML
+    yarrrml_out = tmp_path / "mapping.yarrrml.yaml"
+    compile_result = runner.invoke(
         yarrrml_cli,
         [
-            "--sssom",
             str(sssom),
             "--source-schema",
             str(nor_schema),
             "--master-schema",
             str(mc_schema),
-            "--force",
-            "--run",
-            "--data",
+            "-o",
+            str(yarrrml_out),
+        ],
+    )
+    assert compile_result.exit_code == 0, (
+        f"compile failed (exit {compile_result.exit_code}): {compile_result.stderr}"
+    )
+
+    # 3. Materialize CSV → JSON-LD via rosetta run
+    from rosetta.cli.run import cli as run_cli
+
+    jsonld_out = tmp_path / "output.jsonld"
+    result = runner.invoke(
+        run_cli,
+        [
+            str(yarrrml_out),
             str(csv_data),
-            "--jsonld-output",
+            "--master-schema",
+            str(mc_schema),
+            "-o",
             str(jsonld_out),
             "--workdir",
             str(tmp_path / "wd"),
