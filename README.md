@@ -421,7 +421,7 @@ rosetta suggest → candidates.sssom.tsv
 Usage: rosetta accredit [OPTIONS] COMMAND
 
 Global options:
-  --audit-log PATH   Path to audit log .sssom.tsv  [default: store/audit-log.sssom.tsv]
+  --audit-log PATH   Path to audit log .sssom.tsv  [default: audit-log.sssom.tsv]
   -c, --config PATH
 
 Commands:
@@ -623,12 +623,12 @@ Compiles an approved SSSOM audit log plus source and master LinkML schemas into 
 
 ```bash
 # Compile to YARRRML (stdout)
-uv run rosetta compile store/audit-log.sssom.tsv \
+uv run rosetta compile audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml
 
 # Compile to file with coverage report and intermediate TransformSpec
-uv run rosetta compile store/audit-log.sssom.tsv \
+uv run rosetta compile audit-log.sssom.tsv \
   --source-schema demo_out/nor_radar.linkml.yaml \
   --master-schema demo_out/master_cop.linkml.yaml \
   -o demo_out/nor_to_mc.yarrrml.yml \
@@ -690,7 +690,7 @@ structural_weight = 0.2
 strict = false
 
 [accredit]
-log = "store/audit-log.sssom.tsv"
+log = "audit-log.sssom.tsv"
 ```
 
 ---

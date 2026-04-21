@@ -243,10 +243,10 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
     epilog="""Examples:
 
   rosetta lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
-      --audit-log store/audit-log.sssom.tsv
+      --audit-log audit-log.sssom.tsv
 
   rosetta -v lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
-      --audit-log store/audit-log.sssom.tsv -o report.json"""
+      --audit-log audit-log.sssom.tsv -o report.json"""
 )
 @click.argument("sssom_file", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")

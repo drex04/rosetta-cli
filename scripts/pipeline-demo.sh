@@ -20,7 +20,7 @@
 #   uv sync            Install dependencies before running.
 #   DEEPL_API_KEY      Only needed for non-English source schemas.
 #
-# The audit log is written to store/audit-log.sssom.tsv (rosetta.toml default).
+# The audit log is written to $OUTPUT_DIR/audit-log.sssom.tsv.
 # Re-running the script will accumulate entries in the same log.
 
 set -euo pipefail
@@ -73,11 +73,10 @@ confirm() {
 OUT="${1:-demo_out}"
 SRC_FIXTURE="rosetta/tests/fixtures/nations/nor_radar.csv"
 MASTER_FIXTURE="rosetta/tests/fixtures/nations/master_cop_ontology.ttl"
-LOG="store/audit-log.sssom.tsv"
+LOG="$OUT/audit-log.sssom.tsv"
 SHAPES_DIR="rosetta/policies/shacl"
 
 mkdir -p "$OUT"
-mkdir -p "$(dirname "$LOG")"
 
 echo ""
 echo "Pipeline demo"

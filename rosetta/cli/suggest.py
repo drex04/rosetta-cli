@@ -51,10 +51,10 @@ _SSSOM_COLUMNS = [
     epilog="""Examples:
 
   rosetta suggest source.embeddings.json master.embeddings.json \\
-      --audit-log store/audit-log.sssom.tsv -o proposals.sssom.tsv
+      --audit-log audit-log.sssom.tsv -o proposals.sssom.tsv
 
   rosetta -v suggest source.embeddings.json master.embeddings.json \\
-      --audit-log store/audit-log.sssom.tsv --top-k 10"""
+      --audit-log audit-log.sssom.tsv --top-k 10"""
 )
 @click.argument("source", type=click.Path(exists=True))
 @click.argument("master", type=click.Path(exists=True))

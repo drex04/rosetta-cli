@@ -249,7 +249,17 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         # Write a minimal valid src embed too
         src_emb = tmp_path / "src.embed.json"
         src_emb.write_text(json.dumps({"src/foo": {"lexical": [0.0, 0.0, 0.0, 0.0]}}))
+        dummy_log = tmp_path / "audit-log.sssom.tsv"
+        dummy_log.write_text("")
         sg = runner.invoke(
-            suggest_cli, [str(src_emb), str(empty_emb), "--output", str(tmp_path / "o.tsv")]
+            suggest_cli,
+            [
+                str(src_emb),
+                str(empty_emb),
+                "--audit-log",
+                str(dummy_log),
+                "--output",
+                str(tmp_path / "o.tsv"),
+            ],
         )
         assert sg.exit_code == 1, f"suggest with empty master embed: {sg.exit_code} {sg.stderr!r}"

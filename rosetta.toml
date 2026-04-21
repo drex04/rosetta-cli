@@ -24,4 +24,4 @@ structural_weight = 0.2
 strict = false
 
 [accredit]
-log = "store/audit-log.sssom.tsv"
+log = "audit-log.sssom.tsv"
