@@ -11,10 +11,11 @@ Every command is auto-documented from its Click definition — options, argument
 | [`rosetta embed`](embed.md) | Compute per-slot sentence embeddings |
 | [`rosetta suggest`](suggest.md) | Rank candidate mappings by cosine similarity |
 | [`rosetta lint`](lint.md) | Validate analyst proposals against unit and log constraints |
-| [`rosetta accredit`](accredit.md) | Manage the two-role accreditation state machine |
+| [`rosetta ledger`](ledger.md) | Manage the two-role accreditation state machine |
 | [`rosetta validate`](validate.md) | SHACL-validate RDF data (Turtle or JSON-LD) |
 | [`rosetta compile`](compile.md) | Compile approved mappings to YARRRML |
-| [`rosetta run`](run.md) | Materialise a YARRRML mapping into JSON-LD |
+| [`rosetta transform`](transform.md) | Materialise a YARRRML mapping into JSON-LD |
+| [`rosetta shapes`](shapes.md) | Auto-generate SHACL shapes from a master LinkML schema |
 
 ## Conventions
 

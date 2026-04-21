@@ -277,7 +277,7 @@ def test_build_composite_slot_derivation_rejects_multi_target() -> None:
 def test_build_spec_emits_valid_transformspec() -> None:
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-    from rosetta.core.accredit import parse_sssom_tsv
+    from rosetta.core.ledger import parse_sssom_tsv
 
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
@@ -296,7 +296,7 @@ def test_build_spec_emits_valid_transformspec() -> None:
 def test_build_spec_class_derivations_is_list() -> None:
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-    from rosetta.core.accredit import parse_sssom_tsv
+    from rosetta.core.ledger import parse_sssom_tsv
 
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
@@ -315,7 +315,7 @@ def test_build_spec_class_derivations_is_list() -> None:
 def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-    from rosetta.core.accredit import parse_sssom_tsv
+    from rosetta.core.ledger import parse_sssom_tsv
 
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
@@ -456,7 +456,7 @@ def test_build_spec_datatype_warning_for_mismatched_ranges(
 def test_build_spec_composite_group_flows_to_expr() -> None:
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-    from rosetta.core.accredit import parse_sssom_tsv
+    from rosetta.core.ledger import parse_sssom_tsv
 
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]

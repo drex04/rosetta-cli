@@ -24,7 +24,7 @@ from click.testing import CliRunner
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.lint import cli as lint_cli
 from rosetta.cli.suggest import cli as suggest_cli
-from rosetta.core.accredit import parse_sssom_tsv
+from rosetta.core.ledger import parse_sssom_tsv
 from rosetta.core.models import LintReport
 
 pytestmark = [pytest.mark.integration]

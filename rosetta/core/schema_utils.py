@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from linkml_runtime.utils.schemaview import SchemaView
 
-from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION
+from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION
 from rosetta.core.models import SSSOMRow
 
 

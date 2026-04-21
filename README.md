@@ -25,18 +25,18 @@ All tools are available via `uv run rosetta <command>` after syncing.
 
 ## Tools
 
-| Command | Purpose |
-| ------- | ------- |
-| `rosetta ingest` | Parse a schema file → LinkML YAML |
-| `rosetta translate` | Translate non-English titles to English via DeepL |
-| `rosetta embed` | Compute embeddings for schema slots |
-| `rosetta suggest` | Rank candidate mappings by similarity |
-| `rosetta lint` | Validate proposals before accreditor review |
-| `rosetta accredit` | Manage the append-only audit log (append, review, dump) |
-| `rosetta compile` | Compile approved mappings → YARRRML |
-| `rosetta run` | Materialise YARRRML → JSON-LD with optional SHACL validation |
-| `rosetta validate` | Validate RDF against SHACL shapes |
-| `rosetta shacl-gen` | Auto-generate SHACL shapes from a master LinkML schema |
+| Command     | Purpose                                                      |
+| ----------- | ------------------------------------------------------------ |
+| `ingest`    | Parse a schema file → LinkML YAML                            |
+| `translate` | Translate non-English titles to English via DeepL            |
+| `embed`     | Compute embeddings for schema slots                          |
+| `suggest`   | Rank candidate mappings by similarity                        |
+| `lint`      | Validate proposals before accreditor review                  |
+| `ledger`    | Manage the append-only audit log (append, review, dump)      |
+| `compile`   | Compile approved mappings → YARRRML                          |
+| `transform` | Materialise YARRRML → JSON-LD with optional SHACL validation |
+| `validate`  | Validate RDF against SHACL shapes                            |
+| `shapes`    | Auto-generate SHACL shapes from a master LinkML schema       |
 
 Run `uv run rosetta <command> --help` for options and usage.
 

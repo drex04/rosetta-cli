@@ -83,6 +83,14 @@
 ## [review] D-20-21: SIGPIPE implementation
 **Decision:** Use `BrokenPipeError` try/except wrapper (portable) rather than `signal.SIGPIPE` (not available on Windows).
 
+## D-20-22: Command renames (Plan 20-05)
+**Decision:** Three renames: `accredit` → `ledger`, `run` → `transform`, `shacl-gen` → `shapes`. No backward-compat aliases.
+**Rationale:** `accredit` is opaque — `ledger` matches the append-only audit log metaphor. `run` is too generic — `transform` says what it does (data → graph). `shacl-gen` is implementation-leaky — `shapes` says what it produces.
+
+## D-20-23: Ledger subcommand names unchanged
+**Decision:** `ledger append`, `ledger review`, `ledger dump` — subcommand names stay the same.
+**Rationale:** All three read naturally under `ledger`. No reason to rename.
+
 ---
 
 ## Deferred Ideas

@@ -18,7 +18,7 @@ from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView
 
 from rosetta.cli.compile import cli as compile_cli
-from rosetta.core.accredit import parse_sssom_tsv
+from rosetta.core.ledger import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec
 
 pytestmark = [pytest.mark.integration]

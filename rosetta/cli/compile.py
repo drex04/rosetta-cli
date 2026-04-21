@@ -13,8 +13,8 @@ from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView  # type: ignore[import-untyped]
 
-from rosetta.core.accredit import parse_sssom_tsv
 from rosetta.core.io import open_output
+from rosetta.core.ledger import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec, filter_rows
 
 
@@ -91,8 +91,8 @@ def cli(
 ) -> None:
     """Compile an SSSOM audit log to a YARRRML mapping artifact.
 
-    SSSOM_FILE is the path to the SSSOM audit log TSV produced by rosetta accredit.
-    The primary output is YARRRML (the executable artifact consumed by rosetta run).
+    SSSOM_FILE is the path to the SSSOM audit log TSV produced by rosetta ledger.
+    The primary output is YARRRML (the executable artifact consumed by rosetta transform).
     Use --spec-output to also write the intermediate TransformSpec YAML.
     """
     # 1. Parse SSSOM audit log

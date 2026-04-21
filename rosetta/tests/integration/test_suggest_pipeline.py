@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.suggest import cli as suggest_cli
-from rosetta.core.accredit import parse_sssom_tsv
+from rosetta.core.ledger import parse_sssom_tsv
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -65,13 +65,13 @@ def test_suggest_inheritance_schema(
 
     # 3. Run suggest — writes SSSOM TSV.
     out_tsv = tmp_path / "suggestions.sssom.tsv"
-    # Need a rosetta.toml with [accredit].log so suggest's audit-log requirement is satisfied.
+    # Need a rosetta.toml with [ledger].log so suggest's audit-log requirement is satisfied.
     audit_log = tmp_path / "audit-log.sssom.tsv"
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     append_log([], audit_log)
     config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{audit_log}"\n')
 
     result = CliRunner(mix_stderr=False).invoke(
         suggest_cli,

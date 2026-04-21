@@ -11,7 +11,7 @@ import rdflib
 from click.testing import CliRunner
 from rdflib.namespace import RDF
 
-from rosetta.cli.run import cli
+from rosetta.cli.transform import cli
 
 # Fixture paths
 _FIXTURES = Path("rosetta/tests/fixtures/nations")
@@ -98,11 +98,11 @@ def test_run_happy_path_writes_jsonld_to_stdout(
     fixed_bytes = b'{"@context": {}, "@graph": []}'
 
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
     )
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: fixed_bytes,
     )
     result = CliRunner(mix_stderr=False).invoke(
@@ -124,11 +124,11 @@ def test_run_with_output_flag_writes_file(
     fixed_bytes = b'{"@context": {"ex": "https://ex.org/"}, "@graph": []}'
 
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
     )
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: fixed_bytes,
     )
     result = CliRunner(mix_stderr=False).invoke(
@@ -160,7 +160,7 @@ def test_run_with_runner_error_exits_1(
         raise RuntimeError("materialize failed")
         yield rdflib.Graph()  # unreachable  # pragma: no cover
 
-    monkeypatch.setattr("rosetta.cli.run.run_materialize", _boom)
+    monkeypatch.setattr("rosetta.cli.transform.run_materialize", _boom)
     result = CliRunner(mix_stderr=False).invoke(
         cli,
         [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
@@ -194,9 +194,9 @@ def test_run_with_workdir_supplied(
             (work_dir / "mapping.yml").write_text("mock mapping\n", encoding="utf-8")
         yield _fixed_graph()
 
-    monkeypatch.setattr("rosetta.cli.run.run_materialize", _capture)
+    monkeypatch.setattr("rosetta.cli.transform.run_materialize", _capture)
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: b'{"@context": {}, "@graph": []}',
     )
     result = CliRunner(mix_stderr=False).invoke(
@@ -241,10 +241,10 @@ def test_run_with_context_output_forwarded(
         return b'{"@context": {}, "@graph": []}'
 
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
     )
-    monkeypatch.setattr("rosetta.cli.run.graph_to_jsonld", _capture_jsonld)
+    monkeypatch.setattr("rosetta.cli.transform.graph_to_jsonld", _capture_jsonld)
     result = CliRunner(mix_stderr=False).invoke(
         cli,
         [
@@ -274,11 +274,11 @@ def test_run_empty_graph_warns_and_exits_0(
 ) -> None:
     """Empty materialized graph warns on stderr but still exits 0."""
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(rdflib.Graph()),
     )
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: b'{"@context": {}, "@graph": []}',
     )
     result = CliRunner(mix_stderr=False).invoke(
@@ -314,11 +314,11 @@ def test_run_validate_pass_exits_0_and_emits_jsonld(
     )
 
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
     )
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: fixed_bytes,
     )
     monkeypatch.setattr(
@@ -374,11 +374,11 @@ def test_run_validate_fail_exits_1_no_jsonld(
     )
 
     monkeypatch.setattr(
-        "rosetta.cli.run.run_materialize",
+        "rosetta.cli.transform.run_materialize",
         lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
     )
     monkeypatch.setattr(
-        "rosetta.cli.run.graph_to_jsonld",
+        "rosetta.cli.transform.graph_to_jsonld",
         lambda *a, **kw: b'{"@context": {}, "@graph": []}',
     )
     monkeypatch.setattr(

@@ -28,8 +28,8 @@ def _cell(row: object, col: str) -> str:
 
 def _write_sssom(path: Path, rows: list[dict[str, object]]) -> None:
     """Write SSSOM TSV using real SSSOMRow models for format consistency."""
-    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
-    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+    from rosetta.core.ledger import AUDIT_LOG_COLUMNS
+    from rosetta.core.ledger import SSSOM_HEADER as _HEADER
     from rosetta.core.models import SSSOMRow
 
     built: list[SSSOMRow] = []
@@ -66,8 +66,8 @@ def test_lint_on_suggest_output(tmp_path: Path, sssom_nor_path: Path) -> None:
     """Clean SSSOM proposal fixture → exit 0, zero BLOCK findings."""
     import csv
 
-    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
-    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+    from rosetta.core.ledger import AUDIT_LOG_COLUMNS
+    from rosetta.core.ledger import SSSOM_HEADER as _HEADER
 
     config = _no_accredit_toml(tmp_path)
 
@@ -131,8 +131,8 @@ def test_lint_unit_dimension_mismatch(tmp_path: Path) -> None:
     )
     import csv
 
-    from rosetta.core.accredit import AUDIT_LOG_COLUMNS
-    from rosetta.core.accredit import SSSOM_HEADER as _HEADER
+    from rosetta.core.ledger import AUDIT_LOG_COLUMNS
+    from rosetta.core.ledger import SSSOM_HEADER as _HEADER
 
     config = _no_accredit_toml(tmp_path)
 

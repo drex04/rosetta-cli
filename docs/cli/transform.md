@@ -1,13 +1,13 @@
-# rosetta run
+# rosetta transform
 
 Materializes a YARRRML mapping against a concrete data file via [morph-kgc](https://morph-kgc.readthedocs.io/), then frames the resulting RDF as JSON-LD using a `@context` derived from the master LinkML schema.
 
 ## Command reference
 
 ::: mkdocs-click
-    :module: rosetta.cli.run
+    :module: rosetta.cli.transform
     :command: cli
-    :prog_name: rosetta run
+    :prog_name: rosetta transform
     :depth: 2
 
 ## Examples
@@ -15,14 +15,14 @@ Materializes a YARRRML mapping against a concrete data file via [morph-kgc](http
 ### Basic materialization
 
 ```bash
-rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   --master-schema demo_out/master_cop.linkml.yaml
 ```
 
 ### Write JSON-LD to file
 
 ```bash
-rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   --master-schema demo_out/master_cop.linkml.yaml \
   -o demo_out/nor_tracks.jsonld
 ```
@@ -30,7 +30,7 @@ rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
 ### With inline SHACL validation
 
 ```bash
-rosetta run demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   --master-schema demo_out/master_cop.linkml.yaml \
   -o demo_out/nor_tracks.jsonld \
   --validate rosetta/policies/shacl/ \
@@ -51,6 +51,6 @@ Both `--output` and `--validate-report` can target stdout. Setting both to stdou
 
 ## See also
 
-- [`rosetta compile`](compile.md) — produce the YARRRML mapping file consumed by `run`.
-- [`rosetta shacl-gen`](shacl-gen.md) — generate the shapes directory for `--validate`.
+- [`rosetta compile`](compile.md) — produce the YARRRML mapping file consumed by `transform`.
+- [`rosetta shapes`](shapes.md) — generate the shapes directory for `--validate`.
 - [`rosetta validate`](validate.md) — standalone validator for offline validation.

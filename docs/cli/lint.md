@@ -1,6 +1,6 @@
 # rosetta lint
 
-Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (from `rosetta.toml [accredit].audit_log` or `--audit-log`) to check for conflicts with existing decisions.
+Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (from `rosetta.toml [ledger].audit_log` or `--audit-log`) to check for conflicts with existing decisions.
 
 ## Command reference
 
@@ -61,7 +61,7 @@ uv run rosetta lint candidates.sssom.tsv \
   --strict --output lint.json
 
 # Stage for accreditor review if clean
-uv run rosetta accredit append candidates.sssom.tsv
+uv run rosetta ledger append candidates.sssom.tsv
 ```
 
 ## Exit codes

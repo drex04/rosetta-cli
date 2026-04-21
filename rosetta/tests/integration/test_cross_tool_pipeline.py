@@ -25,16 +25,16 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.accredit import cli as accredit_cli
 from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
+from rosetta.cli.ledger import cli as accredit_cli
 from rosetta.cli.lint import cli as lint_cli
-from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+from rosetta.cli.shapes import cli as shacl_gen_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.cli.translate import cli as translate_cli
 from rosetta.cli.validate import cli as validate_cli
-from rosetta.core.accredit import AUDIT_LOG_COLUMNS, SSSOM_HEADER, parse_sssom_tsv
+from rosetta.core.ledger import AUDIT_LOG_COLUMNS, SSSOM_HEADER, parse_sssom_tsv
 from rosetta.core.models import LintReport
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
@@ -201,11 +201,11 @@ def test_suggest_to_lint(
     suggest_sssom = _run_embed_suggest(runner, tmp_path, nor_linkml_path, master_schema_path)
 
     audit_log = tmp_path / "audit-log.sssom.tsv"
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     append_log([], audit_log)
     no_accredit_toml = tmp_path / "rosetta.toml"
-    no_accredit_toml.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
+    no_accredit_toml.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{audit_log}"\n')
 
     result = runner.invoke(
         lint_cli,
@@ -410,7 +410,7 @@ def test_compile_run_jsonld_validated_by_shacl(
     )
 
     # 3. Materialize CSV → JSON-LD via rosetta run
-    from rosetta.cli.run import cli as run_cli
+    from rosetta.cli.transform import cli as run_cli
 
     jsonld_out = tmp_path / "output.jsonld"
     result = runner.invoke(

@@ -23,7 +23,7 @@ import rdflib
 from click.testing import CliRunner
 from rdflib.namespace import RDF
 
-from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+from rosetta.cli.shapes import cli as shacl_gen_cli
 from rosetta.core.shacl_validate import validate_graph
 from rosetta.core.shapes_loader import load_shapes_from_dir
 

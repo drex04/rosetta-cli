@@ -60,7 +60,7 @@ def mst_file(tmp_path):
 @pytest.fixture
 def empty_log(tmp_path: Path) -> str:
     """An empty (but existing) audit log file for tests that don't need log data."""
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     lp = tmp_path / "empty-audit-log.sssom.tsv"
     append_log([], lp)
@@ -274,7 +274,7 @@ def test_suggest_cli_top_k(src_file, mst_file, empty_log) -> None:
 def test_suggest_cli_config_precedence(tmp_path) -> None:
     """--top-k CLI flag overrides top_k in rosetta.toml."""
     from rosetta.cli.suggest import cli
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     src = tmp_path / "source.json"
     src.write_text(json.dumps(SOURCE_EMB))
@@ -285,7 +285,7 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     append_log([], log_path)
 
     toml_cfg = tmp_path / "rosetta.toml"
-    toml_cfg.write_text(f'[suggest]\ntop_k = 10\n\n[accredit]\nlog = "{log_path}"\n')
+    toml_cfg.write_text(f'[suggest]\ntop_k = 10\n\n[ledger]\nlog = "{log_path}"\n')
 
     result = CliRunner().invoke(
         cli,
@@ -310,7 +310,7 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
 def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     """HC approval in audit log suppresses that pair from suggest output."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FieldA"
@@ -365,7 +365,7 @@ def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Pa
 def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     """HC owl:differentFrom in audit log deranks candidate confidence."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FieldB"
@@ -433,7 +433,7 @@ def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) ->
 
 
 def test_suggest_cli_no_log_configured_raises_usage_error(tmp_path: Path) -> None:
-    """Config without [accredit] section and no --audit-log → UsageError (exit 2)."""
+    """Config without [ledger] section and no --audit-log → UsageError (exit 2)."""
     from rosetta.cli.suggest import cli as suggest_cli
 
     config = tmp_path / "rosetta.toml"
@@ -454,7 +454,7 @@ def test_suggest_cli_no_log_configured_raises_usage_error(tmp_path: Path) -> Non
 def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     """MMC row in log → suggest TSV output has ManualMappingCuration for that pair."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FC"
@@ -497,7 +497,7 @@ def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path)
 def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     """HC row in audit log → that pair is omitted from suggest output entirely."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FC"
@@ -767,7 +767,7 @@ def test_suggest_cli_structural_weight_config(tmp_path) -> None:
     import json as _json
 
     from rosetta.cli.suggest import cli
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     runner = CliRunner()
 
@@ -798,7 +798,7 @@ def test_suggest_cli_structural_weight_config(tmp_path) -> None:
         toml_file = tmp_path / f"rosetta_{weight}.toml"
         log_str = str(log_path)
         toml_file.write_text(
-            f'[suggest]\nstructural_weight = {weight}\n\n[accredit]\nlog = "{log_str}"\n'
+            f'[suggest]\nstructural_weight = {weight}\n\n[ledger]\nlog = "{log_str}"\n'
         )
         result = runner.invoke(
             cli,
@@ -829,7 +829,7 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     import json as _json
 
     from rosetta.cli.suggest import cli
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     src_emb = {
         "schema/A": {
@@ -855,7 +855,7 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     append_log([], log_path)
 
     toml_file = tmp_path / "rosetta_zero.toml"
-    toml_file.write_text(f'[suggest]\nstructural_weight = 0.0\n\n[accredit]\nlog = "{log_path}"\n')
+    toml_file.write_text(f'[suggest]\nstructural_weight = 0.0\n\n[ledger]\nlog = "{log_path}"\n')
 
     result = CliRunner().invoke(
         cli,
@@ -885,7 +885,7 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
 def test_suggest_cli_audit_log_flag(tmp_path: Path) -> None:
     """--audit-log CLI flag provides audit log explicitly."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
     master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
@@ -914,9 +914,9 @@ def test_suggest_cli_audit_log_flag(tmp_path: Path) -> None:
 
 
 def test_suggest_cli_audit_log_config_fallback(tmp_path: Path) -> None:
-    """--audit-log omitted from CLI; rosetta.toml [accredit].log used as fallback."""
+    """--audit-log omitted from CLI; rosetta.toml [ledger].log used as fallback."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import append_log
+    from rosetta.core.ledger import append_log
 
     src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
     master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
@@ -929,7 +929,7 @@ def test_suggest_cli_audit_log_config_fallback(tmp_path: Path) -> None:
     append_log([], log_path)
 
     config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{log_path}"\n')
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{log_path}"\n')
 
     # No --audit-log on CLI; must read from config
     result = CliRunner().invoke(
@@ -978,9 +978,9 @@ def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
 
 
 def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:
-    """--audit-log CLI flag takes precedence over [accredit].log in rosetta.toml."""
+    """--audit-log CLI flag takes precedence over [ledger].log in rosetta.toml."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FA"
@@ -1020,7 +1020,7 @@ def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:
     append_log([], cli_log)
 
     config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{config_log}"\n')
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{config_log}"\n')
 
     result = CliRunner().invoke(
         suggest_cli,

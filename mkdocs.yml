@@ -73,8 +73,8 @@ nav:
       - rosetta suggest: cli/suggest.md
       - rosetta lint: cli/lint.md
       - rosetta compile: cli/compile.md
-      - rosetta run: cli/run.md
+      - rosetta transform: cli/transform.md
       - rosetta validate: cli/validate.md
-      - rosetta shacl-gen: cli/shacl-gen.md
-      - rosetta accredit: cli/accredit.md
+      - rosetta shapes: cli/shapes.md
+      - rosetta ledger: cli/ledger.md
   - Configuration: configuration.md

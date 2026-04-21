@@ -100,10 +100,10 @@ _SUBCOMMANDS = [
     "suggest",
     "lint",
     "compile",
-    "run",
+    "transform",
     "validate",
-    "shacl-gen",
-    "accredit",
+    "shapes",
+    "ledger",
 ]
 
 

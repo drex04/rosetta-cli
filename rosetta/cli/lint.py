@@ -7,9 +7,9 @@ import click
 import rdflib
 from linkml_runtime.utils.schemaview import SchemaView
 
-from rosetta.core.accredit import load_log, parse_sssom_tsv
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
+from rosetta.core.ledger import load_log, parse_sssom_tsv
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 from rosetta.core.schema_utils import check_slot_class_reachability
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
@@ -283,7 +283,7 @@ def cli(
     cfg = load_config(Path(config)) if config else load_config()
 
     # Resolve audit log: CLI flag > config > empty
-    resolved_log_path: str | None = audit_log or get_config_value(cfg, "accredit", "log")
+    resolved_log_path: str | None = audit_log or get_config_value(cfg, "ledger", "log")
     log: list[SSSOMRow] = []
     if resolved_log_path and Path(resolved_log_path).exists():
         log = load_log(Path(resolved_log_path))

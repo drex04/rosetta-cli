@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.run import cli as run_cli
+from rosetta.cli.transform import cli as run_cli
 
 pytestmark = [pytest.mark.adversarial]
 

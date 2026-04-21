@@ -23,9 +23,9 @@ _ALL_SUBCOMMANDS = [
     "lint",
     "validate",
     "compile",
-    "run",
-    "accredit",
-    "shacl-gen",
+    "transform",
+    "ledger",
+    "shapes",
 ]
 
 

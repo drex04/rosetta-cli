@@ -22,8 +22,8 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
-from rosetta.cli.run import cli as run_cli
-from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+from rosetta.cli.shapes import cli as shacl_gen_cli
+from rosetta.cli.transform import cli as run_cli
 
 pytestmark = [pytest.mark.integration]
 

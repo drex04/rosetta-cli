@@ -161,7 +161,7 @@ def _write_minimal_schemas(tmp_path: Path) -> tuple[Path, Path]:
 
 def _write_empty_audit_log(tmp_path: Path) -> Path:
     """Write an empty (header-only) audit log. Returns its path."""
-    from rosetta.core.accredit import AUDIT_LOG_COLUMNS, SSSOM_HEADER
+    from rosetta.core.ledger import AUDIT_LOG_COLUMNS, SSSOM_HEADER
 
     log = tmp_path / "audit-log.sssom.tsv"
     import csv
@@ -303,7 +303,7 @@ def test_lint_sssom_max_one_mmc_per_subject_fails(tmp_path: Path) -> None:
 
 
 def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     log_path = tmp_path / "audit-log.sssom.tsv"
@@ -362,7 +362,7 @@ def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_
 
 
 def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
+    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     log_path = tmp_path / "audit-log.sssom.tsv"
@@ -1321,7 +1321,7 @@ def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
 
 
 def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
-    """--audit-log omitted from CLI; rosetta.toml [accredit].log used as fallback."""
+    """--audit-log omitted from CLI; rosetta.toml [ledger].log used as fallback."""
     sssom = tmp_path / "clean.sssom.tsv"
     _write_sssom(
         sssom,
@@ -1339,7 +1339,7 @@ def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
     src, mst = _write_minimal_schemas(tmp_path)
 
     config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[accredit]\nlog = "{audit_log}"\n')
+    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{audit_log}"\n')
 
     result = CliRunner().invoke(
         cli,

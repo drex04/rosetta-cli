@@ -1,4 +1,4 @@
-"""rosetta accredit: Manage mapping accreditation via append-only SSSOM audit log."""
+"""rosetta ledger: Manage mapping accreditation via append-only SSSOM audit log."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from typing import IO
 
 import click
 
-from rosetta.core.accredit import (
+from rosetta.core.config import get_config_value, load_config
+from rosetta.core.io import open_output
+from rosetta.core.ledger import (
     AUDIT_LOG_COLUMNS,
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
@@ -21,17 +23,16 @@ from rosetta.core.accredit import (
     parse_sssom_tsv,
     query_pending,
 )
-from rosetta.core.config import get_config_value, load_config
-from rosetta.core.io import open_output
 from rosetta.core.models import SSSOMRow
 
 
 @click.group(
+    "ledger",
     epilog="""Examples:
 
-  rosetta accredit append proposals.sssom.tsv
+  rosetta ledger append proposals.sssom.tsv
 
-  rosetta accredit review -o pending.sssom.tsv"""
+  rosetta ledger review -o pending.sssom.tsv""",
 )
 @click.option("--audit-log", "log", default=None, help="Path to audit-log SSSOM TSV")
 @click.option("--config", "-c", "config", default=None, help="Path to rosetta.toml")
@@ -39,7 +40,7 @@ from rosetta.core.models import SSSOMRow
 def cli(ctx: click.Context, log: str | None, config: str | None) -> None:
     """Manage mapping accreditation via append-only SSSOM audit log."""
     cfg = load_config(Path(config)) if config else load_config()
-    log_path_str = log or get_config_value(cfg, "accredit", "log") or "audit-log.sssom.tsv"
+    log_path_str = log or get_config_value(cfg, "ledger", "log") or "audit-log.sssom.tsv"
     ctx.ensure_object(dict)
     ctx.obj["log"] = Path(log_path_str)
 
@@ -72,9 +73,9 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
     "append",
     epilog="""Examples:
 
-  rosetta accredit append proposals.sssom.tsv
+  rosetta ledger append proposals.sssom.tsv
 
-  rosetta -v accredit --audit-log audit-log.sssom.tsv append proposals.sssom.tsv""",
+  rosetta -v ledger --audit-log audit-log.sssom.tsv append proposals.sssom.tsv""",
 )
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
 @click.pass_context
@@ -140,9 +141,9 @@ def append_cmd(ctx: click.Context, file: Path) -> None:
     "review",
     epilog="""Examples:
 
-  rosetta accredit review
+  rosetta ledger review
 
-  rosetta accredit review -o pending.sssom.tsv""",
+  rosetta ledger review -o pending.sssom.tsv""",
 )
 @click.option("-o", "--output", "output", default=None, help="Output file (default stdout)")
 @click.pass_context
@@ -160,9 +161,9 @@ def review(ctx: click.Context, output: str | None) -> None:
     "dump",
     epilog="""Examples:
 
-  rosetta accredit dump
+  rosetta ledger dump
 
-  rosetta accredit dump -o accredited.sssom.tsv""",
+  rosetta ledger dump -o accredited.sssom.tsv""",
 )
 @click.option("-o", "--output", "output", default=None, help="Output file (default stdout)")
 @click.pass_context

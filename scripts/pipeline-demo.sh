@@ -188,13 +188,13 @@ done
 
 info "Step 6 — Stage analyst proposals into audit log"
 
-run_cmd uv run rosetta accredit --audit-log "$LOG" append "$OUT/candidates.sssom.tsv"
+run_cmd uv run rosetta ledger --audit-log "$LOG" append "$OUT/candidates.sssom.tsv"
 
 # ── Step 7: Generate accreditor work list ─────────────────────────────────────
 
 info "Step 7 — Generate accreditor review list"
 
-run_cmd uv run rosetta accredit --audit-log "$LOG" review -o "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta ledger --audit-log "$LOG" review -o "$OUT/review.sssom.tsv"
 ok "$OUT/review.sssom.tsv"
 
 # ── Pause: Accreditor edits review ───────────────────────────────────────────
@@ -214,7 +214,7 @@ confirm "Done editing? (yes to append decisions, skip to finish without appendin
 
 info "Step 8 — Append accreditor decisions"
 
-run_cmd uv run rosetta accredit --audit-log "$LOG" append "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta ledger --audit-log "$LOG" append "$OUT/review.sssom.tsv"
 
 # ── Step 9: Compile YARRRML mapping artifact ─────────────────────────────────
 
@@ -244,7 +244,7 @@ JSONLD_OK=false
 if $COMPILE_OK; then
     info "Step 10 — Materialize JSON-LD from YARRRML mapping"
 
-    if run_cmd uv run rosetta run \
+    if run_cmd uv run rosetta transform \
         "$OUT/nor_to_mc.yarrrml.yaml" \
         "$SRC_FIXTURE" \
         --master-schema "$OUT/master_cop_en.linkml.yaml" \
@@ -299,5 +299,5 @@ echo "  Validation  : $OUT/validation-report.json"
 fi
 echo ""
 echo "  Next steps:"
-echo "    uv run rosetta accredit --audit-log '$LOG' dump     # export approved mappings"
+echo "    uv run rosetta ledger --audit-log '$LOG' dump     # export approved mappings"
 echo "    uv run rosetta suggest  ... --audit-log '$LOG' -o candidates2.sssom.tsv  # re-run with boost/derank"

@@ -10,9 +10,9 @@ from typing import Any
 import click
 import numpy as np
 
-from rosetta.core.accredit import DATETIME_MIN, load_log
 from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
+from rosetta.core.ledger import DATETIME_MIN, load_log
 from rosetta.core.models import (
     EmbeddingReport,
     SSSOMRow,
@@ -87,9 +87,9 @@ def cli(
     )
 
     # Resolve audit log path: CLI flag > config fallback > error
-    log_path_str: str | None = audit_log or get_config_value(cfg, "accredit", "log", cli_value=None)
+    log_path_str: str | None = audit_log or get_config_value(cfg, "ledger", "log", cli_value=None)
     if not log_path_str:
-        raise click.UsageError("Audit log not found — run rosetta accredit append first")
+        raise click.UsageError("Audit log not found — run rosetta ledger append first")
     log: list[SSSOMRow] = []
     lp = Path(log_path_str)
     if lp.exists():

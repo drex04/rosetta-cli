@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+from rosetta.cli.shapes import cli as shacl_gen_cli
 from rosetta.cli.validate import cli as validate_cli
 from rosetta.core.models import ValidationReport
 

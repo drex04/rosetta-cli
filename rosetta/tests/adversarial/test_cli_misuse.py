@@ -13,8 +13,8 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.ingest import cli as ingest_cli
-from rosetta.cli.run import cli as run_cli
 from rosetta.cli.suggest import cli as suggest_cli
+from rosetta.cli.transform import cli as run_cli
 
 pytestmark = [pytest.mark.integration]
 

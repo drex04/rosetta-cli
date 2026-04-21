@@ -146,7 +146,7 @@ def _cell(row: Any, col: str) -> str:
 
 def _write_sssom_approved(path: Path, rows: list[dict[str, object]]) -> Path:
     """Write SSSOM TSV using real SSSOMRow models for format consistency."""
-    from rosetta.core.accredit import AUDIT_LOG_COLUMNS, SSSOM_HEADER
+    from rosetta.core.ledger import AUDIT_LOG_COLUMNS, SSSOM_HEADER
     from rosetta.core.models import SSSOMRow
 
     built: list[SSSOMRow] = []

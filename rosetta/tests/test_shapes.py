@@ -1,7 +1,7 @@
 """Phase 19 / Plan 19-01 / Task 4 — tests for rosetta shacl-gen.
 
 Covers both the helper ``rosetta.core.shacl_generator.generate_shacl`` and the
-Click CLI ``rosetta.cli.shacl_gen.cli``. Six required tests, mirroring the plan.
+Click CLI ``rosetta.cli.shapes.cli``. Six required tests, mirroring the plan.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.collection import Collection
 from rdflib.namespace import DCTERMS, SH
 
-from rosetta.cli.shacl_gen import cli
+from rosetta.cli.shapes import cli
 from rosetta.core.shacl_generator import generate_shacl
 from rosetta.core.shacl_validate import validate_graph
 

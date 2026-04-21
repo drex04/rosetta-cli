@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.accredit import cli
-from rosetta.core.accredit import (
+from rosetta.cli.ledger import cli
+from rosetta.core.ledger import (
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
     SSSOM_HEADER,
@@ -499,7 +499,7 @@ def test_accredit_review_cli_empty_when_log_absent(tmp_path: Path) -> None:
     # Config with log pointing to non-existent file
     log_path = tmp_path / "no-log.sssom.tsv"
     config = tmp_path / "rosetta.toml"
-    config.write_text(f'[accredit]\nlog = "{log_path}"\n')
+    config.write_text(f'[ledger]\nlog = "{log_path}"\n')
 
     result = CliRunner().invoke(cli, ["--config", str(config), "review"])
     assert result.exit_code == 0

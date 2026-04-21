@@ -23,8 +23,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.accredit import cli as accredit_cli
-from rosetta.core.accredit import HC_JUSTIFICATION, MMC_JUSTIFICATION
+from rosetta.cli.ledger import cli as accredit_cli
+from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION
 
 pytestmark = [pytest.mark.integration]
 

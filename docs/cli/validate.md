@@ -27,5 +27,5 @@ uv run rosetta validate out.jsonld rosetta/policies/shacl/ \
 
 ## See also
 
-- [`rosetta shacl-gen`](shacl-gen.md) — auto-generate the `SHAPES_DIR` input from a master LinkML schema; documents the `generated/` + `overrides/` directory convention.
-- [`rosetta run`](run.md) — chain materialization and validation in one step via `--validate <shapes-dir>`.
+- [`rosetta shapes`](shapes.md) — auto-generate the `SHAPES_DIR` input from a master LinkML schema; documents the `generated/` + `overrides/` directory convention.
+- [`rosetta transform`](transform.md) — chain materialization and validation in one step via `--validate <shapes-dir>`.

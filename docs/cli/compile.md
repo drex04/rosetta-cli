@@ -1,6 +1,6 @@
 # rosetta compile
 
-Compiles an approved SSSOM audit log plus source and master LinkML schemas into a [YARRRML](https://rml.io/yarrrml/) mapping file, ready for `rosetta run`.
+Compiles an approved SSSOM audit log plus source and master LinkML schemas into a [YARRRML](https://rml.io/yarrrml/) mapping file, ready for `rosetta transform`.
 
 Internally, this builds a `linkml-map` [`TransformationSpecification`](https://linkml.io/linkml-map/) YAML, then compiles it to YARRRML via the forked `YarrrmlCompiler`.
 
@@ -54,5 +54,5 @@ When `--coverage-report` is provided, a JSON file matching the `CoverageReport` 
 
 ## See also
 
-- [`rosetta run`](run.md) — execute the compiled YARRRML mapping against a data file.
-- [`rosetta shacl-gen`](shacl-gen.md) — generate SHACL shapes for validation.
+- [`rosetta transform`](transform.md) — execute the compiled YARRRML mapping against a data file.
+- [`rosetta shapes`](shapes.md) — generate SHACL shapes for validation.

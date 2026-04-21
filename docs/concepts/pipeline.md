@@ -18,8 +18,8 @@
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  Analyst edits → rosetta lint → rosetta accredit append      │
-│  Accreditor reviews → rosetta accredit append                │
+│  Analyst edits → rosetta lint → rosetta ledger append        │
+│  Accreditor reviews → rosetta ledger append                  │
 │                           │                                  │
 │                           ▼                                  │
 │                  audit-log.sssom.tsv  (append-only)          │
@@ -27,7 +27,7 @@
                                                   │
                                                   ▼
 ┌──────────────────────────────────────────────────────────────┐
-│  rosetta compile → rosetta run                               │
+│  rosetta compile → rosetta transform                         │
 │     TransformSpec YAML → YARRRML → morph-kgc → JSON-LD       │
 └──────────────────────────────────────────────────────────────┘
                                                   │
@@ -62,11 +62,11 @@
 
 ### 6. Accredit — the two-role state machine
 
-[`rosetta accredit`](../cli/accredit.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. See [Accreditation workflow](accreditation.md) for the full state machine.
+[`rosetta ledger`](../cli/ledger.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. See [Accreditation workflow](accreditation.md) for the full state machine.
 
 ### 7. Generate — compile approved mappings into RML
 
-[`rosetta compile`](../cli/compile.md) reads the audit log and produces a YARRRML mapping file. [`rosetta run`](../cli/run.md) materialises the YARRRML against concrete source data via morph-kgc and frames the result as JSON-LD using a `@context` derived from the master LinkML schema.
+[`rosetta compile`](../cli/compile.md) reads the audit log and produces a YARRRML mapping file. [`rosetta transform`](../cli/transform.md) materialises the YARRRML against concrete source data via morph-kgc and frames the result as JSON-LD using a `@context` derived from the master LinkML schema.
 
 ### 8. Validate — SHACL conformance
 

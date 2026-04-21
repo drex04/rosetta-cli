@@ -19,7 +19,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rosetta.core.accredit import AUDIT_LOG_COLUMNS, parse_sssom_tsv
+from rosetta.core.ledger import AUDIT_LOG_COLUMNS, parse_sssom_tsv
 from rosetta.core.models import SSSOMRow
 
 _NATIONS = Path(__file__).parent / "nations"
@@ -212,7 +212,7 @@ def generate_shacl_fixtures() -> None:
     """Run rosetta-shacl-gen on master schema to produce SHACL shapes fixture."""
     from click.testing import CliRunner
 
-    from rosetta.cli.shacl_gen import cli as shacl_gen_cli
+    from rosetta.cli.shapes import cli as shacl_gen_cli
 
     runner = CliRunner()
     out = _NATIONS / "master_cop.shapes.ttl"
