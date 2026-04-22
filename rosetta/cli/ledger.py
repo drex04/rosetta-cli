@@ -105,6 +105,7 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
     default=False,
     help="Run lint checks without appending to the audit log",
 )
+@click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")
 @click.pass_context
 def append_cmd(
     ctx: click.Context,
@@ -113,6 +114,7 @@ def append_cmd(
     source_schema: str,
     master_schema: str,
     dry_run: bool,
+    strict: bool,
 ) -> None:
     """Append an SSSOM TSV file into the audit log."""
     log_path: Path = ctx.obj["log"]
@@ -125,7 +127,7 @@ def append_cmd(
     log = load_log(log_path)
 
     # 1. Run lint on ALL unfiltered candidates
-    report = run_lint(incoming, log, source_schema, master_schema)
+    report = run_lint(incoming, log, source_schema, master_schema, strict=strict)
 
     # For accreditor, HC rows are expected — strip hc_in_candidates findings
     if role == "accreditor":
@@ -149,8 +151,8 @@ def append_cmd(
         click.echo(report.model_dump_json(indent=2), err=True)
         sys.exit(1)
 
-    # 4. Print warnings/info to stderr if any
-    if report.findings:
+    # 4. Print warnings to stderr if any
+    if report.summary.warning > 0:
         click.echo(report.model_dump_json(indent=2), err=True)
 
     # 5. Role-based filtering

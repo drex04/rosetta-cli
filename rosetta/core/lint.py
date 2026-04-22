@@ -261,8 +261,19 @@ def _check_reachability(
     source_schema: str | Path,
     master_schema: str | Path,
 ) -> None:
-    source_view = SchemaView(str(source_schema))
-    master_view = SchemaView(str(master_schema))
+    try:
+        source_view = SchemaView(str(source_schema))
+        master_view = SchemaView(str(master_schema))
+    except Exception as exc:  # noqa: BLE001
+        findings.append(
+            LintFinding(
+                rule="schema_parse_error",
+                severity="BLOCK",
+                source_uri="",
+                message=f"Cannot load schema for reachability check: {exc}",
+            )
+        )
+        return
     for mismatch in check_slot_class_reachability(confirmed_rows, source_view, master_view):
         findings.append(
             LintFinding(
