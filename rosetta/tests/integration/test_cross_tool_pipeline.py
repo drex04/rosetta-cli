@@ -174,19 +174,37 @@ def test_suggest_to_accredit_append(
     nor_linkml_path: Path,
     master_schema_path: Path,
     mock_model: None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Suggest SSSOM output can be appended by accredit without errors.
 
     Tests the suggest -> accredit seam: column format, header parsing,
     and justification values must be compatible.
     """
+    from rosetta.core.models import LintReport, LintSummary
+
+    monkeypatch.setattr(
+        "rosetta.cli.ledger.run_lint",
+        lambda *a, **kw: LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0)),
+    )
     runner = CliRunner(mix_stderr=False)
     suggest_sssom = _run_embed_suggest(runner, tmp_path, nor_linkml_path, master_schema_path)
     accredit_log = tmp_path / "accredit-audit-log.sssom.tsv"
 
     result = runner.invoke(
         accredit_cli,
-        ["--audit-log", str(accredit_log), "append", str(suggest_sssom)],
+        [
+            "--audit-log",
+            str(accredit_log),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(nor_linkml_path),
+            "--master-schema",
+            str(master_schema_path),
+            str(suggest_sssom),
+        ],
     )
     assert result.exit_code == 0, (
         f"accredit append failed on suggest output: {result.stderr}\n"
@@ -430,6 +448,7 @@ def test_compile_run_jsonld_validated_by_shacl(
             str(jsonld_out),
             "--workdir",
             str(tmp_path / "wd"),
+            "--no-validate",
         ],
     )
     assert result.exit_code == 0, (

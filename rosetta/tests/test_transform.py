@@ -107,7 +107,7 @@ def test_run_happy_path_writes_jsonld_to_stdout(
     )
     result = CliRunner(mix_stderr=False).invoke(
         cli,
-        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA), "--no-validate"],
     )
     assert result.exit_code == 0, result.stderr + (result.exception and str(result.exception) or "")
     assert fixed_bytes.decode("utf-8") in result.stdout
@@ -140,6 +140,7 @@ def test_run_with_output_flag_writes_file(
             str(_MC_SCHEMA),
             "-o",
             str(jsonld_out),
+            "--no-validate",
         ],
     )
     assert result.exit_code == 0, result.stderr
@@ -163,7 +164,7 @@ def test_run_with_runner_error_exits_1(
     monkeypatch.setattr("rosetta.cli.transform.run_materialize", _boom)
     result = CliRunner(mix_stderr=False).invoke(
         cli,
-        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA), "--no-validate"],
     )
     assert result.exit_code == 1
     assert "@context" not in result.stdout
@@ -208,6 +209,7 @@ def test_run_with_workdir_supplied(
             str(_MC_SCHEMA),
             "--workdir",
             str(wd),
+            "--no-validate",
         ],
     )
     assert result.exit_code == 0, result.stderr
@@ -254,6 +256,7 @@ def test_run_with_context_output_forwarded(
             str(_MC_SCHEMA),
             "--context-output",
             str(ctx_out),
+            "--no-validate",
         ],
     )
     assert result.exit_code == 0, result.stderr
@@ -283,7 +286,7 @@ def test_run_empty_graph_warns_and_exits_0(
     )
     result = CliRunner(mix_stderr=False).invoke(
         cli,
-        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA), "--no-validate"],
     )
     assert result.exit_code == 0, result.stderr
     assert "produced 0 triples" in result.stderr
@@ -322,11 +325,11 @@ def test_run_validate_pass_exits_0_and_emits_jsonld(
         lambda *a, **kw: fixed_bytes,
     )
     monkeypatch.setattr(
-        "rosetta.core.shacl_validate.validate_graph",
+        "rosetta.cli.transform.validate_graph",
         lambda *a, **kw: conforming_report,
     )
     monkeypatch.setattr(
-        "rosetta.core.shapes_loader.load_shapes_from_dir",
+        "rosetta.cli.transform.load_shapes_from_dir",
         lambda _p: rdflib.Graph(),
     )
 
@@ -337,7 +340,7 @@ def test_run_validate_pass_exits_0_and_emits_jsonld(
             str(dummy_data),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--validate",
+            "--shapes-dir",
             str(shapes_dir),
         ],
     )
@@ -382,11 +385,11 @@ def test_run_validate_fail_exits_1_no_jsonld(
         lambda *a, **kw: b'{"@context": {}, "@graph": []}',
     )
     monkeypatch.setattr(
-        "rosetta.core.shacl_validate.validate_graph",
+        "rosetta.cli.transform.validate_graph",
         lambda *a, **kw: failing_report,
     )
     monkeypatch.setattr(
-        "rosetta.core.shapes_loader.load_shapes_from_dir",
+        "rosetta.cli.transform.load_shapes_from_dir",
         lambda _p: rdflib.Graph(),
     )
 
@@ -397,7 +400,7 @@ def test_run_validate_fail_exits_1_no_jsonld(
             str(dummy_data),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--validate",
+            "--shapes-dir",
             str(shapes_dir),
             "--validate-report",
             str(report_path),
@@ -432,6 +435,7 @@ def test_run_stdout_collision_output_and_validate_report(
             str(_MC_SCHEMA),
             "--validate-report",
             "-",
+            "--no-validate",
         ],
     )
     assert result.exit_code == 2, (
@@ -439,3 +443,102 @@ def test_run_stdout_collision_output_and_validate_report(
         f"stderr={result.stderr!r}"
     )
     assert "stdout" in result.stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# --shapes-dir / --no-validate guards
+# ---------------------------------------------------------------------------
+
+
+def test_run_missing_both_shapes_dir_and_no_validate_exits_2(
+    dummy_yarrrml: Path,
+    dummy_data: Path,
+) -> None:
+    """Neither --shapes-dir nor --no-validate provided → UsageError exit 2."""
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
+    )
+    assert result.exit_code == 2, f"expected exit 2; got {result.exit_code}: {result.stderr!r}"
+    assert "--shapes-dir" in result.stderr or "required" in result.stderr
+
+
+def test_run_shapes_dir_and_no_validate_mutually_exclusive_exits_2(
+    tmp_path: Path,
+    dummy_yarrrml: Path,
+    dummy_data: Path,
+) -> None:
+    """--shapes-dir and --no-validate together → UsageError exit 2."""
+    shapes_dir = tmp_path / "shapes"
+    shapes_dir.mkdir()
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            str(dummy_yarrrml),
+            str(dummy_data),
+            "--master-schema",
+            str(_MC_SCHEMA),
+            "--shapes-dir",
+            str(shapes_dir),
+            "--no-validate",
+        ],
+    )
+    assert result.exit_code == 2, f"expected exit 2; got {result.exit_code}: {result.stderr!r}"
+    assert "mutually exclusive" in result.stderr
+
+
+def test_transform_no_validate_skips_shacl(
+    tmp_path: Path,
+    dummy_yarrrml: Path,
+    dummy_data: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--no-validate: SHACL is not called, run succeeds, warning emitted on stderr."""
+    validate_called: dict[str, bool] = {"called": False}
+
+    def _fail_if_called(*args: object, **kwargs: object) -> object:  # pragma: no cover
+        validate_called["called"] = True
+        raise AssertionError("validate_graph must not be called with --no-validate")
+
+    fixed_bytes = b'{"@context": {}, "@graph": []}'
+    monkeypatch.setattr(
+        "rosetta.cli.transform.run_materialize",
+        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
+    )
+    monkeypatch.setattr(
+        "rosetta.cli.transform.graph_to_jsonld",
+        lambda *a, **kw: fixed_bytes,
+    )
+    monkeypatch.setattr("rosetta.cli.transform.validate_graph", _fail_if_called)
+
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA), "--no-validate"],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert not validate_called["called"]
+    assert fixed_bytes.decode("utf-8") in result.stdout
+
+
+def test_transform_no_validate_emits_warning(
+    tmp_path: Path,
+    dummy_yarrrml: Path,
+    dummy_data: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--no-validate emits 'Warning: SHACL validation bypassed' on stderr."""
+    fixed_bytes = b'{"@context": {}, "@graph": []}'
+    monkeypatch.setattr(
+        "rosetta.cli.transform.run_materialize",
+        lambda *a, **kw: _fake_runner_yielding(_fixed_graph()),
+    )
+    monkeypatch.setattr(
+        "rosetta.cli.transform.graph_to_jsonld",
+        lambda *a, **kw: fixed_bytes,
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA), "--no-validate"],
+    )
+    assert result.exit_code == 0, result.stderr
+    assert "Warning: SHACL validation bypassed" in result.stderr

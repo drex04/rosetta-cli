@@ -25,8 +25,59 @@ from click.testing import CliRunner
 
 from rosetta.cli.ledger import cli as accredit_cli
 from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION
+from rosetta.core.lint import check_sssom_proposals
+from rosetta.core.models import LintReport, LintSummary, SSSOMRow
 
 pytestmark = [pytest.mark.integration]
+
+
+_MINIMAL_SCHEMA = """\
+id: https://example.org/test
+name: test_schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+classes:
+  TestClass:
+    attributes:
+      test_field:
+        range: string
+"""
+
+
+def _schema_file(tmp_path: Path, name: str = "schema.yaml") -> Path:
+    p = tmp_path / name
+    p.write_text(_MINIMAL_SCHEMA)
+    return p
+
+
+def _noop_lint(
+    rows: list[SSSOMRow],
+    log: list[SSSOMRow],
+    source_schema: str | Path,
+    master_schema: str | Path,
+    *,
+    strict: bool = False,
+) -> LintReport:
+    return LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0))
+
+
+def _proposals_only_lint(
+    rows: list[SSSOMRow],
+    log: list[SSSOMRow],
+    source_schema: str | Path,
+    master_schema: str | Path,
+    *,
+    strict: bool = False,
+) -> LintReport:
+    findings = check_sssom_proposals(rows, log)
+    summary = LintSummary(
+        block=sum(1 for f in findings if f.severity == "BLOCK"),
+        warning=sum(1 for f in findings if f.severity == "WARNING"),
+        info=sum(1 for f in findings if f.severity == "INFO"),
+    )
+    return LintReport(findings=findings, summary=summary)
 
 
 # Full 13-column audit-log SSSOM shape (post-Phase 16-00).
@@ -66,15 +117,15 @@ def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
     return path
 
 
-def test_accredit_duplicate_mmc(tmp_path: Path) -> None:
+def test_accredit_duplicate_mmc(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Two MMC rows with the same (subject_id, object_id) in one file → exit 1, no log write.
 
-    The in-file duplicate guard lives at `rosetta/cli/accredit.py::ingest` and emits
-    stderr lines shaped like:
-
-        Error: Duplicate MMC pair in file: (nor:alt_m, mc:altitude)
+    The duplicate guard lives in `check_sssom_proposals` (max_one_mmc_per_pair rule).
     """
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _proposals_only_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    src = _schema_file(tmp_path, "src.yaml")
+    mst = _schema_file(tmp_path, "mst.yaml")
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -100,20 +151,30 @@ def test_accredit_duplicate_mmc(tmp_path: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--audit-log", str(log_path), "append", str(tsv_file)],
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+            str(tsv_file),
+        ],
     )
 
     # 1. Exit code.
     assert result.exit_code == 1, f"expected exit 1, got {result.exit_code}: {result.stderr}"
-    # 2. Stderr substring — "Duplicate" and the subject id must appear.
-    assert "Duplicate" in result.stderr
+    # 2. Stderr — lint report JSON with max_one_mmc_per_pair rule.
+    assert "max_one_mmc_per_pair" in result.stderr
     assert "nor:alt_m" in result.stderr
-    assert "mc:altitude" in result.stderr
     # 3. Behavioural invariant: nothing was appended to the audit log.
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_wrong_column_count(tmp_path: Path) -> None:
+def test_accredit_wrong_column_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """TSV header missing required SSSOM columns → exit 1, clear diagnostic, no log write.
 
     `parse_sssom_tsv` raises `ValueError` at the parse boundary when the header
@@ -121,11 +182,13 @@ def test_accredit_wrong_column_count(tmp_path: Path) -> None:
     mapping_justification, confidence). The CLI catches the exception and emits
     a clean error naming the missing columns. No log file is created.
     """
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    src = _schema_file(tmp_path, "src.yaml")
+    mst = _schema_file(tmp_path, "mst.yaml")
     assert not log_path.exists()
 
     tsv_file = tmp_path / "missing_required_cols.sssom.tsv"
-    # Header lacks `confidence` and `mapping_justification` — both required.
     bad_cols = ["subject_id", "predicate_id", "object_id"]
     with tsv_file.open("w", encoding="utf-8") as f:
         f.write(_SSSOM_FILE_HEADER)
@@ -134,32 +197,38 @@ def test_accredit_wrong_column_count(tmp_path: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--audit-log", str(log_path), "append", str(tsv_file)],
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+            str(tsv_file),
+        ],
     )
 
-    # 1. Exit code — explicit failure from the new header guard.
     assert result.exit_code == 1, (
         f"expected exit 1 on missing required columns; got {result.exit_code}"
     )
-    # 2. Stderr — names the missing columns for the user.
     assert "missing required" in result.stderr.lower()
     assert "confidence" in result.stderr or "mapping_justification" in result.stderr
-    # 3. Behavioural invariant: no audit-log file was created.
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_phantom_rejection_filter(tmp_path: Path) -> None:
+def test_accredit_phantom_rejection_filter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """HC with owl:differentFrom but no prior MMC → exit 1, no log write.
 
-    Flow: `check_ingest_row` routes HC-justified rows to `_check_hc_transition`,
-    which raises ValueError when `pair_rows` has no MMC row. The CLI converts this
-    into an entry in its `errors` list and exits 1.
-
-    Since filter_decided_suggestions filters HC-rejected pairs from suggest output,
-    a phantom rejection (no prior MMC) must be rejected at ingest time — otherwise
-    the pair would be silently filtered from future suggests without any audit trail.
+    Flow: accreditor role accepts HC rows, then `check_ingest_row` raises ValueError
+    when no prior MMC exists for the pair.
     """
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    src = _schema_file(tmp_path, "src.yaml")
+    mst = _schema_file(tmp_path, "mst.yaml")
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -178,30 +247,36 @@ def test_accredit_phantom_rejection_filter(tmp_path: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--audit-log", str(log_path), "append", str(tsv_file)],
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+            str(tsv_file),
+        ],
     )
 
-    # 1. Exit code.
     assert result.exit_code == 1, f"expected exit 1, got {result.exit_code}: {result.stderr}"
-    # 2. Stderr substring — stable phrasing from _check_hc_transition.
     assert (
         "no ManualMappingCuration" in result.stderr
         or "Cannot ingest HumanCuration" in result.stderr
     ), f"stderr did not name the missing-MMC transition: {result.stderr!r}"
-    # The specific pair must appear.
     assert "nor:spd" in result.stderr
     assert "mc:speed" in result.stderr
-    # 3. Behavioural invariant: no log write.
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_clean_append_baseline(tmp_path: Path) -> None:
-    """Positive control: a single valid MMC row ingests cleanly.
-
-    Guarantees the above negative tests fail for the *right* reason — a valid TSV
-    under the same fixture really does produce exit 0 + a non-empty log.
-    """
+def test_accredit_clean_append_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Positive control: a single valid MMC row ingests cleanly."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    src = _schema_file(tmp_path, "src.yaml")
+    mst = _schema_file(tmp_path, "mst.yaml")
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -220,13 +295,21 @@ def test_accredit_clean_append_baseline(tmp_path: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--audit-log", str(log_path), "append", str(tsv_file)],
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+            str(tsv_file),
+        ],
     )
 
-    # 1. Exit code.
     assert result.exit_code == 0, f"clean append should succeed; stderr: {result.stderr}"
-    # 2. No error on stderr.
     assert "Error" not in result.stderr
-    # 3. Behavioural invariant: log file exists and is non-empty.
     assert log_path.exists(), "log file must be created on a successful append"
     assert log_path.stat().st_size > 0

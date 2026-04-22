@@ -910,7 +910,7 @@ def test_lint_sssom_strict_info_stays_info(tmp_path: Path) -> None:
 
 def test_lint_sssom_unit_vector_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Both units have QUDT IRIs but dimension vector missing → unit_vector_missing INFO."""
-    import rosetta.cli.lint as lint_mod
+    import rosetta.core.lint as lint_mod
 
     monkeypatch.setattr(lint_mod, "units_compatible", lambda *_: None)
     sssom = tmp_path / "vec_missing.sssom.tsv"

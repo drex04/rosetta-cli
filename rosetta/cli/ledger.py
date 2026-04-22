@@ -22,16 +22,21 @@ from rosetta.core.ledger import (
     parse_sssom_tsv,
     query_pending,
 )
-from rosetta.core.models import SSSOMRow
+from rosetta.core.lint import run_lint
+from rosetta.core.models import LintReport, LintSummary, SSSOMRow
 
 
 @click.group(
     "ledger",
     epilog="""Examples:
 
-  rosetta ledger append proposals.sssom.tsv
+  rosetta ledger --audit-log log.tsv append --role analyst proposals.sssom.tsv \\
+      --source-schema s.yaml --master-schema m.yaml
 
-  rosetta ledger review -o pending.sssom.tsv""",
+  rosetta ledger --audit-log log.tsv append --role analyst --dry-run proposals.sssom.tsv \\
+      --source-schema s.yaml --master-schema m.yaml
+
+  rosetta ledger --audit-log log.tsv review -o pending.sssom.tsv""",
 )
 @click.option("--audit-log", "log", required=True, help="Path to audit-log SSSOM TSV")
 @click.pass_context
@@ -69,13 +74,46 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
     "append",
     epilog="""Examples:
 
-  rosetta ledger append proposals.sssom.tsv
+  rosetta ledger --audit-log log.tsv append --role analyst proposals.sssom.tsv \\
+      --source-schema s.yaml --master-schema m.yaml
 
-  rosetta -v ledger --audit-log audit-log.sssom.tsv append proposals.sssom.tsv""",
+  rosetta ledger --audit-log log.tsv append --role analyst --dry-run proposals.sssom.tsv \\
+      --source-schema s.yaml --master-schema m.yaml""",
 )
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--role",
+    type=click.Choice(["analyst", "accreditor"]),
+    required=True,
+    help="Role determines which rows are accepted and how they are linted",
+)
+@click.option(
+    "--source-schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="Source LinkML schema YAML",
+)
+@click.option(
+    "--master-schema",
+    type=click.Path(exists=True),
+    required=True,
+    help="Master LinkML schema YAML",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Run lint checks without appending to the audit log",
+)
 @click.pass_context
-def append_cmd(ctx: click.Context, file: Path) -> None:
+def append_cmd(
+    ctx: click.Context,
+    file: Path,
+    role: str,
+    source_schema: str,
+    master_schema: str,
+    dry_run: bool,
+) -> None:
     """Append an SSSOM TSV file into the audit log."""
     log_path: Path = ctx.obj["log"]
 
@@ -86,51 +124,63 @@ def append_cmd(ctx: click.Context, file: Path) -> None:
         sys.exit(1)
     log = load_log(log_path)
 
-    errors: list[str] = []
+    # 1. Run lint on ALL unfiltered candidates
+    report = run_lint(incoming, log, source_schema, master_schema)
 
-    # Pre-scan for in-file duplicate MMC pairs
-    seen: set[tuple[str, str]] = set()
-    for row in incoming:
-        if row.mapping_justification == MMC_JUSTIFICATION:
-            pair = (row.subject_id, row.object_id)
-            if pair in seen:
-                errors.append(f"Duplicate MMC pair in file: ({row.subject_id}, {row.object_id})")
-            seen.add(pair)
+    # For accreditor, HC rows are expected — strip hc_in_candidates findings
+    if role == "accreditor":
+        filtered_findings = [f for f in report.findings if f.rule != "hc_in_candidates"]
+        summary = LintSummary(
+            block=sum(1 for f in filtered_findings if f.severity == "BLOCK"),
+            warning=sum(1 for f in filtered_findings if f.severity == "WARNING"),
+            info=sum(1 for f in filtered_findings if f.severity == "INFO"),
+        )
+        report = LintReport(findings=filtered_findings, summary=summary)
 
-    # Pairs that are pending review (MMC with no subsequent HC) — re-ingesting MMC is a no-op
-    pending_pairs: set[tuple[str, str]] = {(r.subject_id, r.object_id) for r in query_pending(log)}
+    has_blocks = report.summary.block > 0
 
-    # Validate each MMC/HC row against the log
-    passing_rows = []
-    skipped = 0
-    skipped_dupes = 0
-    for row in incoming:
-        if row.mapping_justification in {MMC_JUSTIFICATION, HC_JUSTIFICATION}:
-            if (
-                row.mapping_justification == MMC_JUSTIFICATION
-                and (row.subject_id, row.object_id) in pending_pairs
-            ):
-                skipped_dupes += 1
-                continue
-            try:
-                check_ingest_row(row, log)
-                passing_rows.append(row)
-            except ValueError as exc:
-                errors.append(str(exc))
-        else:
-            skipped += 1
+    # 2. Dry-run: report to stdout and exit
+    if dry_run:
+        click.echo(report.model_dump_json(indent=2))
+        sys.exit(1 if has_blocks else 0)
 
-    if errors:
-        for err in errors:
-            click.echo(f"Error: {err}", err=True)
+    # 3. Lint gate: block on BLOCK findings
+    if has_blocks:
+        click.echo(report.model_dump_json(indent=2), err=True)
         sys.exit(1)
 
-    append_log(passing_rows, log_path)
-    click.echo(
-        f"Appended {len(passing_rows)} rows, skipped {skipped} CompositeMatching rows, "
-        f"{skipped_dupes} duplicate MMC rows",
-        err=True,
-    )
+    # 4. Print warnings/info to stderr if any
+    if report.findings:
+        click.echo(report.model_dump_json(indent=2), err=True)
+
+    # 5. Role-based filtering
+    if role == "analyst":
+        target_justification = MMC_JUSTIFICATION
+    else:
+        target_justification = HC_JUSTIFICATION
+
+    filtered = [r for r in incoming if r.mapping_justification == target_justification]
+    skipped = len(incoming) - len(filtered)
+
+    # 6. For accreditor: validate HC state machine transitions
+    if role == "accreditor":
+        errors: list[str] = []
+        valid_rows: list[SSSOMRow] = []
+        for row in filtered:
+            try:
+                check_ingest_row(row, log)
+                valid_rows.append(row)
+            except ValueError as exc:
+                errors.append(str(exc))
+        if errors:
+            for err in errors:
+                click.echo(f"Error: {err}", err=True)
+            sys.exit(1)
+        filtered = valid_rows
+
+    # 7. Append
+    append_log(filtered, log_path)
+    click.echo(f"Appended {len(filtered)} rows, skipped {skipped} non-{role} rows", err=True)
 
 
 @cli.command(

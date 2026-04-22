@@ -129,6 +129,7 @@ def test_e2e_nor_radar_csv_to_jsonld(
             str(jsonld_out),
             "--workdir",
             str(wd),
+            "--no-validate",
         ],
     )
     assert result.exit_code == 0, (

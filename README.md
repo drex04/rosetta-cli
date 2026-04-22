@@ -32,9 +32,9 @@ All tools are available via `uv run rosetta <command>` after syncing.
 | `embed`     | Compute embeddings for schema slots                          |
 | `suggest`   | Rank candidate mappings by similarity; accepts LinkML YAML schemas directly and embeds on-the-fly |
 | `lint`      | Validate proposals before accreditor review                  |
-| `ledger`    | Manage the append-only audit log (append, review, dump)      |
+| `ledger`    | Manage the append-only audit log (append `--role analyst\|accreditor`, review, dump) |
 | `compile`   | Compile approved mappings → YARRRML                          |
-| `transform` | Materialise YARRRML → JSON-LD with optional SHACL validation |
+| `transform` | Materialise YARRRML → JSON-LD; `--shapes-dir` or `--no-validate` required |
 | `validate`  | Validate RDF against SHACL shapes                            |
 | `shapes`    | Auto-generate SHACL shapes from a master LinkML schema       |
 

@@ -104,6 +104,7 @@ def test_run_stdout_and_validate_report_collision(
             # omit -o → defaults to stdout
             "--validate-report",
             "-",  # also targets stdout
+            "--no-validate",
         ],
     )
 

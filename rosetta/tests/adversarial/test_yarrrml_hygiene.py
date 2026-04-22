@@ -256,6 +256,7 @@ def test_compile_run_with_datetime_typo(tmp_path: Path, nor_csv_sample_path: Pat
                 str(jsonld_out),
                 "--workdir",
                 str(wd),
+                "--no-validate",
             ],
         )
 

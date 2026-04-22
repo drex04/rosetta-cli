@@ -23,9 +23,35 @@ from rosetta.core.ledger import (
     SSSOM_HEADER,
     load_log,
 )
-from rosetta.core.models import SSSOMRow
+from rosetta.core.models import LintReport, LintSummary, SSSOMRow
 
 pytestmark = [pytest.mark.integration]
+
+
+_MINIMAL_SCHEMA = """\
+id: https://example.org/test
+name: test_schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+classes:
+  TestClass:
+    attributes:
+      test_field:
+        range: string
+"""
+
+
+def _noop_lint(
+    rows: list[SSSOMRow],
+    log: list[SSSOMRow],
+    source_schema: str | Path,
+    master_schema: str | Path,
+    *,
+    strict: bool = False,
+) -> LintReport:
+    return LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0))
 
 
 def _build_row(overrides: dict[str, object]) -> SSSOMRow:
@@ -65,9 +91,14 @@ def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
     return path
 
 
-def test_accredit_revoke_lifecycle(tmp_path: Path) -> None:
+def test_accredit_revoke_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """After MMC + HC approval, an HC with owl:differentFrom flips state to 'rejected'."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    src = tmp_path / "src.yaml"
+    src.write_text(_MINIMAL_SCHEMA)
+    mst = tmp_path / "mst.yaml"
+    mst.write_text(_MINIMAL_SCHEMA)
     pair = {"subject_id": "nor:spd_kmh", "object_id": "mc:speed"}
 
     # Seed MMC.
@@ -85,7 +116,21 @@ def test_accredit_revoke_lifecycle(tmp_path: Path) -> None:
     )
     assert (
         CliRunner(mix_stderr=False)
-        .invoke(accredit_cli, ["--audit-log", str(log_path), "append", str(mmc_file)])
+        .invoke(
+            accredit_cli,
+            [
+                "--audit-log",
+                str(log_path),
+                "append",
+                "--role",
+                "analyst",
+                "--source-schema",
+                str(src),
+                "--master-schema",
+                str(mst),
+                str(mmc_file),
+            ],
+        )
         .exit_code
         == 0
     )
@@ -105,7 +150,21 @@ def test_accredit_revoke_lifecycle(tmp_path: Path) -> None:
     )
     assert (
         CliRunner(mix_stderr=False)
-        .invoke(accredit_cli, ["--audit-log", str(log_path), "append", str(hc_file)])
+        .invoke(
+            accredit_cli,
+            [
+                "--audit-log",
+                str(log_path),
+                "append",
+                "--role",
+                "accreditor",
+                "--source-schema",
+                str(src),
+                "--master-schema",
+                str(mst),
+                str(hc_file),
+            ],
+        )
         .exit_code
         == 0
     )
@@ -125,7 +184,18 @@ def test_accredit_revoke_lifecycle(tmp_path: Path) -> None:
     )
     revoke_result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--audit-log", str(log_path), "append", str(revoke_file)],
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+            str(revoke_file),
+        ],
     )
     assert revoke_result.exit_code == 0, f"revoke append failed: {revoke_result.stderr}"
 

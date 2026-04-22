@@ -145,7 +145,7 @@ def test_yarrrml_run_validate_happy_path(
             str(mc_schema),
             "-o",
             str(jsonld_out),
-            "--validate",
+            "--shapes-dir",
             str(shapes_dir),
             "--workdir",
             str(workdir),
@@ -193,7 +193,7 @@ def test_yarrrml_run_validate_violation_blocks_emission(
             str(mc_schema),
             "-o",
             str(jsonld_out),
-            "--validate",
+            "--shapes-dir",
             str(shapes_dir),
             "--validate-report",
             str(report_out),
@@ -241,7 +241,7 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
     jsonld_out = tmp_path / "pipeline-out.jsonld"
     workdir = tmp_path / "wd"
 
-    # Stage 1: materialize without inline --validate (write JSON-LD to disk).
+    # Stage 1: materialize without inline --shapes-dir (write JSON-LD to disk).
     gen_result = CliRunner(mix_stderr=False).invoke(
         run_cli,
         [
@@ -253,6 +253,7 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
             str(jsonld_out),
             "--workdir",
             str(workdir),
+            "--no-validate",
         ],
     )
     assert gen_result.exit_code == 0, (
@@ -323,7 +324,7 @@ def test_yarrrml_run_validate_with_committed_policy_shapes(
             str(mc_schema),
             "-o",
             str(jsonld_out),
-            "--validate",
+            "--shapes-dir",
             str(policy_shapes),
             "--validate-report",
             str(report_out),

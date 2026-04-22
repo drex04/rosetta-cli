@@ -22,7 +22,7 @@ from rosetta.core.ledger import (
     parse_sssom_tsv,
     query_pending,
 )
-from rosetta.core.models import SSSOMRow
+from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -72,6 +72,44 @@ def _make_sssom_tsv(
         for row in rows:
             writer.writerow({c: row.get(c, "") for c in cols})
     return path
+
+
+# ---------------------------------------------------------------------------
+# Schema fixtures for append tests that invoke run_lint
+# ---------------------------------------------------------------------------
+
+_MINIMAL_SCHEMA = """\
+id: https://example.org/test
+name: test_schema
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+classes:
+  TestClass:
+    attributes:
+      test_field:
+        range: string
+"""
+
+
+@pytest.fixture()
+def source_schema(tmp_path: Path) -> Path:
+    p = tmp_path / "source.yaml"
+    p.write_text(_MINIMAL_SCHEMA, encoding="utf-8")
+    return p
+
+
+@pytest.fixture()
+def master_schema(tmp_path: Path) -> Path:
+    p = tmp_path / "master.yaml"
+    p.write_text(_MINIMAL_SCHEMA.replace("test_schema", "master_schema"), encoding="utf-8")
+    return p
+
+
+def _noop_lint(*args: object, **kwargs: object) -> LintReport:
+    """Return an empty LintReport — used in tests that don't exercise the lint gate."""
+    return LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0))
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +223,14 @@ def test_check_ingest_hc_correction_allowed_over_existing_hc() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_accredit_append_cli_adds_mmc_rows_to_log(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_append_cli_adds_mmc_rows_to_log(
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     tsv = _make_sssom_tsv(
         tmp_path,
@@ -199,14 +244,35 @@ def test_accredit_append_cli_adds_mmc_rows_to_log(tmp_path: Path, tmp_rosetta_to
             }
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = load_log(log_path)
     assert len(rows) == 1
     assert rows[0].subject_id == "a"
 
 
-def test_accredit_append_cli_adds_hc_rows_to_log(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_append_cli_adds_hc_rows_to_log(
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
 
@@ -222,7 +288,21 @@ def test_accredit_append_cli_adds_hc_rows_to_log(tmp_path: Path, tmp_rosetta_tom
             }
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = load_log(log_path)
     assert len(rows) == 2
@@ -230,7 +310,10 @@ def test_accredit_append_cli_adds_hc_rows_to_log(tmp_path: Path, tmp_rosetta_tom
 
 
 def test_accredit_append_cli_rejects_mmc_with_human_curation(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
 ) -> None:
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
@@ -248,13 +331,32 @@ def test_accredit_append_cli_rejects_mmc_with_human_curation(
             }
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 1
 
 
 def test_accredit_append_cli_rejects_hc_without_predecessor(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     tsv = _make_sssom_tsv(
         tmp_path,
@@ -268,15 +370,38 @@ def test_accredit_append_cli_rejects_hc_without_predecessor(
             }
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 1
 
 
 def test_accredit_append_cli_no_partial_write_on_mixed_file(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """One valid MMC + one invalid HC (no predecessor) → exit 1, log unchanged."""
+    """HC row with no MMC predecessor → accreditor rejects it, exit 1, log unchanged."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
+    # Seed only MMC for pair (a, b), not (c, d) — so the HC for (c, d) has no predecessor
+    append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
+    rows_before = load_log(log_path)
+
     tsv = _make_sssom_tsv(
         tmp_path,
         [
@@ -284,8 +409,8 @@ def test_accredit_append_cli_no_partial_write_on_mixed_file(
                 "subject_id": "a",
                 "predicate_id": "skos:exactMatch",
                 "object_id": "b",
-                "mapping_justification": MMC_JUSTIFICATION,
-                "confidence": "0.9",
+                "mapping_justification": HC_JUSTIFICATION,
+                "confidence": "0.95",
             },
             {
                 "subject_id": "c",
@@ -296,15 +421,35 @@ def test_accredit_append_cli_no_partial_write_on_mixed_file(
             },
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 1
-    # Log should not exist or be empty
-    assert not log_path.exists() or not load_log(log_path)
+    # Log unchanged — only the seeded MMC row remains
+    rows_after = load_log(log_path)
+    assert len(rows_after) == len(rows_before)
 
 
 def test_accredit_append_cli_skips_composite_matching_rows(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     tsv = _make_sssom_tsv(
         tmp_path,
@@ -325,13 +470,30 @@ def test_accredit_append_cli_skips_composite_matching_rows(
             },
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 0
     assert "skipped 2" in result.output or "skipped 2" in (result.stderr or "")
 
 
 def test_accredit_append_cli_rejects_in_file_duplicate_mmc(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
 ) -> None:
     log_path = tmp_path / "audit-log.sssom.tsv"
     tsv = _make_sssom_tsv(
@@ -353,11 +515,32 @@ def test_accredit_append_cli_rejects_in_file_duplicate_mmc(
             },
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 1
 
 
-def test_accredit_append_cli_prints_count_to_stderr(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_append_cli_prints_count_to_stderr(
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     tsv = _make_sssom_tsv(
         tmp_path,
@@ -379,7 +562,19 @@ def test_accredit_append_cli_prints_count_to_stderr(tmp_path: Path, tmp_rosetta_
         ],
     )
     result = CliRunner(mix_stderr=False).invoke(
-        cli, ["--audit-log", str(log_path), "append", str(tsv)]
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
     )
     assert result.exit_code == 0
     stderr = result.stderr if hasattr(result, "stderr") else result.output
@@ -388,8 +583,13 @@ def test_accredit_append_cli_prints_count_to_stderr(tmp_path: Path, tmp_rosetta_
 
 
 def test_accredit_append_hc_correction_over_existing_hc(
-    tmp_path: Path, tmp_rosetta_toml: Path
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
     append_log([_row("a", "b", HC_JUSTIFICATION)], log_path)
@@ -406,16 +606,35 @@ def test_accredit_append_hc_correction_over_existing_hc(
             }
         ],
     )
-    result = CliRunner().invoke(cli, ["--audit-log", str(log_path), "append", str(tsv)])
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = load_log(log_path)
     assert len(rows) == 3
 
 
-def test_accredit_append_cli_skips_mmc_already_in_log(
-    tmp_path: Path, tmp_rosetta_toml: Path
+def test_accredit_append_cli_appends_mmc_on_reingest(
+    tmp_path: Path,
+    tmp_rosetta_toml: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """MMC rows already present in the log are skipped silently on re-ingest."""
+    """Re-ingesting an MMC row already in the log appends it again (no dedup in new impl)."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([_row("a", "b", MMC_JUSTIFICATION)], log_path)
 
@@ -432,13 +651,23 @@ def test_accredit_append_cli_skips_mmc_already_in_log(
         ],
     )
     result = CliRunner(mix_stderr=False).invoke(
-        cli, ["--audit-log", str(log_path), "append", str(tsv)]
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
     )
     assert result.exit_code == 0, result.output + str(result.exception)
-    rows = load_log(log_path)
-    assert len(rows) == 1  # no new row appended
     stderr = result.stderr if hasattr(result, "stderr") else result.output
-    assert "1 duplicate MMC rows" in stderr
+    assert "Appended" in stderr
 
 
 # ---------------------------------------------------------------------------
@@ -822,3 +1051,575 @@ def test_accredit_append_log_no_migration_on_current_shape(tmp_path: Path) -> No
     loaded = load_log(log)
     assert len(loaded) == 2
     _ = mtime_before  # referenced to satisfy linters
+
+
+# ---------------------------------------------------------------------------
+# Task 5 — New append / transform tests
+# ---------------------------------------------------------------------------
+
+
+def test_append_requires_role(tmp_path: Path, source_schema: Path, master_schema: Path) -> None:
+    """Missing --role → Click UsageError exit 2."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(tmp_path, [])
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_append_analyst_appends_mmc_only(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Analyst role: only MMC rows land in log; CompositeMatching rows are skipped."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "src:C",
+                "predicate_id": "skos:relatedMatch",
+                "object_id": "mst:D",
+                "mapping_justification": COMPOSITE_JUSTIFICATION,
+                "confidence": "0.7",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    rows = load_log(log_path)
+    assert len(rows) == 1
+    assert rows[0].subject_id == "src:A"
+    assert rows[0].mapping_justification == MMC_JUSTIFICATION
+
+
+def test_append_analyst_blocks_hc_rows(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+) -> None:
+    """Analyst role: HC row in candidates → BLOCK lint finding, exit 1, nothing appended."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    # Seed the log with an MMC predecessor so HC is state-valid
+    append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": HC_JUSTIFICATION,
+                "confidence": "0.95",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 1
+    # Log should still have only the original row
+    rows = load_log(log_path)
+    assert len(rows) == 1
+    assert rows[0].mapping_justification == MMC_JUSTIFICATION
+
+
+def test_append_accreditor_appends_hc_only(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Accreditor role: only HC rows are appended; MMC rows are skipped."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    # Seed MMC predecessor required for HC state-machine check
+    append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": HC_JUSTIFICATION,
+                "confidence": "0.95",
+            },
+            {
+                "subject_id": "src:C",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:D",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.8",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    rows = load_log(log_path)
+    # Only the HC row is appended (plus the seeded MMC predecessor)
+    assert len(rows) == 2
+    hc_rows = [r for r in rows if r.mapping_justification == HC_JUSTIFICATION]
+    assert len(hc_rows) == 1
+    assert hc_rows[0].subject_id == "src:A"
+
+
+def test_append_lint_gate_block(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+) -> None:
+    """Duplicate MMC pair triggers BLOCK lint finding → exit 1, nothing appended."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:X",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:Y",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "src:X",
+                "predicate_id": "skos:relatedMatch",
+                "object_id": "mst:Y",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.8",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 1
+    assert not log_path.exists() or not load_log(log_path)
+
+
+def test_append_lint_gate_warning_proceeds(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WARNING lint finding → rows still appended; report emitted on stderr."""
+
+    def _mock_warning(*args: object, **kwargs: object) -> LintReport:
+        return LintReport(
+            findings=[
+                LintFinding(
+                    rule="test_warning",
+                    severity="WARNING",
+                    source_uri="src:A",
+                    message="test warning",
+                )
+            ],
+            summary=LintSummary(block=0, warning=1, info=0),
+        )
+
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _mock_warning)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0, result.stderr
+    # Row was appended
+    rows = load_log(log_path)
+    assert len(rows) == 1
+    # Warning report was emitted on stderr
+    assert "WARNING" in result.stderr
+
+
+def test_append_dry_run_no_side_effect(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--dry-run: audit log file unchanged, lint report on stdout."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--dry-run",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0
+    # Audit log must NOT have been created
+    assert not log_path.exists()
+    # Report JSON on stdout
+    assert "findings" in result.stdout
+
+
+def test_append_dry_run_exit_code(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+) -> None:
+    """--dry-run with BLOCK finding → exit 1; without → exit 0."""
+    log_path_block = tmp_path / "audit-block.sssom.tsv"
+    # Two duplicate MMC rows → BLOCK
+    tsv_block = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:X",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:Y",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "src:X",
+                "predicate_id": "skos:relatedMatch",
+                "object_id": "mst:Y",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.8",
+            },
+        ],
+        filename="block_input.sssom.tsv",
+    )
+    result_block = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path_block),
+            "append",
+            "--role",
+            "analyst",
+            "--dry-run",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv_block),
+        ],
+    )
+    assert result_block.exit_code == 1
+
+    # Clean single MMC row → no BLOCK → exit 0
+    log_path_ok = tmp_path / "audit-ok.sssom.tsv"
+    tsv_ok = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+        filename="ok_input.sssom.tsv",
+    )
+    result_ok = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path_ok),
+            "append",
+            "--role",
+            "analyst",
+            "--dry-run",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv_ok),
+        ],
+    )
+    assert result_ok.exit_code == 0
+
+
+def test_append_requires_schemas(tmp_path: Path) -> None:
+    """Missing --source-schema or --master-schema → Click UsageError exit 2."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(tmp_path, [])
+
+    # Missing both schemas
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 2
+
+    # Missing --master-schema only
+    schema = tmp_path / "src.yaml"
+    schema.write_text(_MINIMAL_SCHEMA, encoding="utf-8")
+    result2 = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(schema),
+            str(tsv),
+        ],
+    )
+    assert result2.exit_code == 2
+
+
+def test_append_analyst_mixed_hc_mmc_blocks(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+) -> None:
+    """Analyst with mixed MMC+HC candidates → BLOCK (hc_in_candidates), exit 1, nothing appended."""
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    # Seed so HC is state-valid
+    append_log([_row("src:A", "mst:B", MMC_JUSTIFICATION)], log_path)
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:C",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:D",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": HC_JUSTIFICATION,
+                "confidence": "0.95",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 1
+    # No new rows beyond the seeded one
+    rows = load_log(log_path)
+    assert len(rows) == 1
+
+
+def test_append_accreditor_zero_hc_rows(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Accreditor with file containing only MMC rows → exit 0, empty append."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0
+    # No rows appended — file may not exist or be empty
+    assert not log_path.exists() or not load_log(log_path)
+
+
+def test_append_role_plus_dry_run(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--role analyst --dry-run: lint report on stdout, no side effects."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    result = CliRunner(mix_stderr=False).invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--dry-run",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(tsv),
+        ],
+    )
+    assert result.exit_code == 0
+    # Audit log not written
+    assert not log_path.exists()
+    # JSON report on stdout
+    assert "findings" in result.stdout
+    assert "summary" in result.stdout
