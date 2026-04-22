@@ -86,7 +86,15 @@ def _resolve_multi(
     out_dir = output if output is not None else Path()
     if output is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
-    return [(Path(sf), out_dir / f"{Path(sf).stem}.linkml.yaml") for sf in schema_files]
+    pairs = [(Path(sf), out_dir / f"{Path(sf).stem}.linkml.yaml") for sf in schema_files]
+    seen: dict[Path, Path] = {}
+    for src, dst in pairs:
+        if dst in seen:
+            raise click.UsageError(
+                f"Duplicate output stem: {src} and {seen[dst]} both resolve to {dst.name}"
+            )
+        seen[dst] = src
+    return pairs
 
 
 def _is_dir_target(path: Path) -> bool:

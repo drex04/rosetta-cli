@@ -385,7 +385,7 @@ def test_ingest_multi_schema_no_output(tmp_path: Path) -> None:
     """Two inputs with no -o → two .linkml.yaml files written to cwd."""
     runner = CliRunner()
     # CliRunner's mix_stderr=False default; use isolated filesystem so cwd is tmp
-    with runner.isolated_filesystem(temp_dir=tmp_path):
+    with runner.isolated_filesystem(temp_dir=tmp_path) as td:
         result = runner.invoke(
             cli,
             [
@@ -393,7 +393,9 @@ def test_ingest_multi_schema_no_output(tmp_path: Path) -> None:
                 str(FIXTURES / "nor_radar.csv"),
             ],
         )
-    assert result.exit_code == 0, f"CLI failed: {result.output}"
+        assert result.exit_code == 0, f"CLI failed: {result.output}"
+        assert Path(td, "deu_patriot.linkml.yaml").exists()
+        assert Path(td, "nor_radar.linkml.yaml").exists()
 
 
 def test_ingest_multi_stdout_error(tmp_path: Path) -> None:
@@ -469,6 +471,14 @@ def test_ingest_translate_no_key_error(tmp_path: Path) -> None:
     assert result.exit_code != 0
 
 
+def test_ingest_master_no_source_error(tmp_path: Path) -> None:
+    """--master with no source schema_files → Click required=True exit != 0."""
+    ontology = tmp_path / "mini_ontology.ttl"
+    _ = ontology.write_text(_MINI_ONTOLOGY)
+    result = CliRunner().invoke(cli, ["--master", str(ontology), "-o", str(tmp_path)])
+    assert result.exit_code != 0
+
+
 def test_ingest_master(tmp_path: Path) -> None:
     """--master ontology.ttl -o dir/ → .linkml.yaml + .shacl.ttl in directory."""
     ontology = tmp_path / "mini_ontology.ttl"
@@ -479,31 +489,15 @@ def test_ingest_master(tmp_path: Path) -> None:
     result = CliRunner().invoke(
         cli,
         [
+            str(FIXTURES / "nor_radar.csv"),
             "--master",
             str(ontology),
             "-o",
             str(out_dir),
         ],
     )
-    # --master with no source schemas: schema_files is empty → Click required=True guard
-    # The CLI requires at least one schema_file positionally, so either we supply one
-    # or the test verifies the master-only path works if supported.
-    # Since schema_files has required=True, we need a dummy source schema.
-    # Re-invoke with a source schema to test --master processing.
-    _ = result  # discard the no-args result
-    source = FIXTURES / "nor_radar.csv"
-    result2 = CliRunner().invoke(
-        cli,
-        [
-            str(source),
-            "--master",
-            str(ontology),
-            "-o",
-            str(out_dir),
-        ],
-    )
-    assert result2.exit_code == 0, f"CLI failed: {result2.output}"
-    stem = ontology.stem  # "mini_ontology"
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    stem = ontology.stem
     assert (out_dir / f"{stem}.linkml.yaml").exists(), "Master LinkML YAML not written"
     assert (out_dir / f"{stem}.shacl.ttl").exists(), "Master SHACL not written"
 
@@ -617,3 +611,48 @@ def test_ingest_multi_file_output_error(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code != 0
+
+
+def test_ingest_master_non_ttl_error(tmp_path: Path) -> None:
+    """--master with a non-TTL/OWL/RDFS file → UsageError, exit != 0."""
+    json_file = tmp_path / "schema.json"
+    _ = json_file.write_text('{"type": "object", "properties": {"x": {"type": "string"}}}')
+    result = CliRunner().invoke(
+        cli, [str(json_file), "--master", str(json_file), "-o", str(tmp_path / "out")]
+    )
+    assert result.exit_code != 0
+    assert "TTL" in result.output or "RDFS" in result.output or "OWL" in result.output
+
+
+def test_ingest_multi_schema_format_same_ok(tmp_path: Path) -> None:
+    """--schema-format with same-format multi-input → exit 0 (not ambiguous)."""
+    a = tmp_path / "a.json"
+    b = tmp_path / "b.json"
+    _ = a.write_text('{"type": "object", "properties": {"x": {"type": "string"}}}')
+    _ = b.write_text('{"type": "object", "properties": {"y": {"type": "integer"}}}')
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = CliRunner().invoke(
+        cli,
+        [str(a), str(b), "--schema-format", "json-schema", "-o", str(out_dir)],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert (out_dir / "a.linkml.yaml").exists()
+    assert (out_dir / "b.linkml.yaml").exists()
+
+
+def test_ingest_multi_duplicate_stem_error(tmp_path: Path) -> None:
+    """Two inputs with the same stem from different directories → UsageError."""
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    schema_a = dir_a / "data.json"
+    schema_b = dir_b / "data.json"
+    _ = schema_a.write_text('{"type": "object", "properties": {"x": {"type": "string"}}}')
+    _ = schema_b.write_text('{"type": "object", "properties": {"y": {"type": "integer"}}}')
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = CliRunner().invoke(cli, [str(schema_a), str(schema_b), "-o", str(out_dir)])
+    assert result.exit_code != 0
+    assert "Duplicate" in result.output or "duplicate" in result.output
