@@ -205,19 +205,6 @@ def test_suggest_cli_basic(src_file, mst_file, empty_log) -> None:
     assert result.output.lstrip().startswith("#")
 
 
-def test_suggest_cli_stdout(src_file, mst_file, empty_log) -> None:
-    """CLI without --output writes SSSOM TSV to stdout."""
-    from rosetta.cli.suggest import cli
-
-    result = CliRunner().invoke(cli, [src_file, mst_file, "--audit-log", empty_log])
-
-    assert result.exit_code == 0, result.output
-    assert "subject_id" in result.output
-    assert "\t" in result.output
-    assert "{" not in result.output
-    assert result.output.lstrip().startswith("#")
-
-
 def test_suggest_cli_empty_source(tmp_path, mst_file, empty_log) -> None:
     """CLI exits 1 with 'source file' in output when source has no embeddings."""
     from rosetta.cli.suggest import cli
@@ -271,7 +258,7 @@ def test_suggest_cli_top_k(src_file, mst_file, empty_log) -> None:
     assert len(data_rows) == len(SOURCE_EMB)
 
 
-def test_suggest_cli_config_precedence(tmp_path) -> None:
+def test_suggest_cli_top_k_flag(tmp_path) -> None:
     """--top-k 1 returns exactly 1 result per source field."""
     from rosetta.cli.suggest import cli
     from rosetta.core.ledger import append_log
@@ -902,34 +889,6 @@ def test_suggest_cli_audit_log_nonexistent_treated_as_empty(tmp_path: Path) -> N
         if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
     assert data_rows
-
-
-def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
-    """--audit-log pointing to nonexistent file → treated as empty log, suggest succeeds."""
-    from rosetta.cli.suggest import cli as suggest_cli
-
-    src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
-    master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
-    src_f = tmp_path / "src.json"
-    src_f.write_text(json.dumps(src_emb))
-    mst_f = tmp_path / "master.json"
-    mst_f.write_text(json.dumps(master_emb))
-
-    missing = tmp_path / "does-not-exist.sssom.tsv"
-    out = tmp_path / "candidates.sssom.tsv"
-
-    result = CliRunner().invoke(
-        suggest_cli,
-        [
-            str(src_f),
-            str(mst_f),
-            "--audit-log",
-            str(missing),
-            "-o",
-            str(out),
-        ],
-    )
-    assert result.exit_code == 0, f"expected exit 0, got {result.exit_code}: {result.output}"
 
 
 def test_suggest_cli_audit_log_empty_shows_pair(tmp_path: Path) -> None:

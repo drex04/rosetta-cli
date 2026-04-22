@@ -171,10 +171,14 @@ def cli(
 
         result = filter_decided_suggestions(result, log)
 
-        # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row
+        # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row.
+        # Exclude HC rejections — those pairs are already filtered from result.
         log_index: dict[tuple[str, str], SSSOMRow] = {}
         for row in log:
-            if row.mapping_justification != "semapv:CompositeMatching":
+            if row.mapping_justification != "semapv:CompositeMatching" and not (
+                row.mapping_justification == "semapv:HumanCuration"
+                and row.predicate_id == "owl:differentFrom"
+            ):
                 key = (row.subject_id, row.object_id)
                 existing = log_index.get(key)
                 if existing is None or (row.mapping_date or DATETIME_MIN) >= (
