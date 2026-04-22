@@ -2,7 +2,7 @@
 # scripts/pipeline-demo.sh
 #
 # Interactive walkthrough of the full accreditation pipeline:
-#   ingest → translate → embed → suggest
+#   ingest → translate → suggest
 #   → [analyst edits candidates.sssom.tsv]
 #   → lint (with retry loop)
 #   → accredit append (analyst proposals)
@@ -115,28 +115,14 @@ run_cmd uv run rosetta translate \
     -o "$OUT/master_cop_en.linkml.yaml"
 ok "$OUT/master_cop_en.linkml.yaml"
 
-# ── Step 3: Embed ─────────────────────────────────────────────────────────────
+# ── Step 3: Suggest ───────────────────────────────────────────────────────────
 
-info "Step 3 — Embed schemas"
-echo "  (First run downloads the model ~1.2 GB from HuggingFace; subsequent runs use cache)"
-
-run_cmd uv run rosetta embed \
-    "$OUT/nor_radar_en.linkml.yaml" \
-    -o "$OUT/nor_radar_emb.json"
-ok "$OUT/nor_radar_emb.json"
-
-run_cmd uv run rosetta embed \
-    "$OUT/master_cop_en.linkml.yaml" \
-    -o "$OUT/master_cop_emb.json"
-ok "$OUT/master_cop_emb.json"
-
-# ── Step 4: Suggest ───────────────────────────────────────────────────────────
-
-info "Step 4 — Generate mapping candidates"
+info "Step 3 — Generate mapping candidates"
+echo "  (First run downloads the embedding model ~1.2 GB from HuggingFace; subsequent runs use cache)"
 
 run_cmd uv run rosetta suggest \
-    "$OUT/nor_radar_emb.json" \
-    "$OUT/master_cop_emb.json" \
+    "$OUT/nor_radar_en.linkml.yaml" \
+    "$OUT/master_cop_en.linkml.yaml" \
     --audit-log "$LOG" \
     -o "$OUT/candidates.sssom.tsv"
 ok "$OUT/candidates.sssom.tsv"
@@ -300,4 +286,4 @@ fi
 echo ""
 echo "  Next steps:"
 echo "    uv run rosetta ledger --audit-log '$LOG' dump     # export approved mappings"
-echo "    uv run rosetta suggest  ... --audit-log '$LOG' -o candidates2.sssom.tsv  # re-run with boost/derank"
+echo "    uv run rosetta suggest nor_radar_en.linkml.yaml master_cop_en.linkml.yaml --audit-log '$LOG' -o candidates2.sssom.tsv  # re-run suggest"

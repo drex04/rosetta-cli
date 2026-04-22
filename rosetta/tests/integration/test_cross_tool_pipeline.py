@@ -8,7 +8,7 @@ expected 'nor_radar:Observation'.
 Seams tested:
   - ingest -> embed
   - ingest -> translate -> embed
-  - embed -> suggest -> compile
+  - schema -> suggest -> compile
   - suggest -> accredit
   - suggest -> lint
   - shacl-gen -> validate
@@ -60,7 +60,7 @@ def test_embed_suggest_compile_format_compatibility(
     master_schema_path: Path,
     mock_model: None,
 ) -> None:
-    """Chain embed -> suggest -> compile with real tool output at every seam.
+    """Chain suggest -> compile with real tool output at every seam.
 
     No hand-crafted intermediates. Suggest SSSOM rows are promoted to
     HumanCuration (simulating accreditor approval) and fed to compile.
@@ -69,21 +69,7 @@ def test_embed_suggest_compile_format_compatibility(
     """
     runner = CliRunner(mix_stderr=False)
 
-    # 1. Embed both schemas
-    src_embed = tmp_path / "src.embed.json"
-    result = runner.invoke(embed_cli, [str(nor_linkml_path), "--output", str(src_embed)])
-    assert result.exit_code == 0, f"embed(src) failed: {result.stderr}"
-
-    mst_embed = tmp_path / "master.embed.json"
-    result = runner.invoke(embed_cli, [str(master_schema_path), "--output", str(mst_embed)])
-    assert result.exit_code == 0, f"embed(master) failed: {result.stderr}"
-
-    # 2. Verify embed output keys use CURIE format (colon separator)
-    src_keys = list(json.loads(src_embed.read_text()).keys())
-    non_curie = [k for k in src_keys if ":" not in k]
-    assert not non_curie, f"embed keys missing CURIE ':' separator: {non_curie}"
-
-    # 3. Suggest
+    # 1. Suggest directly from schemas
     suggest_sssom = tmp_path / "suggest.sssom.tsv"
     empty_log = tmp_path / "empty-audit-log.sssom.tsv"
     from rosetta.core.ledger import append_log as _append_log_tmp
@@ -92,8 +78,8 @@ def test_embed_suggest_compile_format_compatibility(
     result = runner.invoke(
         suggest_cli,
         [
-            str(src_embed),
-            str(mst_embed),
+            str(nor_linkml_path),
+            str(master_schema_path),
             "--output",
             str(suggest_sssom),
             "--top-k",
@@ -104,13 +90,13 @@ def test_embed_suggest_compile_format_compatibility(
     )
     assert result.exit_code == 0, f"suggest failed: {result.stderr}"
 
-    # 4. Verify suggest subject_ids use CURIE format
+    # 2. Verify suggest subject_ids use CURIE format
     suggest_rows = parse_sssom_tsv(suggest_sssom)
     assert suggest_rows, "suggest produced no rows"
     bad_ids = [r.subject_id for r in suggest_rows if ":" not in r.subject_id]
     assert not bad_ids, f"suggest subject_ids missing ':' separator: {bad_ids}"
 
-    # 5. Promote to HC and write approved SSSOM (simulates accreditor approval)
+    # 3. Promote to HC and write approved SSSOM (simulates accreditor approval)
     approved = tmp_path / "approved.sssom.tsv"
     with approved.open("w", encoding="utf-8", newline="") as fh:
         fh.write(SSSOM_HEADER)
@@ -135,7 +121,7 @@ def test_embed_suggest_compile_format_compatibility(
                 ]
             )
 
-    # 6. Feed to compile -- prefix filter must accept the format
+    # 4. Feed to compile -- prefix filter must accept the format
     result = runner.invoke(
         compile_cli,
         [
@@ -160,21 +146,17 @@ def _run_embed_suggest(
     nor_linkml_path: Path,
     master_schema_path: Path,
 ) -> Path:
-    """Shared helper: embed both schemas, run suggest, return suggest SSSOM path."""
+    """Shared helper: run suggest directly from schemas, return suggest SSSOM path."""
     from rosetta.core.ledger import append_log as _append_log_helper
 
-    src_embed = tmp_path / "src.embed.json"
-    runner.invoke(embed_cli, [str(nor_linkml_path), "--output", str(src_embed)])
-    mst_embed = tmp_path / "master.embed.json"
-    runner.invoke(embed_cli, [str(master_schema_path), "--output", str(mst_embed)])
     suggest_sssom = tmp_path / "suggest.sssom.tsv"
     helper_log = tmp_path / "helper-audit-log.sssom.tsv"
     _append_log_helper([], helper_log)
     result = runner.invoke(
         suggest_cli,
         [
-            str(src_embed),
-            str(mst_embed),
+            str(nor_linkml_path),
+            str(master_schema_path),
             "--output",
             str(suggest_sssom),
             "--top-k",

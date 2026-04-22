@@ -94,7 +94,7 @@ def _resolve_multi(
                 f"Duplicate output stem: {src} and {seen[dst]} both resolve to {dst.name}"
             )
         seen[dst] = src
-    return pairs
+    return pairs  # pyright: ignore[reportReturnType]
 
 
 def _is_dir_target(path: Path) -> bool:

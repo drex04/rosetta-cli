@@ -30,7 +30,7 @@ All tools are available via `uv run rosetta <command>` after syncing.
 | `ingest`    | Parse one or more schemas → LinkML YAML; optional in-line translation and master ontology alignment |
 | `translate` | Translate non-English titles to English via DeepL            |
 | `embed`     | Compute embeddings for schema slots                          |
-| `suggest`   | Rank candidate mappings by similarity                        |
+| `suggest`   | Rank candidate mappings by similarity; accepts LinkML YAML schemas directly and embeds on-the-fly |
 | `lint`      | Validate proposals before accreditor review                  |
 | `ledger`    | Manage the append-only audit log (append, review, dump)      |
 | `compile`   | Compile approved mappings → YARRRML                          |

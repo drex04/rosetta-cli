@@ -17,7 +17,6 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
-from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.lint import cli as lint_cli
 from rosetta.cli.suggest import cli as suggest_cli
@@ -63,7 +62,7 @@ def test_full_chain_json_to_lint(
     master_schema_path: Path,
     mock_labse: None,
 ) -> None:
-    """JSON-Schema → ingest → embed → suggest → lint, all exit 0, no BLOCK findings."""
+    """JSON-Schema → ingest → suggest → lint, all exit 0, no BLOCK findings."""
     runner = CliRunner(mix_stderr=False)
 
     # 1. Ingest stress JSON Schema → LinkML YAML.
@@ -81,22 +80,7 @@ def test_full_chain_json_to_lint(
     assert ingest_result.exit_code == 0, f"ingest: {ingest_result.stderr}"
     assert stress_yaml.exists()
 
-    # 2. Embed source + master → EmbeddingReport JSON files.
-    src_embed = tmp_path / "src.embed.json"
-    src_embed_result = runner.invoke(
-        embed_cli,
-        [str(stress_yaml), "--output", str(src_embed)],
-    )
-    assert src_embed_result.exit_code == 0, f"embed(src): {src_embed_result.stderr}"
-
-    master_embed = tmp_path / "master.embed.json"
-    master_embed_result = runner.invoke(
-        embed_cli,
-        [str(master_schema_path), "--output", str(master_embed)],
-    )
-    assert master_embed_result.exit_code == 0, f"embed(master): {master_embed_result.stderr}"
-
-    # 3. Suggest → SSSOM TSV.
+    # 2. Suggest directly from schemas → SSSOM TSV.
     sssom_out = tmp_path / "candidates.sssom.tsv"
     from rosetta.core.ledger import append_log as _al
 
@@ -105,8 +89,8 @@ def test_full_chain_json_to_lint(
     suggest_result = runner.invoke(
         suggest_cli,
         [
-            str(src_embed),
-            str(master_embed),
+            str(stress_yaml),
+            str(master_schema_path),
             "--output",
             str(sssom_out),
             "--audit-log",
@@ -116,7 +100,7 @@ def test_full_chain_json_to_lint(
     assert suggest_result.exit_code == 0, f"suggest: {suggest_result.stderr}"
     assert sssom_out.exists()
 
-    # 4. Lint the SSSOM TSV → LintReport JSON.
+    # 3. Lint the SSSOM TSV → LintReport JSON.
     lint_out = tmp_path / "lint.json"
     lint_log = tmp_path / "lint-audit-log.sssom.tsv"
     lint_result = runner.invoke(

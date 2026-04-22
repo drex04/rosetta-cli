@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
-import math
 from pathlib import Path
 
+import numpy as np
 import pytest
+import sentence_transformers
 from click.testing import CliRunner
 
 from rosetta.cli.suggest import cli as suggest_cli
@@ -17,23 +17,43 @@ pytestmark = [pytest.mark.integration]
 
 # ---------------------------------------------------------------------------
 # Constants for integration tests
+# URIs now use the CURIE format that suggest emits: {schema_name}:{slot_name}
 # ---------------------------------------------------------------------------
 
-SRC_URI = "http://example.org/NOR#altitude"
-TGT_URI = "http://nato.int/master#Altitude"
-OTHER_TGT = "http://nato.int/master#Elevation"
+SRC_URI = "NOR:altitude"
+TGT_URI = "master_cop:Altitude"
+OTHER_TGT = "master_cop:Elevation"
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Fake embedding model
 # ---------------------------------------------------------------------------
 
 
-def _make_embed_json(tmp_path: Path, filename: str, entries: dict[str, dict[str, object]]) -> Path:
-    """Write an embed JSON file. Each entry has 'lexical' (list[float]) and optionally 'label'."""
-    path = tmp_path / filename
-    path.write_text(json.dumps(entries))
-    return path
+class _FakeLaBSE:
+    """Deterministic fake sentence-transformer that returns non-collinear vectors.
+
+    Vectors are keyed off the slot label so that 'altitude' is close to
+    'Altitude' and 'speed' is close to 'Elevation' (orthogonal bucket).
+    """
+
+    _VECTORS: dict[str, list[float]] = {
+        # src slots
+        "altitude": [0.9, 0.0, 0.436],
+        "speed": [0.0, 1.0, 0.0],
+        # master slots
+        "Altitude": [1.0, 0.0, 0.0],
+        "Elevation": [0.0, 1.0, 0.0],
+    }
+
+    def encode(self, texts: list[str]) -> np.ndarray:
+        rows: list[list[float]] = []
+        for text in texts:
+            # Match on the last word (slot label portion of text)
+            label = text.split()[-1] if text else text
+            vec = self._VECTORS.get(label, [0.5, 0.5, 0.0])
+            rows.append(vec)
+        return np.array(rows, dtype=np.float32)
 
 
 def _row(
@@ -72,28 +92,52 @@ def _parse_suggest_output(output: str) -> list[dict[str, str]]:
 # Full E2E: accredit ingest → suggest
 # ---------------------------------------------------------------------------
 
+_SRC_SCHEMA_YAML = """\
+id: https://example.org/NOR
+name: NOR
+prefixes:
+  NOR: https://example.org/NOR/
+default_prefix: NOR
+slots:
+  altitude:
+    description: altitude
+    range: float
+  speed:
+    description: speed
+    range: float
+"""
 
-def _make_embed_fixtures(
-    tmp_path: Path,
-) -> tuple[Path, Path]:
-    """Build non-collinear embed fixtures: src altitude ~= master Altitude."""
-    sin_val = math.sqrt(1.0 - 0.81)
-    src_emb = {
-        SRC_URI: {"label": "Altitude", "lexical": [0.9, 0.0, sin_val]},
-        "http://example.org/NOR#speed": {"label": "Speed", "lexical": [0.0, 1.0, 0.0]},
-    }
-    master_emb = {
-        TGT_URI: {"label": "Altitude", "lexical": [1.0, 0.0, 0.0]},
-        OTHER_TGT: {"label": "Elevation", "lexical": [0.0, 1.0, 0.0]},
-    }
-    src_file = _make_embed_json(tmp_path, "src.json", src_emb)  # pyright: ignore[reportArgumentType]
-    master_file = _make_embed_json(tmp_path, "master.json", master_emb)  # pyright: ignore[reportArgumentType]
-    return src_file, master_file
+_MASTER_SCHEMA_YAML = """\
+id: https://nato.int/master_cop
+name: master_cop
+prefixes:
+  master_cop: https://nato.int/master_cop/
+default_prefix: master_cop
+slots:
+  Altitude:
+    description: Altitude
+    range: float
+  Elevation:
+    description: Elevation
+    range: float
+"""
 
 
-def test_full_flow_approve_suppresses_future_suggestion(tmp_path: Path) -> None:
+def _make_schema_fixtures(tmp_path: Path) -> tuple[Path, Path]:
+    """Write minimal LinkML YAML fixtures for suggest."""
+    src_path = tmp_path / "src_schema.yaml"
+    master_path = tmp_path / "master_schema.yaml"
+    src_path.write_text(_SRC_SCHEMA_YAML)
+    master_path.write_text(_MASTER_SCHEMA_YAML)
+    return src_path, master_path
+
+
+def test_full_flow_approve_suppresses_future_suggestion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """MMC → HC approve → suggest omits ALL rows for that subject from output."""
-    src_file, master_file = _make_embed_fixtures(tmp_path)
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda _: _FakeLaBSE())
+    src_file, master_file = _make_schema_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
     # Ingest MMC then HC approval
@@ -113,9 +157,10 @@ def test_full_flow_approve_suppresses_future_suggestion(tmp_path: Path) -> None:
     )
 
 
-def test_full_flow_reject_filters_pair(tmp_path: Path) -> None:
+def test_full_flow_reject_filters_pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Rejected pair is completely absent from suggest output."""
-    src_file, master_file = _make_embed_fixtures(tmp_path)
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda _: _FakeLaBSE())
+    src_file, master_file = _make_schema_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
     # Ingest MMC then HC rejection
@@ -137,9 +182,12 @@ def test_full_flow_reject_filters_pair(tmp_path: Path) -> None:
     assert other_rows, "Other suggestions for the rejected subject should still appear"
 
 
-def test_full_flow_correction_overrides_previous_decision(tmp_path: Path) -> None:
+def test_full_flow_correction_overrides_previous_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """MMC → HC approve → HC correction (reject) → subject fully absent (approved wins)."""
-    src_file, master_file = _make_embed_fixtures(tmp_path)
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda _: _FakeLaBSE())
+    src_file, master_file = _make_schema_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
     # MMC → approve → reject correction
@@ -160,9 +208,12 @@ def test_full_flow_correction_overrides_previous_decision(tmp_path: Path) -> Non
     )
 
 
-def test_suggest_existing_pair_merge_preserves_justification(tmp_path: Path) -> None:
+def test_suggest_existing_pair_merge_preserves_justification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """MMC row in log → suggest output has ManualMappingCuration for that pair."""
-    src_file, master_file = _make_embed_fixtures(tmp_path)
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda _: _FakeLaBSE())
+    src_file, master_file = _make_schema_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
     # Ingest MMC only (no HC)

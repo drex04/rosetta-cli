@@ -21,7 +21,6 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.lint import cli as lint_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.ledger import parse_sssom_tsv
@@ -125,20 +124,20 @@ def test_suggest_type_divergence_flagged_by_lint(
 
     runner = CliRunner(mix_stderr=False)
 
-    src_emb = tmp_path / "src.embed.json"
-    master_emb = tmp_path / "master.embed.json"
-    r1 = runner.invoke(embed_cli, [str(src_yaml), "--output", str(src_emb)])
-    assert r1.exit_code == 0, f"embed(src): {r1.stderr!r}"
-    r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
-    assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
-
     dummy_log = tmp_path / "audit-log.sssom.tsv"
     dummy_log.write_text("")
 
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
         suggest_cli,
-        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
+        [
+            str(src_yaml),
+            str(master_yaml),
+            "--output",
+            str(sssom_out),
+            "--audit-log",
+            str(dummy_log),
+        ],
     )
 
     # 1. Exit code — suggest succeeds
@@ -224,20 +223,20 @@ def test_renamed_field_survives_as_alias(tmp_path: Path, monkeypatch: pytest.Mon
 
     runner = CliRunner(mix_stderr=False)
 
-    src_emb = tmp_path / "src.embed.json"
-    master_emb = tmp_path / "master.embed.json"
-    r1 = runner.invoke(embed_cli, [str(src_yaml), "--output", str(src_emb)])
-    assert r1.exit_code == 0, f"embed(src): {r1.stderr!r}"
-    r2 = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
-    assert r2.exit_code == 0, f"embed(master): {r2.stderr!r}"
-
     dummy_log = tmp_path / "audit-log.sssom.tsv"
     dummy_log.write_text("")
 
     sssom_out = tmp_path / "candidates.sssom.tsv"
     suggest_result = runner.invoke(
         suggest_cli,
-        [str(src_emb), str(master_emb), "--output", str(sssom_out), "--audit-log", str(dummy_log)],
+        [
+            str(src_yaml),
+            str(master_yaml),
+            "--output",
+            str(sssom_out),
+            "--audit-log",
+            str(dummy_log),
+        ],
     )
 
     # 1. Exit code

@@ -9,7 +9,6 @@ import pytest
 import sentence_transformers
 from click.testing import CliRunner
 
-from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.ledger import parse_sssom_tsv
 
@@ -34,17 +33,12 @@ class _FakeLaBSE:
         return out
 
 
-def _embed_schema(linkml_path: Path, out_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _install_fake_labse(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         sentence_transformers,
         "SentenceTransformer",
         lambda _name: _FakeLaBSE(),
     )
-    result = CliRunner(mix_stderr=False).invoke(
-        embed_cli,
-        [str(linkml_path), "--output", str(out_path)],
-    )
-    assert result.exit_code == 0, f"embed failed: {result.stderr}"
 
 
 def test_suggest_inheritance_schema(
@@ -53,17 +47,12 @@ def test_suggest_inheritance_schema(
     master_schema_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Inheritance LinkML → embed → suggest against master produces SSSOM rows."""
-    # 1. Embed the inheritance fixture directly (it is already LinkML YAML).
+    """Inheritance LinkML → suggest against master produces SSSOM rows."""
+    _install_fake_labse(monkeypatch)
+
     src_linkml = stress_dir / "linkml_inheritance.linkml.yaml"
-    src_embed = tmp_path / "src.embed.json"
-    _embed_schema(src_linkml, src_embed, monkeypatch)
 
-    # 2. Embed the master schema.
-    master_embed = tmp_path / "master.embed.json"
-    _embed_schema(master_schema_path, master_embed, monkeypatch)
-
-    # 3. Run suggest — writes SSSOM TSV.
+    # Run suggest directly from schema YAMLs — embeddings are computed internally.
     out_tsv = tmp_path / "suggestions.sssom.tsv"
     audit_log = tmp_path / "audit-log.sssom.tsv"
     from rosetta.core.ledger import append_log
@@ -73,8 +62,8 @@ def test_suggest_inheritance_schema(
     result = CliRunner(mix_stderr=False).invoke(
         suggest_cli,
         [
-            str(src_embed),
-            str(master_embed),
+            str(src_linkml),
+            str(master_schema_path),
             "--output",
             str(out_tsv),
             "--audit-log",
@@ -83,7 +72,7 @@ def test_suggest_inheritance_schema(
     )
     assert result.exit_code == 0, f"suggest failed: {result.stderr}"
 
-    # 4. Parse SSSOM TSV via the canonical loader.
+    # Parse SSSOM TSV via the canonical loader.
     rows = parse_sssom_tsv(out_tsv)
 
     # Behavioural invariant: at least one suggestion row was emitted.

@@ -1,6 +1,6 @@
 # rosetta suggest
 
-Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. Requires an audit log (`--audit-log`) to filter out already-resolved subjects and suppress individually rejected pairs.
+Ranks candidate mappings by cosine similarity between source and master LinkML YAML schemas. Embeddings are computed on-the-fly using a sentence-transformer model — no pre-computed embedding files required. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. Requires an audit log (`--audit-log`) to filter out already-resolved subjects and suppress individually rejected pairs.
 
 ## Command reference
 
@@ -9,6 +9,12 @@ Compares source embeddings against master embeddings and ranks candidates by cos
     :command: cli
     :prog_name: rosetta suggest
     :depth: 2
+
+## Internal embedding pipeline
+
+`rosetta suggest` loads both LinkML YAML schemas, extracts slot labels and descriptions, and encodes them with the sentence-transformer model specified by `--model` (default: `intfloat/e5-large-v2`). The first run downloads the model (~1.2 GB from HuggingFace); subsequent runs use the local cache.
+
+Structural features (slot type, cardinality, parent class) are extracted alongside lexical text. If both schemas yield structural arrays, scoring blends lexical and structural cosine similarity using `--structural-weight`. If either schema lacks structural data, scoring falls back to lexical-only automatically.
 
 ## Output — SSSOM TSV
 
@@ -47,7 +53,7 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 
 ## Structural blending
 
-When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `--structural-weight` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
+When both schemas yield structural feature arrays, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `--structural-weight` (default: `0.2`). Set it to `0.0` to disable blending. If either schema lacks structural arrays, scoring falls back to lexical-only automatically.
 
 When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
@@ -65,7 +71,16 @@ Pending proposals (`ManualMappingCuration` rows, non-HC entries) are not filtere
 ## Example
 
 ```bash
-uv run rosetta suggest nor.emb.json master.emb.json \
+uv run rosetta suggest nor_radar.linkml.yaml master_cop.linkml.yaml \
+  --audit-log audit.sssom.tsv \
+  --output candidates.sssom.tsv
+```
+
+Use `--model` to choose a different sentence-transformer:
+
+```bash
+uv run rosetta suggest nor_radar.linkml.yaml master_cop.linkml.yaml \
+  --model sentence-transformers/LaBSE \
   --audit-log audit.sssom.tsv \
   --output candidates.sssom.tsv
 ```

@@ -2,20 +2,20 @@
 
 import csv
 import io
-import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import click
 import numpy as np
+from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
+from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
+from rosetta.core.embedding import EmbeddingModel, extract_text_inputs_linkml
+from rosetta.core.features import extract_structural_features_linkml
 from rosetta.core.io import open_output
 from rosetta.core.ledger import DATETIME_MIN, load_log
-from rosetta.core.models import (
-    EmbeddingReport,
-    SSSOMRow,
-)
+from rosetta.core.models import SSSOMRow
 from rosetta.core.similarity import filter_decided_suggestions, rank_suggestions
 
 _SSSOM_HEADER_LINES = [
@@ -49,14 +49,14 @@ _SSSOM_COLUMNS = [
 @click.command(
     epilog="""Examples:
 
-  rosetta suggest source.embeddings.json master.embeddings.json \\
+  rosetta suggest source.yaml master.yaml \\
       --audit-log audit-log.sssom.tsv -o proposals.sssom.tsv
 
-  rosetta -v suggest source.embeddings.json master.embeddings.json \\
-      --audit-log audit-log.sssom.tsv --top-k 10"""
+  rosetta -v suggest source.yaml master.yaml \\
+      --audit-log audit-log.sssom.tsv --top-k 10 --model intfloat/e5-large-v2"""
 )
-@click.argument("source", type=click.Path(exists=True))
-@click.argument("master", type=click.Path(exists=True))
+@click.argument("source_schema", type=click.Path(exists=True))
+@click.argument("master_schema", type=click.Path(exists=True))
 @click.option("--top-k", default=5, show_default=True, type=int, help="Max suggestions per field")
 @click.option(
     "--min-score",
@@ -81,53 +81,93 @@ _SSSOM_COLUMNS = [
     type=click.Path(),
     help="Path to SSSOM audit log.",
 )
+@click.option(
+    "--model",
+    default="intfloat/e5-large-v2",
+    show_default=True,
+    help="Sentence-transformer model for embeddings.",
+)
 def cli(
-    source: str,
-    master: str,
+    source_schema: str,
+    master_schema: str,
     top_k: int,
     min_score: float,
     output: str | None,
     structural_weight: float,
     audit_log: str,
+    model: str,
 ) -> None:
-    """Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
+    """Rank master ontology candidates for source schema fields (SSSOM TSV output).
+
+    SOURCE_SCHEMA and MASTER_SCHEMA are LinkML YAML schema files. Embeddings are
+    computed on-the-fly using the specified sentence-transformer model.
+    """
     log: list[SSSOMRow] = []
     lp = Path(audit_log)
     if lp.exists():
         log = load_log(lp)
 
     try:
-        src_raw = json.loads(Path(source).read_text())
-        master_raw = json.loads(Path(master).read_text())
+        # Load LinkML schemas
+        source_def: SchemaDefinition = cast(
+            "SchemaDefinition",
+            yaml_loader.load(  # pyright: ignore[reportUnknownMemberType]
+                source_schema, target_class=SchemaDefinition
+            ),
+        )
+        master_def: SchemaDefinition = cast(
+            "SchemaDefinition",
+            yaml_loader.load(  # pyright: ignore[reportUnknownMemberType]
+                master_schema, target_class=SchemaDefinition
+            ),
+        )
 
-        if not src_raw:
-            click.echo(f"No embeddings found in source file: {source}")
+        # Extract (node_id, label, text) triples
+        src_inputs = extract_text_inputs_linkml(source_def)
+        master_inputs = extract_text_inputs_linkml(master_def)
+
+        if not src_inputs:
+            click.echo(f"No nodes found in source schema: {source_schema}", err=True)
             sys.exit(1)
-        if not master_raw:
-            click.echo(f"No embeddings found in master file: {master}")
+        if not master_inputs:
+            click.echo(f"No nodes found in master schema: {master_schema}", err=True)
             sys.exit(1)
 
-        # Validate and build numpy arrays
-        for uri, val in src_raw.items():
-            if "lexical" not in val:
-                raise ValueError(f"Missing 'lexical' key for URI: {uri}")
-        for uri, val in master_raw.items():
-            if "lexical" not in val:
-                raise ValueError(f"Missing 'lexical' key for URI: {uri}")
+        # Build URI lists and lookup dicts
+        src_uris = [uid for uid, _, _ in src_inputs]
+        master_uris = [uid for uid, _, _ in master_inputs]
+        src_labels = {uid: label for uid, label, _ in src_inputs}
+        master_labels = {uid: label for uid, label, _ in master_inputs}
+        src_texts = [text for _, _, text in src_inputs]
+        master_texts = [text for _, _, text in master_inputs]
 
-        # Parse via EmbeddingReport for typed access
-        src_report = EmbeddingReport.model_validate(src_raw)
-        master_report = EmbeddingReport.model_validate(master_raw)
+        # Build datatype lookups from schema slots
+        src_schema_name: str = source_def.name or "schema"  # pyright: ignore[reportUnknownMemberType]
+        src_datatypes: dict[str, str | None] = {}
+        for slot_name, slot_obj in cast("dict[str, Any]", source_def.slots).items():  # pyright: ignore[reportUnknownMemberType]
+            src_datatypes[f"{src_schema_name}:{slot_name}"] = getattr(slot_obj, "range", None)
 
-        src_uris = list(src_report.root.keys())
-        master_uris = list(master_report.root.keys())
+        master_schema_name: str = master_def.name or "schema"  # pyright: ignore[reportUnknownMemberType]
+        master_datatypes: dict[str, str | None] = {}
+        for slot_name, slot_obj in cast("dict[str, Any]", master_def.slots).items():  # pyright: ignore[reportUnknownMemberType]
+            master_datatypes[f"{master_schema_name}:{slot_name}"] = getattr(slot_obj, "range", None)
 
-        A = np.array([src_report.root[u].lexical for u in src_uris], dtype=np.float32)
-        B = np.array([master_report.root[u].lexical for u in master_uris], dtype=np.float32)
+        # Load embedding model and encode
+        click.echo("Loading embedding model...", err=True)
+        try:
+            embedding_model = EmbeddingModel(model)
+        except OSError as exc:
+            raise click.ClickException(f"Failed to load embedding model: {exc}") from exc
 
-        # Build structural numpy arrays (empty structural → zero-row matrix → fallback triggers)
-        src_structs = [src_report.root[u].structural for u in src_uris]
-        master_structs = [master_report.root[u].structural for u in master_uris]
+        src_vectors = np.array(embedding_model.encode(src_texts), dtype=np.float32)
+        master_vectors = np.array(embedding_model.encode(master_texts), dtype=np.float32)
+
+        # Extract structural features
+        src_struct_dict = extract_structural_features_linkml(source_def)
+        master_struct_dict = extract_structural_features_linkml(master_def)
+
+        src_structs = [src_struct_dict.get(uri, []) for uri in src_uris]
+        master_structs = [master_struct_dict.get(uri, []) for uri in master_uris]
 
         struct_dim = max((len(v) for v in src_structs + master_structs), default=0)
         A_struct: np.ndarray | None = None
@@ -140,7 +180,7 @@ def cli(
         master_has_struct = any(len(v) > 0 for v in master_structs)
         if src_has_struct != master_has_struct:
             click.echo(
-                "Warning: structural arrays present in one embed file but not the other"
+                "Warning: structural arrays present in one schema but not the other"
                 " — falling back to lexical-only",
                 err=True,
             )
@@ -159,9 +199,9 @@ def cli(
         # Compute ranked suggestions
         result = rank_suggestions(
             src_uris,
-            A,
+            src_vectors,
             master_uris,
-            B,
+            master_vectors,
             top_k,
             min_score,
             A_struct=A_struct,
@@ -200,14 +240,12 @@ def cli(
         for src_uri, field_data in result.items():
             candidates_tsv: list[dict[str, Any]] = field_data["suggestions"]  # pyright: ignore[reportAny]
 
-            src_label = src_report.root[src_uri].label
+            src_label = src_labels.get(src_uri, "")
 
             for cand in candidates_tsv:
                 obj_uri: str = cand["uri"]  # pyright: ignore[reportAny]
                 score: float = cand["score"]  # pyright: ignore[reportAny]
-                obj_label = (
-                    master_report.root[obj_uri].label if obj_uri in master_report.root else ""
-                )
+                obj_label = master_labels.get(obj_uri, "")
 
                 sssom_rows.append(
                     SSSOMRow(
@@ -222,25 +260,21 @@ def cli(
                         object_label=obj_label,
                         mapping_date=cand.get("mapping_date") or None,
                         record_id=cand.get("record_id") or None,
-                        subject_datatype=src_report.root[src_uri].datatype,
-                        object_datatype=(
-                            master_report.root[obj_uri].datatype
-                            if obj_uri in master_report.root
-                            else None
-                        ),
+                        subject_datatype=src_datatypes.get(src_uri),
+                        object_datatype=master_datatypes.get(obj_uri),
                     )
                 )
 
         # Write SSSOM TSV
         with open_output(output) as fh:
             for line in _SSSOM_HEADER_LINES:
-                fh.write(line + "\n")
+                _ = fh.write(line + "\n")
 
             buf = io.StringIO()
             writer = csv.writer(buf, delimiter="\t", lineterminator="\n")
-            writer.writerow(_SSSOM_COLUMNS)
+            _ = writer.writerow(_SSSOM_COLUMNS)
             for row in sssom_rows:
-                writer.writerow(
+                _ = writer.writerow(
                     [
                         row.subject_id,
                         row.predicate_id,
@@ -259,8 +293,8 @@ def cli(
                         row.composition_expr or "",
                     ]
                 )
-            fh.write(buf.getvalue())
+            _ = fh.write(buf.getvalue())
 
-    except (ValueError, OSError, json.JSONDecodeError, KeyError) as e:
+    except (ValueError, OSError, KeyError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
