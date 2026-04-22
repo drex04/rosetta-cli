@@ -27,7 +27,7 @@ All tools are available via `uv run rosetta <command>` after syncing.
 
 | Command     | Purpose                                                      |
 | ----------- | ------------------------------------------------------------ |
-| `ingest`    | Parse a schema file → LinkML YAML                            |
+| `ingest`    | Parse one or more schemas → LinkML YAML; optional in-line translation and master ontology alignment |
 | `translate` | Translate non-English titles to English via DeepL            |
 | `embed`     | Compute embeddings for schema slots                          |
 | `suggest`   | Rank candidate mappings by similarity                        |

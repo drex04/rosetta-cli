@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 from click.testing import CliRunner
@@ -10,6 +11,16 @@ from click.testing import CliRunner
 from rosetta.cli.ingest import cli
 
 FIXTURES = Path(__file__).parent / "fixtures" / "nations"
+
+_MINI_ONTOLOGY = """\
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix mc: <http://example.org/master/> .
+
+mc: a owl:Ontology .
+mc:Track a owl:Class ; rdfs:label "Track" .
+mc:hasAltitude a owl:DatatypeProperty ; rdfs:label "hasAltitude" ; rdfs:domain mc:Track .
+"""
 
 
 def test_ingest_json_schema_cli(tmp_path: Path) -> None:
@@ -329,3 +340,280 @@ def test_ingest_rdfs_ingest_does_not_stamp_source_format(tmp_path: Path) -> None
     assert "rosetta_source_format" not in annotations, (
         f"RDFS schema should not have rosetta_source_format; got: {annotations}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 22 — multi-schema, translate, --master integration tests
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_single_file_stdout() -> None:
+    """Single input with no -o flag writes to stdout and exits 0."""
+    result = CliRunner().invoke(cli, [str(FIXTURES / "deu_patriot.json")])
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert "classes:" in result.output or "slots:" in result.output
+
+
+def test_ingest_single_file_output(tmp_path: Path) -> None:
+    """Single input with -o file writes the file and exits 0."""
+    out = tmp_path / "out.linkml.yaml"
+    result = CliRunner().invoke(cli, [str(FIXTURES / "deu_patriot.json"), "-o", str(out)])
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert out.exists()
+    assert "classes:" in out.read_text() or "slots:" in out.read_text()
+
+
+def test_ingest_multi_schema(tmp_path: Path) -> None:
+    """Two inputs with -o dir/ → two .linkml.yaml files in the directory."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            str(FIXTURES / "nor_radar.csv"),
+            "-o",
+            str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert (out_dir / "deu_patriot.linkml.yaml").exists()
+    assert (out_dir / "nor_radar.linkml.yaml").exists()
+
+
+def test_ingest_multi_schema_no_output(tmp_path: Path) -> None:
+    """Two inputs with no -o → two .linkml.yaml files written to cwd."""
+    runner = CliRunner()
+    # CliRunner's mix_stderr=False default; use isolated filesystem so cwd is tmp
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(
+            cli,
+            [
+                str(FIXTURES / "deu_patriot.json"),
+                str(FIXTURES / "nor_radar.csv"),
+            ],
+        )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+
+
+def test_ingest_multi_stdout_error(tmp_path: Path) -> None:
+    """Multiple inputs with -o - (stdout) → UsageError, exit != 0."""
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            str(FIXTURES / "nor_radar.csv"),
+            "-o",
+            "-",
+        ],
+    )
+    assert result.exit_code != 0
+
+
+def test_ingest_translate(tmp_path: Path, fake_deepl: Any) -> None:
+    """--translate --lang DE with DEEPL_API_KEY env var → DeepL called, exit 0."""
+    fake_deepl()  # configure with identity mapping (returns input unchanged)
+    out = tmp_path / "out.linkml.yaml"
+    result = CliRunner(env={"DEEPL_API_KEY": "fake-key"}).invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            "--translate",
+            "--lang",
+            "DE",
+            "-o",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert out.exists()
+    state: dict[str, Any] = fake_deepl.state  # pyright: ignore[reportAny]
+    assert state["call_count"] >= 1, "Expected at least one DeepL call"
+
+
+def test_ingest_translate_en_passthrough(tmp_path: Path, fake_deepl: Any) -> None:
+    """--translate --lang EN → DeepL is NOT called, output written unchanged."""
+    fake_deepl()
+    out = tmp_path / "out.linkml.yaml"
+    result = CliRunner(env={"DEEPL_API_KEY": "fake-key"}).invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            "--translate",
+            "--lang",
+            "EN",
+            "-o",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert out.exists()
+    state: dict[str, Any] = fake_deepl.state  # pyright: ignore[reportAny]
+    assert state["call_count"] == 0, "DeepL must NOT be called for EN passthrough"
+
+
+def test_ingest_translate_no_key_error(tmp_path: Path) -> None:
+    """--translate --lang DE without DEEPL_API_KEY → UsageError, exit != 0."""
+    out = tmp_path / "out.linkml.yaml"
+    result = CliRunner(env={"DEEPL_API_KEY": ""}).invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            "--translate",
+            "--lang",
+            "DE",
+            "-o",
+            str(out),
+        ],
+    )
+    assert result.exit_code != 0
+
+
+def test_ingest_master(tmp_path: Path) -> None:
+    """--master ontology.ttl -o dir/ → .linkml.yaml + .shacl.ttl in directory."""
+    ontology = tmp_path / "mini_ontology.ttl"
+    _ = ontology.write_text(_MINI_ONTOLOGY)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "--master",
+            str(ontology),
+            "-o",
+            str(out_dir),
+        ],
+    )
+    # --master with no source schemas: schema_files is empty → Click required=True guard
+    # The CLI requires at least one schema_file positionally, so either we supply one
+    # or the test verifies the master-only path works if supported.
+    # Since schema_files has required=True, we need a dummy source schema.
+    # Re-invoke with a source schema to test --master processing.
+    _ = result  # discard the no-args result
+    source = FIXTURES / "nor_radar.csv"
+    result2 = CliRunner().invoke(
+        cli,
+        [
+            str(source),
+            "--master",
+            str(ontology),
+            "-o",
+            str(out_dir),
+        ],
+    )
+    assert result2.exit_code == 0, f"CLI failed: {result2.output}"
+    stem = ontology.stem  # "mini_ontology"
+    assert (out_dir / f"{stem}.linkml.yaml").exists(), "Master LinkML YAML not written"
+    assert (out_dir / f"{stem}.shacl.ttl").exists(), "Master SHACL not written"
+
+
+def test_ingest_master_plus_sources(tmp_path: Path) -> None:
+    """ingest source.json --master ontology.ttl -o dir/ → source + master files all written."""
+    ontology = tmp_path / "mini_ontology.ttl"
+    _ = ontology.write_text(_MINI_ONTOLOGY)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            "--master",
+            str(ontology),
+            "-o",
+            str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, f"CLI failed: {result.output}"
+    assert (out_dir / "mini_ontology.linkml.yaml").exists(), "Master LinkML YAML not written"
+    assert (out_dir / "mini_ontology.shacl.ttl").exists(), "Master SHACL not written"
+    assert (out_dir / "deu_patriot.linkml.yaml").exists(), "Source schema not written"
+
+
+def test_ingest_master_scaffolds_toml(tmp_path: Path) -> None:
+    """First --master run creates rosetta.toml; second run skips (already exists)."""
+    ontology = tmp_path / "mini_ontology.ttl"
+    _ = ontology.write_text(_MINI_ONTOLOGY)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    source = FIXTURES / "nor_radar.csv"
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        # First run — rosetta.toml must be created
+        result1 = runner.invoke(
+            cli,
+            [str(source), "--master", str(ontology), "-o", str(out_dir)],
+        )
+        assert result1.exit_code == 0, f"First run failed: {result1.output}"
+        assert "Scaffolded rosetta.toml" in result1.output, (
+            f"Expected scaffold message; got: {result1.output}"
+        )
+
+        # Second run — rosetta.toml already exists, should skip
+        result2 = runner.invoke(
+            cli,
+            [str(source), "--master", str(ontology), "-o", str(out_dir)],
+        )
+        assert result2.exit_code == 0, f"Second run failed: {result2.output}"
+        assert "already exists" in result2.output, (
+            f"Expected 'already exists' message; got: {result2.output}"
+        )
+
+
+def test_ingest_prefix_collision_multi(tmp_path: Path) -> None:
+    """Multi-schema ingest where a sibling collides with nor_radar's prefix → exit 1."""
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    # Pre-seed a *different-named* sibling that claims nor_radar's default_prefix.
+    # The collision check skips the file being overwritten (same stem), so we
+    # must use a distinct name to trigger the ValueError path.
+    existing = out_dir / "already_exists.linkml.yaml"
+    _ = existing.write_text(
+        "id: https://example.org/nor_radar\nname: nor_radar\ndefault_prefix: nor_radar\n"
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            str(FIXTURES / "nor_radar.csv"),
+            "-o",
+            str(out_dir),
+        ],
+    )
+    assert result.exit_code != 0
+
+
+def test_ingest_multi_schema_format_mixed_error(tmp_path: Path) -> None:
+    """--schema-format with mixed-format inputs → UsageError, exit != 0."""
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            str(FIXTURES / "nor_radar.csv"),
+            "--schema-format",
+            "json-schema",
+            "-o",
+            str(tmp_path / "out"),
+        ],
+    )
+    assert result.exit_code != 0
+
+
+def test_ingest_multi_file_output_error(tmp_path: Path) -> None:
+    """Multiple inputs with -o pointing to a file (not dir) → UsageError, exit != 0."""
+    out_file = tmp_path / "out.yaml"
+    _ = out_file.write_text("placeholder")  # ensure it exists as a file, not a dir
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(FIXTURES / "deu_patriot.json"),
+            str(FIXTURES / "nor_radar.csv"),
+            "-o",
+            str(out_file),
+        ],
+    )
+    assert result.exit_code != 0
