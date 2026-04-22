@@ -272,7 +272,7 @@ def test_suggest_cli_top_k(src_file, mst_file, empty_log) -> None:
 
 
 def test_suggest_cli_config_precedence(tmp_path) -> None:
-    """--top-k CLI flag overrides top_k in rosetta.toml."""
+    """--top-k 1 returns exactly 1 result per source field."""
     from rosetta.cli.suggest import cli
     from rosetta.core.ledger import append_log
 
@@ -284,16 +284,13 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([], log_path)
 
-    toml_cfg = tmp_path / "rosetta.toml"
-    toml_cfg.write_text(f'[suggest]\ntop_k = 10\n\n[ledger]\nlog = "{log_path}"\n')
-
     result = CliRunner().invoke(
         cli,
         [
             str(src),
             str(mst),
-            "--config",
-            str(toml_cfg),
+            "--audit-log",
+            str(log_path),
             "--top-k",
             "1",
         ],
@@ -307,17 +304,21 @@ def test_suggest_cli_config_precedence(tmp_path) -> None:
     assert len(data_rows) <= len(SOURCE_EMB)
 
 
-def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """HC approval in audit log suppresses that pair from suggest output."""
+def test_suggest_cli_approved_hc_suppressed(tmp_path: Path) -> None:
+    """HC approval in audit log suppresses ALL suggestions for that subject."""
     from rosetta.cli.suggest import cli as suggest_cli
     from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
     src_uri = "http://ex.org/FieldA"
-    master_uri = "http://ex.org/Master1"
+    master_uri1 = "http://ex.org/Master1"
+    master_uri2 = "http://ex.org/Master2"
 
     src_emb = {src_uri: {"label": "FieldA", "lexical": [0.9, 0.0, 0.1]}}
-    master_emb = {master_uri: {"label": "Master1", "lexical": [1.0, 0.0, 0.0]}}
+    master_emb = {
+        master_uri1: {"label": "Master1", "lexical": [1.0, 0.0, 0.0]},
+        master_uri2: {"label": "Master2", "lexical": [0.8, 0.2, 0.0]},
+    }
 
     src_f = tmp_path / "src.json"
     src_f.write_text(json.dumps(src_emb))
@@ -329,7 +330,7 @@ def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Pa
         [
             SSSOMRow(
                 subject_id=src_uri,
-                object_id=master_uri,
+                object_id=master_uri1,
                 predicate_id="skos:exactMatch",
                 mapping_justification=MMC_JUSTIFICATION,
                 confidence=0.9,
@@ -341,7 +342,7 @@ def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Pa
         [
             SSSOMRow(
                 subject_id=src_uri,
-                object_id=master_uri,
+                object_id=master_uri1,
                 predicate_id="skos:exactMatch",
                 mapping_justification=HC_JUSTIFICATION,
                 confidence=0.9,
@@ -350,94 +351,26 @@ def test_suggest_cli_approved_hc_suppressed(tmp_path: Path, tmp_rosetta_toml: Pa
         log_path,
     )
 
-    result = CliRunner().invoke(
-        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
-    )
+    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f), "--audit-log", str(log_path)])
     assert result.exit_code == 0, result.output + str(result.exception)
+    # Parse SSSOM TSV output — check subject_id column has no rows matching approved subject
+    lines = result.output.splitlines()
+    header_line = next((ln for ln in lines if ln.strip() and not ln.startswith("#")), None)
+    assert header_line is not None
+    cols = header_line.split("\t")
+    subject_col = cols.index("subject_id")  # noqa: FURB184
     data_rows = [
-        ln
-        for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith(("#", "subject_id"))
+        ln.split("\t") for ln in lines if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert not data_rows, "Approved HC pair should be suppressed from suggest output"
-
-
-def test_suggest_cli_log_based_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """HC owl:differentFrom in audit log deranks candidate confidence."""
-    from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
-    from rosetta.core.models import SSSOMRow
-
-    src_uri = "http://ex.org/FieldB"
-    master_uri = "http://ex.org/Master2"
-
-    src_emb = {src_uri: {"label": "FieldB", "lexical": [1.0, 0.0, 0.0]}}
-    master_emb = {master_uri: {"label": "Master2", "lexical": [0.9, 0.1, 0.0]}}
-
-    src_f = tmp_path / "src.json"
-    src_f.write_text(json.dumps(src_emb))
-    mst_f = tmp_path / "master.json"
-    mst_f.write_text(json.dumps(master_emb))
-
-    # Baseline: empty log via tmp_rosetta_toml config (log file must exist)
-    log_path = tmp_path / "audit-log.sssom.tsv"
-    append_log([], log_path)
-
-    runner = CliRunner()
-    baseline = runner.invoke(
-        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
+    subject_ids_in_output = {row[subject_col] for row in data_rows if len(row) > subject_col}
+    assert src_uri not in subject_ids_in_output, (
+        "Approved HC subject should have ALL suggestions removed from suggest output"
     )
-    assert baseline.exit_code == 0, baseline.output
-    baseline_data = [
-        ln
-        for ln in baseline.output.splitlines()
-        if ln.strip() and not ln.startswith(("#", "subject_id"))
-    ]
-    baseline_score = float(baseline_data[0].split("\t")[4])
-
-    log_path = tmp_path / "audit-log.sssom.tsv"
-    append_log(
-        [
-            SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri,
-                predicate_id="skos:exactMatch",
-                mapping_justification=MMC_JUSTIFICATION,
-                confidence=0.9,
-            )
-        ],
-        log_path,
-    )
-    append_log(
-        [
-            SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri,
-                predicate_id="owl:differentFrom",
-                mapping_justification=HC_JUSTIFICATION,
-                confidence=0.0,
-            )
-        ],
-        log_path,
-    )
-
-    result = runner.invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)])
-    assert result.exit_code == 0, result.output + str(result.exception)
-    deranked_data = [
-        ln
-        for ln in result.output.splitlines()
-        if ln.strip() and not ln.startswith(("#", "subject_id"))
-    ]
-    deranked_score = float(deranked_data[0].split("\t")[4])
-    assert deranked_score < baseline_score
 
 
 def test_suggest_cli_no_log_configured_raises_usage_error(tmp_path: Path) -> None:
-    """Config without [ledger] section and no --audit-log → UsageError (exit 2)."""
+    """Missing required --audit-log → Click error exit 2."""
     from rosetta.cli.suggest import cli as suggest_cli
-
-    config = tmp_path / "rosetta.toml"
-    config.write_text("[suggest]\ntop_k = 5\n")
 
     src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
     master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
@@ -446,12 +379,12 @@ def test_suggest_cli_no_log_configured_raises_usage_error(tmp_path: Path) -> Non
     mst_f = tmp_path / "master.json"
     mst_f.write_text(json.dumps(master_emb))
 
-    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f), "--config", str(config)])
+    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f)])
     assert result.exit_code == 2
-    assert "Audit log not found" in result.output
+    assert "audit-log" in result.output.lower() or "audit_log" in result.output.lower()
 
 
-def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_suggest_cli_existing_pair_merge(tmp_path: Path) -> None:
     """MMC row in log → suggest TSV output has ManualMappingCuration for that pair."""
     from rosetta.cli.suggest import cli as suggest_cli
     from rosetta.core.ledger import MMC_JUSTIFICATION, append_log
@@ -481,9 +414,7 @@ def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path)
         log_path,
     )
 
-    result = CliRunner().invoke(
-        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
-    )
+    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f), "--audit-log", str(log_path)])
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
         ln
@@ -494,20 +425,26 @@ def test_suggest_cli_existing_pair_merge(tmp_path: Path, tmp_rosetta_toml: Path)
     assert MMC_JUSTIFICATION in data_rows[0]
 
 
-def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """HC row in audit log → that pair is omitted from suggest output entirely."""
+def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path) -> None:
+    """Approved subject has zero rows; rejected pair absent, others remain."""
     from rosetta.cli.suggest import cli as suggest_cli
     from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
-    src_uri = "http://ex.org/FC"
-    master_uri_decided = "http://ex.org/MC_decided"
-    master_uri_new = "http://ex.org/MC_new"
+    src_uri_approved = "http://ex.org/FC_approved"
+    src_uri_rejected = "http://ex.org/FC_rejected"
+    master_uri_approved = "http://ex.org/MC_approved"
+    master_uri_rejected = "http://ex.org/MC_rejected"
+    master_uri_other = "http://ex.org/MC_other"
 
-    src_emb = {src_uri: {"label": "FC", "lexical": [1.0, 0.0]}}
+    src_emb = {
+        src_uri_approved: {"label": "FC_approved", "lexical": [1.0, 0.0, 0.0]},
+        src_uri_rejected: {"label": "FC_rejected", "lexical": [0.0, 1.0, 0.0]},
+    }
     master_emb = {
-        master_uri_decided: {"label": "MC_decided", "lexical": [0.9, 0.1]},
-        master_uri_new: {"label": "MC_new", "lexical": [0.8, 0.2]},
+        master_uri_approved: {"label": "MC_approved", "lexical": [0.9, 0.1, 0.0]},
+        master_uri_rejected: {"label": "MC_rejected", "lexical": [0.1, 0.9, 0.0]},
+        master_uri_other: {"label": "MC_other", "lexical": [0.1, 0.8, 0.1]},
     }
     src_f = tmp_path / "src.json"
     src_f.write_text(json.dumps(src_emb))
@@ -515,11 +452,12 @@ def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_tom
     mst_f.write_text(json.dumps(master_emb))
 
     log_path = tmp_path / "audit-log.sssom.tsv"
+    # Approve src_uri_approved → HC approval (removes all suggestions for that subject)
     append_log(
         [
             SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri_decided,
+                subject_id=src_uri_approved,
+                object_id=master_uri_approved,
                 predicate_id="skos:exactMatch",
                 mapping_justification=MMC_JUSTIFICATION,
                 confidence=0.9,
@@ -530,8 +468,8 @@ def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_tom
     append_log(
         [
             SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri_decided,
+                subject_id=src_uri_approved,
+                object_id=master_uri_approved,
                 predicate_id="skos:exactMatch",
                 mapping_justification=HC_JUSTIFICATION,
                 confidence=0.95,
@@ -539,23 +477,54 @@ def test_suggest_cli_suppresses_hc_decided_pairs(tmp_path: Path, tmp_rosetta_tom
         ],
         log_path,
     )
-
-    result = CliRunner().invoke(
-        suggest_cli, [str(src_f), str(mst_f), "--config", str(tmp_rosetta_toml)]
+    # Reject one pair for src_uri_rejected → only that pair removed, others remain
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri_rejected,
+                object_id=master_uri_rejected,
+                predicate_id="skos:exactMatch",
+                mapping_justification=MMC_JUSTIFICATION,
+                confidence=0.9,
+            )
+        ],
+        log_path,
     )
+    append_log(
+        [
+            SSSOMRow(
+                subject_id=src_uri_rejected,
+                object_id=master_uri_rejected,
+                predicate_id="owl:differentFrom",
+                mapping_justification=HC_JUSTIFICATION,
+                confidence=0.0,
+            )
+        ],
+        log_path,
+    )
+
+    result = CliRunner().invoke(suggest_cli, [str(src_f), str(mst_f), "--audit-log", str(log_path)])
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
         ln
         for ln in result.output.splitlines()
         if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    assert data_rows, "Should still have suggestions for the undecided pair"
+    # Approved subject: zero rows in output
     for row in data_rows:
-        assert master_uri_decided not in row, (
-            "HC-decided pair should be suppressed from suggest output"
+        assert src_uri_approved not in row, (
+            "HC-approved subject should have all suggestions removed"
         )
-    assert any(master_uri_new in row for row in data_rows), (
-        "Undecided candidate should still appear"
+    # Rejected pair: that specific pair absent
+    for row in data_rows:
+        cols = row.split("\t")
+        if len(cols) >= 3:
+            assert not (cols[0] == src_uri_rejected and cols[2] == master_uri_rejected), (
+                "HC-rejected pair should be absent"
+            )
+    # Other suggestions for the rejected subject's source still appear
+    assert any(src_uri_rejected in row for row in data_rows), (
+        "Other suggestions for HC-rejected subject should still appear"
     )
 
 
@@ -795,14 +764,16 @@ def test_suggest_cli_structural_weight_config(tmp_path) -> None:
     append_log([], log_path)
 
     def _run_with_weight(weight: float) -> float:
-        toml_file = tmp_path / f"rosetta_{weight}.toml"
-        log_str = str(log_path)
-        toml_file.write_text(
-            f'[suggest]\nstructural_weight = {weight}\n\n[ledger]\nlog = "{log_str}"\n'
-        )
         result = runner.invoke(
             cli,
-            [str(src_file), str(mst_file), "--config", str(toml_file)],
+            [
+                str(src_file),
+                str(mst_file),
+                "--audit-log",
+                str(log_path),
+                "--structural-weight",
+                str(weight),
+            ],
         )
         assert result.exit_code == 0, f"CLI failed (weight={weight}): {result.output}"
         lines = result.output.splitlines()
@@ -854,12 +825,9 @@ def test_suggest_cli_structural_weight_zero_disables_blending(tmp_path) -> None:
     log_path = tmp_path / "audit-log.sssom.tsv"
     append_log([], log_path)
 
-    toml_file = tmp_path / "rosetta_zero.toml"
-    toml_file.write_text(f'[suggest]\nstructural_weight = 0.0\n\n[ledger]\nlog = "{log_path}"\n')
-
     result = CliRunner().invoke(
         cli,
-        [str(src_file), str(mst_file), "--config", str(toml_file)],
+        [str(src_file), str(mst_file), "--audit-log", str(log_path), "--structural-weight", "0.0"],
     )
     assert result.exit_code == 0, f"CLI failed: {result.output}"
 
@@ -897,12 +865,9 @@ def test_suggest_cli_audit_log_flag(tmp_path: Path) -> None:
     log_path = tmp_path / "mylog.sssom.tsv"
     append_log([], log_path)
 
-    config = tmp_path / "rosetta.toml"
-    config.write_text("[suggest]\ntop_k = 5\n")
-
     result = CliRunner().invoke(
         suggest_cli,
-        [str(src_f), str(mst_f), "--config", str(config), "--audit-log", str(log_path)],
+        [str(src_f), str(mst_f), "--audit-log", str(log_path)],
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
@@ -913,10 +878,9 @@ def test_suggest_cli_audit_log_flag(tmp_path: Path) -> None:
     assert data_rows
 
 
-def test_suggest_cli_audit_log_config_fallback(tmp_path: Path) -> None:
-    """--audit-log omitted from CLI; rosetta.toml [ledger].log used as fallback."""
+def test_suggest_cli_audit_log_nonexistent_treated_as_empty(tmp_path: Path) -> None:
+    """--audit-log pointing to nonexistent file → treated as empty log, suggest succeeds."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.ledger import append_log
 
     src_emb = {"http://ex.org/FA": {"label": "FA", "lexical": [1.0, 0.0]}}
     master_emb = {"http://ex.org/MA": {"label": "MA", "lexical": [0.9, 0.1]}}
@@ -925,16 +889,11 @@ def test_suggest_cli_audit_log_config_fallback(tmp_path: Path) -> None:
     mst_f = tmp_path / "master.json"
     mst_f.write_text(json.dumps(master_emb))
 
-    log_path = tmp_path / "audit-log.sssom.tsv"
-    append_log([], log_path)
+    missing_log = tmp_path / "does-not-exist.sssom.tsv"
 
-    config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{log_path}"\n')
-
-    # No --audit-log on CLI; must read from config
     result = CliRunner().invoke(
         suggest_cli,
-        [str(src_f), str(mst_f), "--config", str(config)],
+        [str(src_f), str(mst_f), "--audit-log", str(missing_log)],
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
@@ -957,8 +916,6 @@ def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
     mst_f.write_text(json.dumps(master_emb))
 
     missing = tmp_path / "does-not-exist.sssom.tsv"
-    config = tmp_path / "rosetta.toml"
-    config.write_text("[suggest]\ntop_k = 5\n")
     out = tmp_path / "candidates.sssom.tsv"
 
     result = CliRunner().invoke(
@@ -966,8 +923,6 @@ def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
         [
             str(src_f),
             str(mst_f),
-            "--config",
-            str(config),
             "--audit-log",
             str(missing),
             "-o",
@@ -977,11 +932,10 @@ def test_suggest_cli_audit_log_missing_file_succeeds(tmp_path: Path) -> None:
     assert result.exit_code == 0, f"expected exit 0, got {result.exit_code}: {result.output}"
 
 
-def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:
-    """--audit-log CLI flag takes precedence over [ledger].log in rosetta.toml."""
+def test_suggest_cli_audit_log_empty_shows_pair(tmp_path: Path) -> None:
+    """Empty audit log → no filtering, all suggestions appear."""
     from rosetta.cli.suggest import cli as suggest_cli
-    from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
-    from rosetta.core.models import SSSOMRow
+    from rosetta.core.ledger import append_log
 
     src_uri = "http://ex.org/FA"
     master_uri = "http://ex.org/MA"
@@ -993,38 +947,13 @@ def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:
     mst_f = tmp_path / "master.json"
     mst_f.write_text(json.dumps(master_emb))
 
-    # Config log: contains an HC approval that suppresses the pair
-    config_log = tmp_path / "config-log.sssom.tsv"
-    append_log(
-        [
-            SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri,
-                predicate_id="skos:exactMatch",
-                mapping_justification=MMC_JUSTIFICATION,
-                confidence=0.9,
-            ),
-            SSSOMRow(
-                subject_id=src_uri,
-                object_id=master_uri,
-                predicate_id="skos:exactMatch",
-                mapping_justification=HC_JUSTIFICATION,
-                confidence=0.9,
-            ),
-        ],
-        config_log,
-    )
-
-    # CLI log: empty — pair should NOT be suppressed
-    cli_log = tmp_path / "cli-log.sssom.tsv"
-    append_log([], cli_log)
-
-    config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{config_log}"\n')
+    # Empty log: pair should NOT be suppressed
+    empty_log = tmp_path / "empty-log.sssom.tsv"
+    append_log([], empty_log)
 
     result = CliRunner().invoke(
         suggest_cli,
-        [str(src_f), str(mst_f), "--config", str(config), "--audit-log", str(cli_log)],
+        [str(src_f), str(mst_f), "--audit-log", str(empty_log)],
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     data_rows = [
@@ -1032,80 +961,148 @@ def test_suggest_cli_audit_log_cli_overrides_config(tmp_path: Path) -> None:
         for ln in result.output.splitlines()
         if ln.strip() and not ln.startswith(("#", "subject_id"))
     ]
-    # CLI log (empty) was used — HC pair from config log was NOT applied, so row appears
-    assert data_rows, "CLI --audit-log should override config; pair should not be suppressed"
+    assert data_rows, "Empty log should not suppress anything"
 
 
 # ---------------------------------------------------------------------------
-# Direct unit tests for _adjusted_score — derank branches
+# Unit tests for filter_decided_suggestions
 # ---------------------------------------------------------------------------
 
 
-class TestAdjustedScore:
-    """Exercise every branch of _adjusted_score with boundary values."""
+def test_filter_decided_approved_removes_subject() -> None:
+    """Approved HC for (X, A) → result dict has no key for X."""
+    from rosetta.core.models import SSSOMRow
+    from rosetta.core.similarity import filter_decided_suggestions
 
-    def test_exact_differentfrom_match_subtracts_full_penalty(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
-
-        score = _adjusted_score(
-            cand_score=0.9,
-            obj_id="obj:X",
-            diff_from_object_ids={"obj:X"},
-            has_diff_from=True,
-            penalty=0.2,
+    result = {
+        "http://src/X": {
+            "suggestions": [
+                {"uri": "http://m/A", "score": 0.9, "rank": 1},
+                {"uri": "http://m/B", "score": 0.8, "rank": 2},
+                {"uri": "http://m/C", "score": 0.7, "rank": 3},
+            ]
+        }
+    }
+    log = [
+        SSSOMRow(
+            subject_id="http://src/X",
+            object_id="http://m/A",
+            predicate_id="skos:exactMatch",
+            mapping_justification="semapv:HumanCuration",
+            confidence=0.9,
         )
-        assert score == pytest.approx(0.7)
+    ]
+    filtered = filter_decided_suggestions(result, log)
+    assert "http://src/X" not in filtered
 
-    def test_exact_differentfrom_match_floors_at_zero(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
 
-        score = _adjusted_score(
-            cand_score=0.1,
-            obj_id="obj:X",
-            diff_from_object_ids={"obj:X"},
-            has_diff_from=True,
-            penalty=0.5,
+def test_filter_decided_rejected_removes_pair_only() -> None:
+    """Rejected HC for (X, B) → result has X with [A, C] only."""
+    from rosetta.core.models import SSSOMRow
+    from rosetta.core.similarity import filter_decided_suggestions
+
+    result = {
+        "http://src/X": {
+            "suggestions": [
+                {"uri": "http://m/A", "score": 0.9, "rank": 1},
+                {"uri": "http://m/B", "score": 0.8, "rank": 2},
+                {"uri": "http://m/C", "score": 0.7, "rank": 3},
+            ]
+        }
+    }
+    log = [
+        SSSOMRow(
+            subject_id="http://src/X",
+            object_id="http://m/B",
+            predicate_id="owl:differentFrom",
+            mapping_justification="semapv:HumanCuration",
+            confidence=0.0,
         )
-        assert score == 0.0
+    ]
+    filtered = filter_decided_suggestions(result, log)
+    assert "http://src/X" in filtered
+    uris = [s["uri"] for s in filtered["http://src/X"]["suggestions"]]
+    assert "http://m/A" in uris
+    assert "http://m/B" not in uris
+    assert "http://m/C" in uris
 
-    def test_soft_derank_uses_quarter_penalty_coefficient(self) -> None:
-        """Regression guard for the 0.25 soft subject-breadth penalty coefficient.
 
-        If anyone changes 0.25, this test will fail — the value is a correctness
-        invariant of apply_sssom_feedback's derank design.
-        """
-        from rosetta.core.similarity import _adjusted_score
+def test_filter_decided_empty_log_passes_all() -> None:
+    """Empty log → returned dict identical to input."""
+    from rosetta.core.similarity import filter_decided_suggestions
 
-        score = _adjusted_score(
-            cand_score=0.8,
-            obj_id="obj:OTHER",
-            diff_from_object_ids={"obj:X"},  # subject has diffFrom, but not for obj:OTHER
-            has_diff_from=True,
-            penalty=0.2,
+    result = {
+        "http://src/X": {
+            "suggestions": [
+                {"uri": "http://m/A", "score": 0.9, "rank": 1},
+            ]
+        }
+    }
+    filtered = filter_decided_suggestions(result, [])
+    assert filtered == result
+    # Must return a new dict, not the same object
+    assert filtered is not result
+
+
+def test_filter_decided_mixed_approved_and_rejected_same_subject() -> None:
+    """Both approved HC for (X, A) and rejected HC for (X, B) → X absent (approved wins)."""
+    from rosetta.core.models import SSSOMRow
+    from rosetta.core.similarity import filter_decided_suggestions
+
+    result = {
+        "http://src/X": {
+            "suggestions": [
+                {"uri": "http://m/A", "score": 0.9, "rank": 1},
+                {"uri": "http://m/B", "score": 0.8, "rank": 2},
+            ]
+        }
+    }
+    log = [
+        SSSOMRow(
+            subject_id="http://src/X",
+            object_id="http://m/A",
+            predicate_id="skos:exactMatch",
+            mapping_justification="semapv:HumanCuration",
+            confidence=0.9,
+        ),
+        SSSOMRow(
+            subject_id="http://src/X",
+            object_id="http://m/B",
+            predicate_id="owl:differentFrom",
+            mapping_justification="semapv:HumanCuration",
+            confidence=0.0,
+        ),
+    ]
+    filtered = filter_decided_suggestions(result, log)
+    assert "http://src/X" not in filtered, "Approved wins: subject must be fully removed"
+
+
+def test_filter_decided_rejected_only_keeps_other_pairs() -> None:
+    """Only rejected HC for (X, B), no approved → X present with [A, C]."""
+    from rosetta.core.models import SSSOMRow
+    from rosetta.core.similarity import filter_decided_suggestions
+
+    result = {
+        "http://src/X": {
+            "suggestions": [
+                {"uri": "http://m/A", "score": 0.9, "rank": 1},
+                {"uri": "http://m/B", "score": 0.8, "rank": 2},
+                {"uri": "http://m/C", "score": 0.7, "rank": 3},
+            ]
+        }
+    }
+    log = [
+        SSSOMRow(
+            subject_id="http://src/X",
+            object_id="http://m/B",
+            predicate_id="owl:differentFrom",
+            mapping_justification="semapv:HumanCuration",
+            confidence=0.0,
         )
-        # 0.8 - (0.2 * 0.25) = 0.8 - 0.05 = 0.75
-        assert score == pytest.approx(0.75)
-
-    def test_soft_derank_floors_at_zero(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
-
-        score = _adjusted_score(
-            cand_score=0.01,
-            obj_id="obj:OTHER",
-            diff_from_object_ids={"obj:X"},
-            has_diff_from=True,
-            penalty=1.0,  # 1.0 * 0.25 = 0.25; 0.01 - 0.25 → floor 0.0
-        )
-        assert score == 0.0
-
-    def test_passthrough_when_no_feedback_applies(self) -> None:
-        from rosetta.core.similarity import _adjusted_score
-
-        score = _adjusted_score(
-            cand_score=0.42,
-            obj_id="obj:UNSEEN",
-            diff_from_object_ids=set(),
-            has_diff_from=False,
-            penalty=0.2,
-        )
-        assert score == pytest.approx(0.42)
+    ]
+    filtered = filter_decided_suggestions(result, log)
+    assert "http://src/X" in filtered
+    uris = [s["uri"] for s in filtered["http://src/X"]["suggestions"]]
+    assert "http://m/A" in uris
+    assert "http://m/B" not in uris
+    assert "http://m/C" in uris

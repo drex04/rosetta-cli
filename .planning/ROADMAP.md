@@ -427,3 +427,64 @@ Design doc: `.planning/designs/2026-04-21-ux-refactor.md`
 
 **Requirements:** REQ-UX-REFACTOR-01
 
+---
+
+## Phase 21: HumanCuration Filtering (lint + suggest)
+**Goal:** Prevent invalid HumanCuration rows from passing lint, and replace the penalty-based
+boost/derank system in `rosetta suggest` with clean subject/pair-level filtering based on
+reviewed mappings in the audit log.
+
+**Delivers:**
+- `rosetta/cli/lint.py` — new BLOCK rule: any candidate row with `mapping_justification == semapv:HumanCuration` is rejected (HC rows belong only in the audit log, never in candidates)
+- `rosetta/cli/suggest.py` — new filtering logic replaces `apply_sssom_feedback` deranking:
+  - Approved HC (predicate != `owl:differentFrom`) → filter ALL suggestions for that subject
+  - Rejected HC (`owl:differentFrom`) → filter only that specific subject-object pair
+- `rosetta/core/similarity.py` — `apply_sssom_feedback()` and `_adjusted_score()` deleted (no longer needed)
+- All config fallbacks (`get_config_value`) removed from every CLI command — all inputs are explicit flags with hardcoded defaults or `required=True`
+- Tests updated across `test_lint.py`, `test_suggest.py`, `test_ledger_integration.py`, `test_sssom_mistakes.py`
+- `docs/cli/suggest.md`, `docs/cli/lint.md`, `README.md` updated with filtering explanation and breaking changes
+
+**Requirements:** REQ-HC-FILTER-01
+
+---
+
+## Phase 22: Command Consolidation
+**Goal:** Reduce the CLI from 10 commands to 5 by folding `translate`, `embed`, `shapes`,
+`validate`, and `lint` into their natural hosts (`ingest`, `suggest`, `ledger append`,
+`transform`). Add multi-schema batching, role-based governance, and default validation.
+
+Design rationale: the 10-command pipeline required too many manual orchestration steps.
+Five commands cover the same workflow with fewer steps and less room for user error.
+
+**Delivers (split across 4 plans):**
+
+### 22-01: Ingest expansion
+- `rosetta ingest` accepts multiple source schemas as positional args
+- `--translate --lang --deepl-key` flags replace standalone `rosetta translate`
+- `--master ontology.ttl` normalizes ontology + generates SHACL shapes + scaffolds `rosetta.toml`
+- Multi-schema output: each input → `{stem}.linkml.yaml`; `-o` becomes output directory
+
+### 22-02: Suggest expansion
+- `rosetta suggest` accepts LinkML YAML schemas directly (not pre-computed embedding JSON)
+- Embeds internally via `EmbeddingModel` — no separate `rosetta embed` step
+- `--model` flag for model selection; structural blending preserved
+
+### 22-03: Ledger + transform refinements
+- `rosetta ledger append` integrates lint as a gate (rejects on BLOCK findings)
+- `--role analyst` / `--role accreditor` (required) — determines accepted row types and lint rules
+- `--dry-run` runs lint without appending (replaces standalone `rosetta lint`)
+- `--source-schema` and `--master-schema` required for lint checks
+- `rosetta transform` validates by default; `--no-validate` opt-out
+- Lint check functions moved from `rosetta/cli/lint.py` to `rosetta/core/lint.py`
+
+### 22-04: Command retirement + docs
+- Delete CLI modules: `translate.py`, `embed.py`, `shapes.py`, `validate.py`, `lint.py`
+- Update `_LAZY_SUBCOMMANDS` to 5 entries: ingest, suggest, ledger, compile, transform
+- Delete docs pages; update mkdocs.yml, README, pipeline-demo.sh
+- Delete/migrate test files for retired commands
+- Full 9-check verification pass
+
+**Dependencies:** Phase 21 (HC Filtering) must be complete first.
+
+**Requirements:** REQ-CMD-CONSOLIDATION-01
+

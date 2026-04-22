@@ -62,14 +62,34 @@ def _no_accredit_toml(tmp_path: Path) -> Path:
     return config
 
 
-def test_lint_on_suggest_output(tmp_path: Path, sssom_nor_path: Path) -> None:
-    """Clean SSSOM proposal fixture → exit 0, zero BLOCK findings."""
+def test_lint_on_suggest_output(tmp_path: Path) -> None:
+    """Clean MMC SSSOM candidates fixture → exit 0, zero BLOCK findings."""
     import csv
 
     from rosetta.core.ledger import AUDIT_LOG_COLUMNS
     from rosetta.core.ledger import SSSOM_HEADER as _HEADER
 
-    config = _no_accredit_toml(tmp_path)
+    # Build a clean MMC candidates file (not HC — HC belongs in the audit log)
+    candidates = tmp_path / "candidates.sssom.tsv"
+    _write_sssom(
+        candidates,
+        [
+            {
+                "subject_id": "nor_radar:hoyde_m",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mc:hasAltitudeFt",
+                "mapping_justification": "semapv:ManualMappingCuration",
+                "confidence": "0.9",
+            },
+            {
+                "subject_id": "nor_radar:breddegrad",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mc:hasLatitude",
+                "mapping_justification": "semapv:ManualMappingCuration",
+                "confidence": "0.85",
+            },
+        ],
+    )
 
     audit_log = tmp_path / "audit-log.sssom.tsv"
     with audit_log.open("w") as fh:
@@ -94,11 +114,9 @@ def test_lint_on_suggest_output(tmp_path: Path, sssom_nor_path: Path) -> None:
     result = CliRunner(mix_stderr=False).invoke(
         lint_cli,
         [
-            str(sssom_nor_path),
+            str(candidates),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src_schema),
             "--master-schema",
@@ -109,7 +127,7 @@ def test_lint_on_suggest_output(tmp_path: Path, sssom_nor_path: Path) -> None:
 
     report = LintReport.model_validate_json(result.stdout)
     assert report.summary.block == 0, (
-        f"expected zero BLOCK findings on clean fixture, got {report.summary.block}: "
+        f"expected zero BLOCK findings on clean MMC fixture, got {report.summary.block}: "
         f"{[f.rule for f in report.findings if f.severity == 'BLOCK']}"
     )
 
@@ -133,8 +151,6 @@ def test_lint_unit_dimension_mismatch(tmp_path: Path) -> None:
 
     from rosetta.core.ledger import AUDIT_LOG_COLUMNS
     from rosetta.core.ledger import SSSOM_HEADER as _HEADER
-
-    config = _no_accredit_toml(tmp_path)
 
     audit_log = tmp_path / "audit-log.sssom.tsv"
     with audit_log.open("w") as fh:
@@ -162,8 +178,6 @@ def test_lint_unit_dimension_mismatch(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src_schema),
             "--master-schema",

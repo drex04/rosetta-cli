@@ -69,68 +69,6 @@ def _parse_suggest_output(output: str) -> list[dict[str, str]]:
 
 
 # ---------------------------------------------------------------------------
-# Unit-level integration: apply_sssom_feedback
-# ---------------------------------------------------------------------------
-
-
-def make_candidates() -> list[dict[str, object]]:
-    return [
-        {"uri": TGT_URI, "score": 0.75, "label": "Altitude"},
-        {"uri": OTHER_TGT, "score": 0.60, "label": "Elevation"},
-    ]
-
-
-def make_approved_rows(predicate: str = "skos:relatedMatch") -> list[SSSOMRow]:
-    return [
-        SSSOMRow(
-            subject_id=SRC_URI,
-            predicate_id=predicate,
-            object_id=TGT_URI,
-            mapping_justification="semapv:LexicalMatching",
-            confidence=0.8,
-        )
-    ]
-
-
-def test_derank_revoked() -> None:
-    """owl:differentFrom row decreases score but candidate is NOT removed."""
-    from rosetta.core.similarity import apply_sssom_feedback
-
-    approved_rows = make_approved_rows("owl:differentFrom")
-    candidates = make_candidates()
-    result = apply_sssom_feedback(SRC_URI, candidates, approved_rows, penalty=0.2)
-
-    uris = [c["uri"] for c in result]
-    assert TGT_URI in uris
-    assert OTHER_TGT in uris
-
-    tgt = next(c for c in result if c["uri"] == TGT_URI)
-    assert tgt["score"] < 0.75
-
-
-def test_no_approved_rows_match_passthrough() -> None:
-    """Candidates with no matching approved rows are unchanged."""
-    from rosetta.core.similarity import apply_sssom_feedback
-
-    approved_rows: list[SSSOMRow] = []
-    result = apply_sssom_feedback(SRC_URI, make_candidates(), approved_rows)
-    original = make_candidates()
-    assert len(result) == len(original)
-    for res, orig in zip(result, original):
-        assert res["uri"] == orig["uri"]
-        assert res["score"] == pytest.approx(float(orig["score"]))  # pyright: ignore[reportArgumentType]
-
-
-def test_empty_candidates() -> None:
-    """Empty candidate list returns empty list regardless of approved rows."""
-    from rosetta.core.similarity import apply_sssom_feedback
-
-    approved_rows = make_approved_rows("skos:relatedMatch")
-    result = apply_sssom_feedback(SRC_URI, [], approved_rows)
-    assert not result
-
-
-# ---------------------------------------------------------------------------
 # Full E2E: accredit ingest → suggest
 # ---------------------------------------------------------------------------
 
@@ -153,10 +91,8 @@ def _make_embed_fixtures(
     return src_file, master_file
 
 
-def test_full_flow_approve_suppresses_future_suggestion(
-    tmp_path: Path, tmp_rosetta_toml: Path
-) -> None:
-    """MMC → HC approve → suggest omits that pair from output."""
+def test_full_flow_approve_suppresses_future_suggestion(tmp_path: Path) -> None:
+    """MMC → HC approve → suggest omits ALL rows for that subject from output."""
     src_file, master_file = _make_embed_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
@@ -164,95 +100,67 @@ def test_full_flow_approve_suppresses_future_suggestion(
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
     append_log([_row(SRC_URI, TGT_URI, HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
 
-    # Suggest with config pointing to audit log
+    # Suggest with explicit audit-log path
     result = CliRunner().invoke(
-        suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(log_path)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = _parse_suggest_output(result.output)
-    approved_tgt = next(
-        (r for r in rows if r.get("subject_id") == SRC_URI and r.get("object_id") == TGT_URI),
-        None,
+    # Subject-level suppression: no rows at all for the approved subject
+    src_rows = [r for r in rows if r.get("subject_id") == SRC_URI]
+    assert not src_rows, (
+        "Approved HC subject should have all suggestions removed from suggest output"
     )
-    assert approved_tgt is None, "Approved HC pair should be suppressed from suggest output"
 
 
-def test_full_flow_reject_deranks_future_suggestion(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
-    """MMC → HC reject (owl:differentFrom) → suggest shows deranked confidence."""
+def test_full_flow_reject_filters_pair(tmp_path: Path) -> None:
+    """Rejected pair is completely absent from suggest output."""
     src_file, master_file = _make_embed_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
-
-    # Baseline
-    runner = CliRunner()
-    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
-    dummy_log.write_text("")
-    baseline = runner.invoke(
-        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
-    )
-    assert baseline.exit_code == 0, baseline.output
-    baseline_rows = _parse_suggest_output(baseline.output)
-    baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
-    assert baseline_tgt is not None
-    baseline_score = float(baseline_tgt["confidence"])
 
     # Ingest MMC then HC rejection
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
     append_log([_row(SRC_URI, TGT_URI, HC_JUSTIFICATION, predicate="owl:differentFrom")], log_path)
 
-    result = runner.invoke(
-        suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
+    result = CliRunner().invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(log_path)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)
-    deranked_rows = _parse_suggest_output(result.output)
-    deranked_tgt = next((r for r in deranked_rows if TGT_URI in r.get("object_id", "")), None)
-    assert deranked_tgt is not None
-    deranked_score = float(deranked_tgt["confidence"])
-    assert deranked_score < baseline_score, (
-        f"Expected deranked ({deranked_score}) < baseline ({baseline_score})"
+    rows = _parse_suggest_output(result.output)
+    rejected_pair = next(
+        (r for r in rows if r.get("subject_id") == SRC_URI and TGT_URI in r.get("object_id", "")),
+        None,
     )
+    assert rejected_pair is None, "HC-rejected pair should be completely absent from suggest output"
+    # Other suggestions for the subject should still appear
+    other_rows = [r for r in rows if r.get("subject_id") == SRC_URI]
+    assert other_rows, "Other suggestions for the rejected subject should still appear"
 
 
-def test_full_flow_correction_overrides_previous_decision(
-    tmp_path: Path, tmp_rosetta_toml: Path
-) -> None:
-    """MMC → HC approve → HC correction (reject) → suggest shows deranked."""
+def test_full_flow_correction_overrides_previous_decision(tmp_path: Path) -> None:
+    """MMC → HC approve → HC correction (reject) → subject fully absent (approved wins)."""
     src_file, master_file = _make_embed_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
 
-    # Baseline
-    runner = CliRunner()
-    dummy_log = tmp_path / "dummy-audit-log.sssom.tsv"
-    dummy_log.write_text("")
-    baseline = runner.invoke(
-        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(dummy_log)]
-    )
-    assert baseline.exit_code == 0
-    baseline_rows = _parse_suggest_output(baseline.output)
-    baseline_tgt = next((r for r in baseline_rows if TGT_URI in r.get("object_id", "")), None)
-    assert baseline_tgt is not None
-    baseline_score = float(baseline_tgt["confidence"])
-
     # MMC → approve → reject correction
+    # filter_decided_suggestions sees both HC rows; approved wins over rejected
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
     append_log([_row(SRC_URI, TGT_URI, HC_JUSTIFICATION, predicate="skos:exactMatch")], log_path)
     append_log([_row(SRC_URI, TGT_URI, HC_JUSTIFICATION, predicate="owl:differentFrom")], log_path)
 
-    result = runner.invoke(
-        suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
+    result = CliRunner().invoke(
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(log_path)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     corrected_rows = _parse_suggest_output(result.output)
-    corrected_tgt = next((r for r in corrected_rows if TGT_URI in r.get("object_id", "")), None)
-    assert corrected_tgt is not None
-    corrected_score = float(corrected_tgt["confidence"])
-    assert corrected_score < baseline_score, (
-        f"Expected corrected ({corrected_score}) < baseline ({baseline_score})"
+    # Approved (non-differentFrom) HC exists in log → subject fully removed
+    src_rows = [r for r in corrected_rows if r.get("subject_id") == SRC_URI]
+    assert not src_rows, (
+        "When both approved and rejected HC exist for same subject, approved wins: subject absent"
     )
 
 
-def test_suggest_existing_pair_merge_preserves_justification(
-    tmp_path: Path, tmp_rosetta_toml: Path
-) -> None:
+def test_suggest_existing_pair_merge_preserves_justification(tmp_path: Path) -> None:
     """MMC row in log → suggest output has ManualMappingCuration for that pair."""
     src_file, master_file = _make_embed_fixtures(tmp_path)
     log_path = tmp_path / "audit-log.sssom.tsv"
@@ -261,7 +169,7 @@ def test_suggest_existing_pair_merge_preserves_justification(
     append_log([_row(SRC_URI, TGT_URI, MMC_JUSTIFICATION)], log_path)
 
     result = CliRunner().invoke(
-        suggest_cli, [str(src_file), str(master_file), "--config", str(tmp_rosetta_toml)]
+        suggest_cli, [str(src_file), str(master_file), "--audit-log", str(log_path)]
     )
     assert result.exit_code == 0, result.output + str(result.exception)
     rows = _parse_suggest_output(result.output)

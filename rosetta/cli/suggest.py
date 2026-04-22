@@ -10,14 +10,13 @@ from typing import Any
 import click
 import numpy as np
 
-from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.ledger import DATETIME_MIN, load_log
 from rosetta.core.models import (
     EmbeddingReport,
     SSSOMRow,
 )
-from rosetta.core.similarity import apply_sssom_feedback, rank_suggestions
+from rosetta.core.similarity import filter_decided_suggestions, rank_suggestions
 
 _SSSOM_HEADER_LINES = [
     "# mapping_set_id: https://rosetta-cli/mappings",
@@ -58,40 +57,42 @@ _SSSOM_COLUMNS = [
 )
 @click.argument("source", type=click.Path(exists=True))
 @click.argument("master", type=click.Path(exists=True))
-@click.option("--top-k", default=None, type=int, help="Max suggestions per field")
-@click.option("--min-score", default=None, type=float, help="Minimum cosine score")
+@click.option("--top-k", default=5, show_default=True, type=int, help="Max suggestions per field")
+@click.option(
+    "--min-score",
+    default=0.0,
+    show_default=True,
+    type=float,
+    help="Minimum cosine score",
+)
 @click.option(
     "-o", "--output", default=None, type=click.Path(), help="Output file (default: stdout)"
 )
-@click.option("-c", "--config", default="rosetta.toml", show_default=True)
+@click.option(
+    "--structural-weight",
+    default=0.2,
+    show_default=True,
+    type=float,
+    help="Weight for structural features when blending (0.0 = lexical-only).",
+)
 @click.option(
     "--audit-log",
-    default=None,
+    required=True,
     type=click.Path(),
     help="Path to SSSOM audit log.",
 )
 def cli(
     source: str,
     master: str,
-    top_k: int | None,
-    min_score: float | None,
+    top_k: int,
+    min_score: float,
     output: str | None,
-    config: str,
-    audit_log: str | None,
+    structural_weight: float,
+    audit_log: str,
 ) -> None:
     """Rank master ontology candidates for source schema fields (SSSOM TSV output)."""
-    cfg = load_config(Path(config))
-    resolved_top_k = int(get_config_value(cfg, "suggest", "top_k", cli_value=top_k) or 5)
-    resolved_min_score = float(
-        get_config_value(cfg, "suggest", "min_score", cli_value=min_score) or 0.0
-    )
-
-    # Resolve audit log path: CLI flag > config fallback > error
-    log_path_str: str | None = audit_log or get_config_value(cfg, "ledger", "log", cli_value=None)
-    if not log_path_str:
-        raise click.UsageError("Audit log not found — run rosetta ledger append first")
     log: list[SSSOMRow] = []
-    lp = Path(log_path_str)
+    lp = Path(audit_log)
     if lp.exists():
         log = load_log(lp)
 
@@ -124,13 +125,6 @@ def cli(
         A = np.array([src_report.root[u].lexical for u in src_uris], dtype=np.float32)
         B = np.array([master_report.root[u].lexical for u in master_uris], dtype=np.float32)
 
-        _raw_structural_weight = get_config_value(
-            cfg, "suggest", "structural_weight", cli_value=None
-        )
-        resolved_structural_weight: float = (
-            float(_raw_structural_weight) if _raw_structural_weight is not None else 0.2
-        )
-
         # Build structural numpy arrays (empty structural → zero-row matrix → fallback triggers)
         src_structs = [src_report.root[u].structural for u in src_uris]
         master_structs = [master_report.root[u].structural for u in master_uris]
@@ -155,8 +149,8 @@ def cli(
             A_struct is not None
             and B_struct is not None
             and np.any(A_struct != 0)
-            and np.any(B_struct != 0)  # pyright: ignore[reportOperatorIssue]
-            and resolved_structural_weight > 0.0
+            and np.any(B_struct != 0)
+            and structural_weight > 0.0
         )
         mapping_justification = (
             "semapv:CompositeMatching" if blending_active else "semapv:LexicalMatching"
@@ -168,18 +162,14 @@ def cli(
             A,
             master_uris,
             B,
-            resolved_top_k,
-            resolved_min_score,
+            top_k,
+            min_score,
             A_struct=A_struct,
             B_struct=B_struct,
-            structural_weight=resolved_structural_weight,
+            structural_weight=structural_weight,
         )
 
-        # Apply per-field derank from rejected HumanCuration log rows
-        hc_rows = [r for r in log if r.mapping_justification == "semapv:HumanCuration"]
-        if hc_rows:
-            for src_uri, entry in result.items():
-                entry["suggestions"] = apply_sssom_feedback(src_uri, entry["suggestions"], hc_rows)
+        result = filter_decided_suggestions(result, log)
 
         # Build index: (subject_id, object_id) -> latest non-CompositeMatching log row
         log_index: dict[tuple[str, str], SSSOMRow] = {}
@@ -191,14 +181,6 @@ def cli(
                     existing.mapping_date or DATETIME_MIN
                 ):
                     log_index[key] = row
-
-        # Approved HC pairs — suppress from output (already decided)
-        hc_approved_pairs: set[tuple[str, str]] = {
-            (r.subject_id, r.object_id)
-            for r in log
-            if r.mapping_justification == "semapv:HumanCuration"
-            and r.predicate_id != "owl:differentFrom"
-        }
 
         # For each candidate in result: if pair is in log_index, refresh justification/predicate
         for src_uri, entry in result.items():
@@ -217,8 +199,6 @@ def cli(
             src_label = src_report.root[src_uri].label
 
             for cand in candidates_tsv:
-                if (src_uri, cand["uri"]) in hc_approved_pairs:
-                    continue
                 obj_uri: str = cand["uri"]  # pyright: ignore[reportAny]
                 score: float = cand["score"]  # pyright: ignore[reportAny]
                 obj_label = (
@@ -236,8 +216,8 @@ def cli(
                         confidence=score,
                         subject_label=src_label,
                         object_label=obj_label,
-                        mapping_date=cand.get("mapping_date") or None,  # pyright: ignore[reportAny]
-                        record_id=cand.get("record_id") or None,  # pyright: ignore[reportAny]
+                        mapping_date=cand.get("mapping_date") or None,
+                        record_id=cand.get("record_id") or None,
                         subject_datatype=src_report.root[src_uri].datatype,
                         object_datatype=(
                             master_report.root[obj_uri].datatype

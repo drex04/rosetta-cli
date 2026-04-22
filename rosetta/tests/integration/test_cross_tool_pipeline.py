@@ -85,9 +85,22 @@ def test_embed_suggest_compile_format_compatibility(
 
     # 3. Suggest
     suggest_sssom = tmp_path / "suggest.sssom.tsv"
+    empty_log = tmp_path / "empty-audit-log.sssom.tsv"
+    from rosetta.core.ledger import append_log as _append_log_tmp
+
+    _append_log_tmp([], empty_log)
     result = runner.invoke(
         suggest_cli,
-        [str(src_embed), str(mst_embed), "--output", str(suggest_sssom), "--top-k", "1"],
+        [
+            str(src_embed),
+            str(mst_embed),
+            "--output",
+            str(suggest_sssom),
+            "--top-k",
+            "1",
+            "--audit-log",
+            str(empty_log),
+        ],
     )
     assert result.exit_code == 0, f"suggest failed: {result.stderr}"
 
@@ -148,14 +161,27 @@ def _run_embed_suggest(
     master_schema_path: Path,
 ) -> Path:
     """Shared helper: embed both schemas, run suggest, return suggest SSSOM path."""
+    from rosetta.core.ledger import append_log as _append_log_helper
+
     src_embed = tmp_path / "src.embed.json"
     runner.invoke(embed_cli, [str(nor_linkml_path), "--output", str(src_embed)])
     mst_embed = tmp_path / "master.embed.json"
     runner.invoke(embed_cli, [str(master_schema_path), "--output", str(mst_embed)])
     suggest_sssom = tmp_path / "suggest.sssom.tsv"
+    helper_log = tmp_path / "helper-audit-log.sssom.tsv"
+    _append_log_helper([], helper_log)
     result = runner.invoke(
         suggest_cli,
-        [str(src_embed), str(mst_embed), "--output", str(suggest_sssom), "--top-k", "1"],
+        [
+            str(src_embed),
+            str(mst_embed),
+            "--output",
+            str(suggest_sssom),
+            "--top-k",
+            "1",
+            "--audit-log",
+            str(helper_log),
+        ],
     )
     assert result.exit_code == 0, f"suggest failed: {result.stderr}"
     return suggest_sssom
@@ -165,7 +191,6 @@ def test_suggest_to_accredit_append(
     tmp_path: Path,
     nor_linkml_path: Path,
     master_schema_path: Path,
-    tmp_rosetta_toml: Path,
     mock_model: None,
 ) -> None:
     """Suggest SSSOM output can be appended by accredit without errors.
@@ -175,10 +200,11 @@ def test_suggest_to_accredit_append(
     """
     runner = CliRunner(mix_stderr=False)
     suggest_sssom = _run_embed_suggest(runner, tmp_path, nor_linkml_path, master_schema_path)
+    accredit_log = tmp_path / "accredit-audit-log.sssom.tsv"
 
     result = runner.invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(suggest_sssom)],
+        ["--audit-log", str(accredit_log), "append", str(suggest_sssom)],
     )
     assert result.exit_code == 0, (
         f"accredit append failed on suggest output: {result.stderr}\n"
@@ -204,15 +230,13 @@ def test_suggest_to_lint(
     from rosetta.core.ledger import append_log
 
     append_log([], audit_log)
-    no_accredit_toml = tmp_path / "rosetta.toml"
-    no_accredit_toml.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{audit_log}"\n')
 
     result = runner.invoke(
         lint_cli,
         [
             str(suggest_sssom),
-            "--config",
-            str(no_accredit_toml),
+            "--audit-log",
+            str(audit_log),
             "--source-schema",
             str(nor_linkml_path),
             "--master-schema",

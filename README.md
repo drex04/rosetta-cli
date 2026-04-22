@@ -9,8 +9,8 @@ Defense coalitions speak in many tongues. Norwegian radar tracks, German Patriot
 - **Ingest** schemas in seven formats (CSV, TSV, JSON Schema, OpenAPI, XSD, RDFS/OWL, JSON samples) and normalise to [LinkML](https://linkml.io/)
 - **Translate** non-English titles via DeepL so multilingual schemas embed in a common semantic space
 - **Embed** every class and slot with multilingual sentence transformers, blending lexical and structural similarity
-- **Suggest** candidate mappings ranked by cosine similarity, boosted by prior approvals and deranked by rejections
-- **Lint** proposals against physical-unit dimensionality, datatype compatibility, and audit-log conflicts
+- **Suggest** candidate mappings ranked by cosine similarity, filtering out already-resolved subjects and suppressing individually rejected pairs
+- **Lint** proposals against physical-unit dimensionality, datatype compatibility, and audit-log conflicts (requires `--audit-log`)
 - **Record** every decision in an append-only [SSSOM](https://mapping-commons.github.io/sssom/) audit log
 - **Compile** approved mappings into [YARRRML](https://rml.io/yarrrml/) and materialise JSON-LD via [morph-kgc](https://morph-kgc.readthedocs.io/)
 - **Validate** the resulting RDF against [SHACL](https://www.w3.org/TR/shacl/) shapes

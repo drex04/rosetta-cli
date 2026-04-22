@@ -9,8 +9,6 @@ from typing import cast
 
 import click
 
-from rosetta.core.config import get_config_value, load_config
-
 
 @click.command(
     epilog="""Examples:
@@ -35,14 +33,6 @@ from rosetta.core.config import get_config_value, load_config
     help="Output path for translated .linkml.yaml file (default: stdout).",
 )
 @click.option(
-    "-c",
-    "--config",
-    "config_path",
-    default=None,
-    type=click.Path(exists=True),
-    help="Path to rosetta.toml config file.",
-)
-@click.option(
     "--deepl-key",
     default=None,
     help="DeepL API key (overrides DEEPL_API_KEY env var).",
@@ -51,7 +41,6 @@ def cli(
     schema_file: str,
     source_lang: str,
     output: str | None,
-    config_path: str | None,
     deepl_key: str | None,
 ) -> None:
     """Translate class and slot titles in a LinkML schema to English using DeepL."""
@@ -62,13 +51,7 @@ def cli(
 
         from rosetta.core.translation import translate_schema
 
-        cfg = load_config(Path(config_path) if config_path else None)
-
-        resolved_key = (
-            deepl_key
-            or os.environ.get("DEEPL_API_KEY")
-            or get_config_value(cfg, "translate", "deepl_key")
-        )
+        resolved_key = deepl_key or os.environ.get("DEEPL_API_KEY")
         if not resolved_key and not source_lang.upper().startswith("EN"):
             click.echo(
                 "Error: DeepL API key required. Set DEEPL_API_KEY or use --deepl-key.",

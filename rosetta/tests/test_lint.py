@@ -193,7 +193,6 @@ def test_lint_sssom_passes_clean_file(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -202,8 +201,6 @@ def test_lint_sssom_passes_clean_file(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -234,7 +231,6 @@ def test_lint_sssom_max_one_mmc_per_pair_fails(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -243,8 +239,6 @@ def test_lint_sssom_max_one_mmc_per_pair_fails(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -276,7 +270,6 @@ def test_lint_sssom_max_one_mmc_per_subject_fails(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -285,8 +278,6 @@ def test_lint_sssom_max_one_mmc_per_subject_fails(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -302,7 +293,7 @@ def test_lint_sssom_max_one_mmc_per_subject_fails(tmp_path: Path) -> None:
     assert "c" in subject_findings[0]["message"]
 
 
-def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path) -> None:
     from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
@@ -350,8 +341,8 @@ def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_
         cli,
         [
             str(sssom),
-            "--config",
-            str(tmp_rosetta_toml),
+            "--audit-log",
+            str(log_path),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -361,7 +352,7 @@ def test_lint_sssom_no_reproposal_of_approved_fails(tmp_path: Path, tmp_rosetta_
     assert result.exit_code == 1
 
 
-def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path) -> None:
     from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION, append_log
     from rosetta.core.models import SSSOMRow
 
@@ -409,8 +400,8 @@ def test_lint_sssom_no_reproposal_of_rejected_fails(tmp_path: Path, tmp_rosetta_
         cli,
         [
             str(sssom),
-            "--config",
-            str(tmp_rosetta_toml),
+            "--audit-log",
+            str(log_path),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -434,7 +425,6 @@ def test_lint_sssom_invalid_predicate_fails(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -443,8 +433,6 @@ def test_lint_sssom_invalid_predicate_fails(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -469,7 +457,6 @@ def test_lint_sssom_empty_audit_log_skips_reproposal_check(tmp_path: Path) -> No
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -478,8 +465,6 @@ def test_lint_sssom_empty_audit_log_skips_reproposal_check(tmp_path: Path) -> No
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -524,7 +509,6 @@ def test_lint_sssom_unit_dimension_mismatch(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -533,8 +517,6 @@ def test_lint_sssom_unit_dimension_mismatch(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -563,7 +545,6 @@ def test_lint_sssom_unit_conversion_required(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -572,8 +553,6 @@ def test_lint_sssom_unit_conversion_required(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -603,7 +582,6 @@ def test_lint_sssom_unit_not_detected(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -612,8 +590,6 @@ def test_lint_sssom_unit_not_detected(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -647,7 +623,6 @@ def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -656,8 +631,6 @@ def test_lint_sssom_unit_no_iri_mapping(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -693,7 +666,6 @@ def test_lint_sssom_unit_detected_from_prose_label(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -702,8 +674,6 @@ def test_lint_sssom_unit_detected_from_prose_label(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -735,7 +705,6 @@ def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -744,8 +713,6 @@ def test_lint_sssom_datatype_mismatch(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -775,7 +742,6 @@ def test_lint_sssom_datatype_both_numeric_no_finding(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -784,8 +750,6 @@ def test_lint_sssom_datatype_both_numeric_no_finding(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -813,7 +777,6 @@ def test_lint_sssom_datatype_missing_skipped(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -822,8 +785,6 @@ def test_lint_sssom_datatype_missing_skipped(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -851,7 +812,6 @@ def test_lint_sssom_json_report_structure(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -860,8 +820,6 @@ def test_lint_sssom_json_report_structure(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -893,7 +851,6 @@ def test_lint_sssom_strict_warning_becomes_block(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -902,8 +859,6 @@ def test_lint_sssom_strict_warning_becomes_block(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -932,7 +887,6 @@ def test_lint_sssom_strict_info_stays_info(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -941,8 +895,6 @@ def test_lint_sssom_strict_info_stays_info(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -974,7 +926,6 @@ def test_lint_sssom_unit_vector_missing(tmp_path: Path, monkeypatch: pytest.Monk
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -983,8 +934,6 @@ def test_lint_sssom_unit_vector_missing(tmp_path: Path, monkeypatch: pytest.Monk
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1020,7 +969,6 @@ def test_lint_sssom_proposals_json_finding(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -1029,8 +977,6 @@ def test_lint_sssom_proposals_json_finding(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1059,7 +1005,6 @@ def test_lint_sssom_skips_composite_matching_rows(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -1068,8 +1013,6 @@ def test_lint_sssom_skips_composite_matching_rows(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1103,7 +1046,6 @@ def test_lint_sssom_mixed_composite_and_mmc_only_lints_mmc(tmp_path: Path) -> No
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
     result = CliRunner().invoke(
@@ -1112,8 +1054,6 @@ def test_lint_sssom_mixed_composite_and_mmc_only_lints_mmc(tmp_path: Path) -> No
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1213,7 +1153,6 @@ def test_lint_structural_block(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     result = CliRunner().invoke(
         cli,
@@ -1221,8 +1160,6 @@ def test_lint_structural_block(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1264,7 +1201,6 @@ def test_lint_structural_pass(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     result = CliRunner().invoke(
         cli,
@@ -1272,8 +1208,6 @@ def test_lint_structural_pass(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1302,7 +1236,6 @@ def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
             },
         ],
     )
-    config = _no_accredit_toml(tmp_path)
     audit_log = _write_empty_audit_log(tmp_path)
     result = CliRunner().invoke(
         cli,
@@ -1310,8 +1243,6 @@ def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
             str(sssom),
             "--audit-log",
             str(audit_log),
-            "--config",
-            str(config),
             "--source-schema",
             str(src),
         ],
@@ -1320,8 +1251,8 @@ def test_lint_schema_one_missing_errors(tmp_path: Path) -> None:
     assert "master-schema" in result.output
 
 
-def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
-    """--audit-log omitted from CLI; rosetta.toml [ledger].log used as fallback."""
+def test_lint_cli_audit_log_provided(tmp_path: Path) -> None:
+    """--audit-log provided explicitly → lint succeeds."""
     sssom = tmp_path / "clean.sssom.tsv"
     _write_sssom(
         sssom,
@@ -1338,15 +1269,12 @@ def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
     audit_log = _write_empty_audit_log(tmp_path)
     src, mst = _write_minimal_schemas(tmp_path)
 
-    config = tmp_path / "rosetta.toml"
-    config.write_text(f'[suggest]\ntop_k = 5\n\n[ledger]\nlog = "{audit_log}"\n')
-
     result = CliRunner().invoke(
         cli,
         [
             str(sssom),
-            "--config",
-            str(config),
+            "--audit-log",
+            str(audit_log),
             "--source-schema",
             str(src),
             "--master-schema",
@@ -1354,3 +1282,73 @@ def test_lint_cli_audit_log_config_fallback(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output + str(result.exception)
+
+
+def test_lint_hc_in_candidates_blocked(tmp_path: Path) -> None:
+    """Candidates SSSOM file with an HC row → BLOCK finding with rule 'hc_in_candidates', exit 1."""
+    sssom = tmp_path / "hc_candidate.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "ex:fieldA",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "ex:masterA",
+                "mapping_justification": _HC,
+                "confidence": "0.95",
+            },
+        ],
+    )
+    audit_log = _write_empty_audit_log(tmp_path)
+    src, mst = _write_minimal_schemas(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(sssom),
+            "--audit-log",
+            str(audit_log),
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+        ],
+    )
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.output)
+    hc_findings = [f for f in data["findings"] if f["rule"] == "hc_in_candidates"]
+    assert hc_findings, "Expected hc_in_candidates BLOCK finding"
+    assert hc_findings[0]["severity"] == "BLOCK"
+
+
+def test_lint_audit_log_autocreated(tmp_path: Path) -> None:
+    """--audit-log pointing to nonexistent path → file is created, lint succeeds (exit 0)."""
+    sssom = tmp_path / "clean_auto.sssom.tsv"
+    _write_sssom(
+        sssom,
+        [
+            {
+                "subject_id": "a",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "b",
+                "mapping_justification": _MMC,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    new_log = tmp_path / "new-subdir" / "audit-log.sssom.tsv"
+    assert not new_log.exists()
+    src, mst = _write_minimal_schemas(tmp_path)
+    result = CliRunner().invoke(
+        cli,
+        [
+            str(sssom),
+            "--audit-log",
+            str(new_log),
+            "--source-schema",
+            str(src),
+            "--master-schema",
+            str(mst),
+        ],
+    )
+    assert result.exit_code == 0, result.output + str(result.exception)
+    assert new_log.exists(), "audit-log file should have been auto-created"

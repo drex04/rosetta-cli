@@ -1,6 +1,6 @@
 # rosetta lint
 
-Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (from `rosetta.toml [ledger].audit_log` or `--audit-log`) to check for conflicts with existing decisions.
+Validates analyst-proposed SSSOM TSV files *before* they are staged for accreditor review. Reads the audit log (`--audit-log`, required) to check for conflicts with existing decisions. If the specified log file does not exist it is created automatically as an empty log.
 
 ## Command reference
 
@@ -24,6 +24,7 @@ Validates analyst-proposed SSSOM TSV files *before* they are staged for accredit
 | `max_one_mmc_per_subject` | **BLOCK** | Same subject has multiple confirmed mappings to different objects |
 | `reproposal_of_approved` | **BLOCK** | Pair already has an approved `HumanCuration` in the audit log |
 | `reproposal_of_rejected` | **BLOCK** | Pair already has a rejected `HumanCuration` in the audit log |
+| `hc_in_candidates` | **BLOCK** | `HumanCuration` row found in candidates — HC belongs only in the audit log |
 | `invalid_predicate` | **BLOCK** | Predicate is not one of the allowed SKOS/OWL predicates |
 
 With `--strict`, all WARNINGs are upgraded to BLOCKs. Use this as a CI gate on a mapping repo.
@@ -49,13 +50,15 @@ Both flags must be provided together; supplying only one is an error.
 ## Example
 
 ```bash
-# Validate analyst proposals (--source-schema and --master-schema required)
+# Validate analyst proposals
 uv run rosetta lint candidates.sssom.tsv \
+  --audit-log audit.sssom.tsv \
   --source-schema nor_radar_en.linkml.yaml \
   --master-schema master_cop_en.linkml.yaml
 
 # Strict mode — WARNINGs become BLOCKs (CI-friendly)
 uv run rosetta lint candidates.sssom.tsv \
+  --audit-log audit.sssom.tsv \
   --source-schema nor_radar_en.linkml.yaml \
   --master-schema master_cop_en.linkml.yaml \
   --strict --output lint.json

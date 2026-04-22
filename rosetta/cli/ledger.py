@@ -9,7 +9,6 @@ from typing import IO
 
 import click
 
-from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.ledger import (
     AUDIT_LOG_COLUMNS,
@@ -34,15 +33,12 @@ from rosetta.core.models import SSSOMRow
 
   rosetta ledger review -o pending.sssom.tsv""",
 )
-@click.option("--audit-log", "log", default=None, help="Path to audit-log SSSOM TSV")
-@click.option("--config", "-c", "config", default=None, help="Path to rosetta.toml")
+@click.option("--audit-log", "log", required=True, help="Path to audit-log SSSOM TSV")
 @click.pass_context
-def cli(ctx: click.Context, log: str | None, config: str | None) -> None:
+def cli(ctx: click.Context, log: str) -> None:
     """Manage mapping accreditation via append-only SSSOM audit log."""
-    cfg = load_config(Path(config)) if config else load_config()
-    log_path_str = log or get_config_value(cfg, "ledger", "log") or "audit-log.sssom.tsv"
     ctx.ensure_object(dict)
-    ctx.obj["log"] = Path(log_path_str)
+    ctx.obj["log"] = Path(log)
 
 
 def _row_to_tsv_cell(row: SSSOMRow, col: str) -> str:

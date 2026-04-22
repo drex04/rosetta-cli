@@ -66,12 +66,7 @@ def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
     return path
 
 
-def _log_path_from_toml(tmp_rosetta_toml: Path) -> Path:
-    """The tmp_rosetta_toml fixture writes log = "<tmp_path>/audit-log.sssom.tsv"."""
-    return tmp_rosetta_toml.parent / "audit-log.sssom.tsv"
-
-
-def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_duplicate_mmc(tmp_path: Path) -> None:
     """Two MMC rows with the same (subject_id, object_id) in one file → exit 1, no log write.
 
     The in-file duplicate guard lives at `rosetta/cli/accredit.py::ingest` and emits
@@ -79,7 +74,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
 
         Error: Duplicate MMC pair in file: (nor:alt_m, mc:altitude)
     """
-    log_path = _log_path_from_toml(tmp_rosetta_toml)
+    log_path = tmp_path / "audit-log.sssom.tsv"
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -105,7 +100,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
+        ["--audit-log", str(log_path), "append", str(tsv_file)],
     )
 
     # 1. Exit code.
@@ -118,7 +113,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_wrong_column_count(tmp_path: Path) -> None:
     """TSV header missing required SSSOM columns → exit 1, clear diagnostic, no log write.
 
     `parse_sssom_tsv` raises `ValueError` at the parse boundary when the header
@@ -126,7 +121,7 @@ def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> 
     mapping_justification, confidence). The CLI catches the exception and emits
     a clean error naming the missing columns. No log file is created.
     """
-    log_path = _log_path_from_toml(tmp_rosetta_toml)
+    log_path = tmp_path / "audit-log.sssom.tsv"
     assert not log_path.exists()
 
     tsv_file = tmp_path / "missing_required_cols.sssom.tsv"
@@ -139,7 +134,7 @@ def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> 
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
+        ["--audit-log", str(log_path), "append", str(tsv_file)],
     )
 
     # 1. Exit code — explicit failure from the new header guard.
@@ -153,21 +148,18 @@ def test_accredit_wrong_column_count(tmp_path: Path, tmp_rosetta_toml: Path) -> 
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_phantom_rejection_filter(tmp_path: Path) -> None:
     """HC with owl:differentFrom but no prior MMC → exit 1, no log write.
 
     Flow: `check_ingest_row` routes HC-justified rows to `_check_hc_transition`,
     which raises ValueError when `pair_rows` has no MMC row. The CLI converts this
-    into an entry in its `errors` list and exits 1. Stderr contains:
+    into an entry in its `errors` list and exits 1.
 
-        Error: Cannot ingest HumanCuration for (nor:spd, mc:speed): \
-            pair has no ManualMappingCuration row in the audit log.
-
-    Note: the CLI does NOT have a dedicated "cannot derank" check — it relies on
-    the broader HC→MMC transition guard. The substring match below targets phrasing
-    that is stable in the current core implementation.
+    Since filter_decided_suggestions filters HC-rejected pairs from suggest output,
+    a phantom rejection (no prior MMC) must be rejected at ingest time — otherwise
+    the pair would be silently filtered from future suggests without any audit trail.
     """
-    log_path = _log_path_from_toml(tmp_rosetta_toml)
+    log_path = tmp_path / "audit-log.sssom.tsv"
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -181,12 +173,12 @@ def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None
                 "confidence": "1.0",
             }
         ],
-        "phantom_derank.sssom.tsv",
+        "phantom_rejection.sssom.tsv",
     )
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
+        ["--audit-log", str(log_path), "append", str(tsv_file)],
     )
 
     # 1. Exit code.
@@ -203,13 +195,13 @@ def test_accredit_phantom_derank(tmp_path: Path, tmp_rosetta_toml: Path) -> None
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 
-def test_accredit_clean_append_baseline(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_clean_append_baseline(tmp_path: Path) -> None:
     """Positive control: a single valid MMC row ingests cleanly.
 
     Guarantees the above negative tests fail for the *right* reason — a valid TSV
     under the same fixture really does produce exit 0 + a non-empty log.
     """
-    log_path = _log_path_from_toml(tmp_rosetta_toml)
+    log_path = tmp_path / "audit-log.sssom.tsv"
     assert not log_path.exists()
 
     tsv_file = _write_sssom(
@@ -228,7 +220,7 @@ def test_accredit_clean_append_baseline(tmp_path: Path, tmp_rosetta_toml: Path) 
 
     result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(tsv_file)],
+        ["--audit-log", str(log_path), "append", str(tsv_file)],
     )
 
     # 1. Exit code.

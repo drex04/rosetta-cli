@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from typing import Any
 
 import numpy as np
@@ -99,51 +98,34 @@ def rank_suggestions(
     return result
 
 
-def _adjusted_score(
-    cand_score: float,
-    obj_id: str,
-    diff_from_object_ids: set[str],
-    has_diff_from: bool,
-    penalty: float,
-) -> float:
-    """Compute the feedback-adjusted score for a single candidate (derank only)."""
-    if obj_id in diff_from_object_ids:
-        return max(cand_score - penalty, 0.0)
-    if has_diff_from:
-        return max(cand_score - penalty * 0.25, 0.0)
-    return cand_score
+def filter_decided_suggestions(result: dict[str, Any], log: list[SSSOMRow]) -> dict[str, Any]:
+    """Filter suggestions based on HumanCuration decisions in the audit log.
 
+    - Approved (HC + predicate != owl:differentFrom): subject removed entirely.
+    - Rejected (HC + predicate == owl:differentFrom): only that (subject, object) pair removed.
+    - If subject has both approved and rejected HC rows, approved wins (subject fully removed).
+    - Empty log → return full result unchanged (as a new dict).
 
-def apply_sssom_feedback(
-    subject_id: str,
-    candidates: list[dict[str, Any]],
-    approved_rows: list[SSSOMRow],
-    penalty: float = 0.2,
-) -> list[dict[str, Any]]:
-    """Derank candidates based on rejected HumanCuration log rows.
-
-    - Row predicate_id == owl:differentFrom → subtract penalty (floor 0.0), row NOT removed.
-    - If ANY differentFrom row exists for subject_id → apply penalty * 0.25 to all
-      OTHER candidates for that field (soft subject-breadth deranking).
-    Returns a new list (does not mutate input).
+    Returns a new dict; does not mutate input.
     """
-    result = copy.deepcopy(candidates)
+    hc_approved_subjects: set[str] = set()
+    hc_rejected_pairs: set[tuple[str, str]] = set()
 
-    diff_from_object_ids = {
-        r.object_id
-        for r in approved_rows
-        if r.subject_id == subject_id and r.predicate_id == "owl:differentFrom"
-    }
-    has_diff_from = bool(diff_from_object_ids)
+    for row in log:
+        if row.mapping_justification != "semapv:HumanCuration":
+            continue
+        if row.predicate_id == "owl:differentFrom":
+            hc_rejected_pairs.add((row.subject_id, row.object_id))
+        else:
+            hc_approved_subjects.add(row.subject_id)
 
-    for cand in result:
-        obj_id = str(cand.get("uri", ""))
-        cand["score"] = _adjusted_score(
-            float(cand["score"]),
-            obj_id,
-            diff_from_object_ids,
-            has_diff_from,
-            penalty,
-        )
+    filtered: dict[str, Any] = {}
+    for src_uri, entry in result.items():
+        if src_uri in hc_approved_subjects:
+            continue
+        kept = [
+            sug for sug in entry["suggestions"] if (src_uri, sug["uri"]) not in hc_rejected_pairs
+        ]
+        filtered[src_uri] = {"suggestions": kept}
 
-    return result
+    return filtered

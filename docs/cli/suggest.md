@@ -1,6 +1,6 @@
 # rosetta suggest
 
-Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. When an audit log is configured, automatically boosts previously approved mappings and deranks rejected ones.
+Compares source embeddings against master embeddings and ranks candidates by cosine similarity. Outputs [SSSOM](https://mapping-commons.github.io/sssom/) TSV. Requires an audit log (`--audit-log`) to filter out already-resolved subjects and suppress individually rejected pairs.
 
 ## Command reference
 
@@ -47,24 +47,27 @@ http://rosetta.interop/ns/NOR/nor_radar/altitude_m	skos:relatedMatch	http://rose
 
 ## Structural blending
 
-When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `structural_weight` in `rosetta.toml` under `[suggest]` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
+When both embed files contain a `"structural"` array per node, `rosetta suggest` automatically blends lexical and structural cosine similarity. The blend weight is controlled by `--structural-weight` (default: `0.2`). Set it to `0.0` to disable blending. If either embed file lacks `"structural"` arrays, scoring falls back to lexical-only automatically.
 
 When blending is active, `mapping_justification` is `semapv:CompositeMatching`; otherwise it is `semapv:LexicalMatching`.
 
-## Audit-log integration
+## Audit-log filtering
 
-When `[accredit].audit_log` is set in `rosetta.toml` (or `--audit-log` is passed) and the log file exists, `rosetta suggest` automatically:
+`--audit-log` is required. `rosetta suggest` reads the log and applies two filtering rules before emitting candidates:
 
-- **Boosts** candidates whose (subject, object) pair has an approved `HumanCuration` row in the log.
-- **Deranks** candidates whose pair has a rejected `HumanCuration` row (`predicate_id = owl:differentFrom`).
-- **Preserves** log-row justification and predicate for already-tracked pairs: if a source–target pair already appears in the audit log with a `ManualMappingCuration` or `HumanCuration` row, that row is included in `candidates.sssom.tsv` with its existing justification and predicate, but with a freshly computed confidence. All other pairs appear as new `CompositeMatching` (or `LexicalMatching`) candidates.
+- **Approved mappings** — a `HumanCuration` row whose predicate is not `owl:differentFrom`. All suggestions for that subject are excluded from output. The subject is considered fully resolved.
+- **Rejected mappings** — a `HumanCuration` row with `predicate_id = owl:differentFrom`. Only that specific (subject, object) pair is excluded; other candidates for the same subject are still shown.
 
-This means `candidates.sssom.tsv` provides a complete picture: newly computed candidates alongside the current state of all previously decided pairs.
+If a subject has both approved and rejected `HumanCuration` rows in the log, approved wins — the subject is fully excluded.
+
+Pending proposals (`ManualMappingCuration` rows, non-HC entries) are not filtered out; they appear in the output with freshly computed confidence values and updated metadata.
 
 ## Example
 
 ```bash
-uv run rosetta suggest nor.emb.json master.emb.json --output candidates.sssom.tsv
+uv run rosetta suggest nor.emb.json master.emb.json \
+  --audit-log audit.sssom.tsv \
+  --output candidates.sssom.tsv
 ```
 
 ## Exit codes

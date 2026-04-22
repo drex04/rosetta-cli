@@ -12,7 +12,6 @@ import click
 from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
-from rosetta.core.config import get_config_value, load_config
 from rosetta.core.embedding import (
     EmbeddingModel,
     extract_text_inputs_linkml,
@@ -29,21 +28,18 @@ from rosetta.core.models import EmbeddingReport, EmbeddingVectors
   rosetta -v embed source.linkml.yaml --include-definitions -o source.embeddings.json"""
 )
 @click.argument("schema_file", type=click.Path(exists=True, path_type=Path))
-@click.option("--model", default=None, help="Sentence-transformer model name.")
+@click.option(
+    "--model",
+    default="intfloat/e5-large-v2",
+    show_default=True,
+    help="Sentence-transformer model name.",
+)
 @click.option(
     "-o",
     "--output",
     default=None,
     type=click.Path(path_type=Path),
     help="Output JSON path (default: stdout).",
-)
-@click.option(
-    "-c",
-    "--config",
-    "config_path",
-    default=None,
-    type=click.Path(exists=True, path_type=Path),
-    help="Path to rosetta.toml config file.",
 )
 @click.option(
     "--include-definitions",
@@ -71,9 +67,8 @@ from rosetta.core.models import EmbeddingReport, EmbeddingVectors
 )
 def cli(
     schema_file: Path,
-    model: str | None,
+    model: str,
     output: Path | None,
-    config_path: Path | None,
     include_definitions: bool,
     include_parents: bool,
     include_ancestors: bool,
@@ -81,11 +76,6 @@ def cli(
 ) -> None:
     """Embed a LinkML schema using a sentence-transformer model."""
     try:
-        config = load_config(config_path)
-        model_name: str = (
-            model or get_config_value(config, "embed", "model") or "intfloat/e5-large-v2"
-        )
-
         schema = _cast(
             SchemaDefinition,
             yaml_loader.load(str(schema_file), target_class=SchemaDefinition),  # pyright: ignore[reportUnknownMemberType]
@@ -110,7 +100,7 @@ def cli(
             for name, slot in slots.items()
         }
 
-        em = EmbeddingModel(model_name)
+        em = EmbeddingModel(model)
         texts = [text for _, _, text in pairs]
         vectors = em.encode(texts)
 

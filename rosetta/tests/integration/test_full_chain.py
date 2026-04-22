@@ -98,21 +98,35 @@ def test_full_chain_json_to_lint(
 
     # 3. Suggest → SSSOM TSV.
     sssom_out = tmp_path / "candidates.sssom.tsv"
+    from rosetta.core.ledger import append_log as _al
+
+    empty_log = tmp_path / "empty-audit-log.sssom.tsv"
+    _al([], empty_log)
     suggest_result = runner.invoke(
         suggest_cli,
-        [str(src_embed), str(master_embed), "--output", str(sssom_out)],
+        [
+            str(src_embed),
+            str(master_embed),
+            "--output",
+            str(sssom_out),
+            "--audit-log",
+            str(empty_log),
+        ],
     )
     assert suggest_result.exit_code == 0, f"suggest: {suggest_result.stderr}"
     assert sssom_out.exists()
 
     # 4. Lint the SSSOM TSV → LintReport JSON.
     lint_out = tmp_path / "lint.json"
+    lint_log = tmp_path / "lint-audit-log.sssom.tsv"
     lint_result = runner.invoke(
         lint_cli,
         [
             str(sssom_out),
             "--output",
             str(lint_out),
+            "--audit-log",
+            str(lint_log),
             "--source-schema",
             str(stress_yaml),
             "--master-schema",

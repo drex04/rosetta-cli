@@ -7,7 +7,6 @@ import click
 import rdflib
 from linkml_runtime.utils.schemaview import SchemaView
 
-from rosetta.core.config import get_config_value, load_config
 from rosetta.core.io import open_output
 from rosetta.core.ledger import load_log, parse_sssom_tsv
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
@@ -50,7 +49,17 @@ def check_sssom_proposals(
     log: list[SSSOMRow],
 ) -> list[LintFinding]:
     """Return list of LintFindings. Empty list = no errors."""
-    findings: list[LintFinding] = []
+    findings: list[LintFinding] = [
+        LintFinding(
+            rule="hc_in_candidates",
+            severity="BLOCK",
+            source_uri=r.subject_id,
+            target_uri=r.object_id,
+            message="HumanCuration row found in candidates — HC belongs only in the audit log",
+        )
+        for r in rows
+        if r.mapping_justification == HC
+    ]
 
     # 1. MaxOneMmcPerPair
     mmc_rows = [r for r in rows if r.mapping_justification == MMC]
@@ -246,17 +255,20 @@ def _check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
       --audit-log audit-log.sssom.tsv
 
   rosetta -v lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
-      --audit-log audit-log.sssom.tsv -o report.json"""
+      --audit-log audit-log.sssom.tsv -o report.json
+
+  # audit-log will be created if it does not exist:
+  rosetta lint proposals.sssom.tsv --source-schema src.yaml --master-schema master.yaml \\
+      --audit-log /new/path/audit-log.sssom.tsv"""
 )
 @click.argument("sssom_file", type=click.Path(exists=True))
 @click.option("--output", "-o", default=None, help="Output JSON file (default: stdout).")
 @click.option("--strict", is_flag=True, default=False, help="Upgrade all WARNINGs to BLOCKs.")
-@click.option("--config", default=None, help="Path to rosetta.toml config file.")
 @click.option(
     "--audit-log",
     type=click.Path(),
-    default=None,
-    help="Path to SSSOM audit log.",
+    required=True,
+    help="Path to SSSOM audit log (created if it does not exist).",
 )
 @click.option(
     "--source-schema",
@@ -274,19 +286,19 @@ def cli(
     sssom_file: str,
     output: str | None,
     strict: bool,
-    config: str | None,
-    audit_log: str | None,
+    audit_log: str,
     source_schema: str,
     master_schema: str,
 ) -> None:
     """Lint a SSSOM proposal TSV for unit/datatype compatibility and structural rules."""
-    cfg = load_config(Path(config)) if config else load_config()
-
-    # Resolve audit log: CLI flag > config > empty
-    resolved_log_path: str | None = audit_log or get_config_value(cfg, "ledger", "log")
-    log: list[SSSOMRow] = []
-    if resolved_log_path and Path(resolved_log_path).exists():
-        log = load_log(Path(resolved_log_path))
+    lp = Path(audit_log)
+    if not lp.exists():
+        try:
+            lp.parent.mkdir(parents=True, exist_ok=True)
+            lp.touch()
+        except OSError as exc:
+            raise click.UsageError(f"Cannot create audit log at {audit_log}: {exc}") from exc
+    log = load_log(lp)
 
     rows = parse_sssom_tsv(Path(sssom_file))
 

@@ -65,7 +65,7 @@ def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
     return path
 
 
-def test_accredit_revoke_lifecycle(tmp_path: Path, tmp_rosetta_toml: Path) -> None:
+def test_accredit_revoke_lifecycle(tmp_path: Path) -> None:
     """After MMC + HC approval, an HC with owl:differentFrom flips state to 'rejected'."""
     log_path = tmp_path / "audit-log.sssom.tsv"
     pair = {"subject_id": "nor:spd_kmh", "object_id": "mc:speed"}
@@ -85,7 +85,7 @@ def test_accredit_revoke_lifecycle(tmp_path: Path, tmp_rosetta_toml: Path) -> No
     )
     assert (
         CliRunner(mix_stderr=False)
-        .invoke(accredit_cli, ["--config", str(tmp_rosetta_toml), "append", str(mmc_file)])
+        .invoke(accredit_cli, ["--audit-log", str(log_path), "append", str(mmc_file)])
         .exit_code
         == 0
     )
@@ -105,7 +105,7 @@ def test_accredit_revoke_lifecycle(tmp_path: Path, tmp_rosetta_toml: Path) -> No
     )
     assert (
         CliRunner(mix_stderr=False)
-        .invoke(accredit_cli, ["--config", str(tmp_rosetta_toml), "append", str(hc_file)])
+        .invoke(accredit_cli, ["--audit-log", str(log_path), "append", str(hc_file)])
         .exit_code
         == 0
     )
@@ -125,7 +125,7 @@ def test_accredit_revoke_lifecycle(tmp_path: Path, tmp_rosetta_toml: Path) -> No
     )
     revoke_result = CliRunner(mix_stderr=False).invoke(
         accredit_cli,
-        ["--config", str(tmp_rosetta_toml), "append", str(revoke_file)],
+        ["--audit-log", str(log_path), "append", str(revoke_file)],
     )
     assert revoke_result.exit_code == 0, f"revoke append failed: {revoke_result.stderr}"
 
