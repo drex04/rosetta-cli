@@ -46,18 +46,18 @@ rosetta suggest output/nor_radar.linkml.yaml output/master.linkml.yaml \
   --audit-log output/audit-log.sssom.tsv -o output/candidates.sssom.tsv
 
 # 3. Analyst edits candidates.sssom.tsv, then appends (lint gate runs automatically)
-rosetta ledger append --role analyst output/candidates.sssom.tsv \
+rosetta ledger --audit-log output/audit-log.sssom.tsv append \
+  --role analyst output/candidates.sssom.tsv \
   --source-schema output/nor_radar.linkml.yaml \
-  --master-schema output/master.linkml.yaml \
-  --audit-log output/audit-log.sssom.tsv
+  --master-schema output/master.linkml.yaml
 
 # 4. Accreditor reviews and approves
-rosetta ledger review --audit-log output/audit-log.sssom.tsv -o output/review.sssom.tsv
+rosetta ledger --audit-log output/audit-log.sssom.tsv review -o output/review.sssom.tsv
 # (accreditor edits review.sssom.tsv)
-rosetta ledger append --role accreditor output/review.sssom.tsv \
+rosetta ledger --audit-log output/audit-log.sssom.tsv append \
+  --role accreditor output/review.sssom.tsv \
   --source-schema output/nor_radar.linkml.yaml \
-  --master-schema output/master.linkml.yaml \
-  --audit-log output/audit-log.sssom.tsv
+  --master-schema output/master.linkml.yaml
 
 # 5. Compile approved mappings and materialise JSON-LD (validates by default)
 rosetta compile output/audit-log.sssom.tsv \

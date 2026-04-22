@@ -1,6 +1,6 @@
 # rosetta ledger
 
-Manages the two-role accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta suggest` (boost/derank) and `rosetta lint` (conflict checking).
+Manages the two-role accreditation pipeline using an append-only audit log (`audit-log.sssom.tsv`). The log is the single source of truth for accreditation decisions and feeds directly into `rosetta suggest` (boost/derank) and the `ledger append` lint gate (conflict checking).
 
 For the conceptual flow and state machine, see [Accreditation workflow](../concepts/accreditation.md).
 
@@ -18,7 +18,7 @@ For the conceptual flow and state machine, see [Accreditation workflow](../conce
 
 Requires `--role` (analyst or accreditor), `--source-schema`, and `--master-schema`. The append pipeline:
 
-1. **Lint gate** — runs `rosetta lint` on all rows in the file (before role filtering). Any `BLOCK`-severity finding rejects the entire append; nothing is written. `WARNING`-severity findings are printed to stderr and the append continues.
+1. **Lint gate** — runs lint checks on all rows in the file (before role filtering). Any `BLOCK`-severity finding rejects the entire append; nothing is written. `WARNING`-severity findings are printed to stderr and the append continues.
 2. **Role filtering** — after lint passes, only the rows matching the role are written:
    - `--role analyst` — accepts only `ManualMappingCuration` rows; `HumanCuration` rows trigger a `BLOCK`.
    - `--role accreditor` — accepts only `HumanCuration` rows; `ManualMappingCuration` rows are silently skipped.
@@ -39,21 +39,22 @@ Outputs the latest `HumanCuration` row per pair as SSSOM TSV — suitable for ex
 ### Analyst workflow
 
 ```bash
-# 1. Generate candidates (audit-log read automatically from rosetta.toml)
-uv run rosetta suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
+# 1. Generate candidates
+uv run rosetta suggest nor.linkml.yaml master.linkml.yaml \
+  --audit-log audit-log.sssom.tsv -o candidates.sssom.tsv
 
 # 2. Analyst edits candidates.sssom.tsv, marking ManualMappingCuration rows.
 
 # 3. Dry-run to verify lint and state machine before committing
-uv run rosetta ledger append candidates.sssom.tsv \
-  --role analyst \
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  candidates.sssom.tsv --role analyst \
   --source-schema schemas/nor.linkml.yaml \
   --master-schema schemas/master.linkml.yaml \
   --dry-run
 
 # 4. Stage analyst proposals
-uv run rosetta ledger append candidates.sssom.tsv \
-  --role analyst \
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  candidates.sssom.tsv --role analyst \
   --source-schema schemas/nor.linkml.yaml \
   --master-schema schemas/master.linkml.yaml
 ```
@@ -62,26 +63,27 @@ uv run rosetta ledger append candidates.sssom.tsv \
 
 ```bash
 # 5. Generate accreditor work list
-uv run rosetta ledger review -o review.sssom.tsv
+uv run rosetta ledger --audit-log audit-log.sssom.tsv review \
+  -o review.sssom.tsv
 
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows.
 
 # 7. Dry-run accreditor review
-uv run rosetta ledger append review.sssom.tsv \
-  --role accreditor \
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  review.sssom.tsv --role accreditor \
   --source-schema schemas/nor.linkml.yaml \
   --master-schema schemas/master.linkml.yaml \
   --dry-run
 
 # 8. Ingest decisions
-uv run rosetta ledger append review.sssom.tsv \
-  --role accreditor \
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  review.sssom.tsv --role accreditor \
   --source-schema schemas/nor.linkml.yaml \
   --master-schema schemas/master.linkml.yaml
 
 # 9. Correct a prior decision
-uv run rosetta ledger append update.sssom.tsv \
-  --role accreditor \
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  update.sssom.tsv --role accreditor \
   --source-schema schemas/nor.linkml.yaml \
   --master-schema schemas/master.linkml.yaml
 ```

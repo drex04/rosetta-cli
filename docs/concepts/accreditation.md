@@ -28,14 +28,11 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
                └─────────────┬──────────────────┘
                              │
                              ▼
-                  ┌──────────────────────┐
-                  │  rosetta lint        │ ← block on errors
-                  └─────────────┬────────┘
-                                │
-                                ▼
            ┌─────────────────────────────────────┐
            │  rosetta ledger append              │
-           │  (ManualMappingCuration → log)      │
+           │  --role analyst                     │
+           │  (lint gate runs automatically;     │
+           │   ManualMappingCuration → log)      │
            └─────────────┬───────────────────────┘
                          │
                          ▼
@@ -64,8 +61,8 @@ The roles are enforced by workflow, not by user accounts. `rosetta-cli` doesn't 
 
 | Rule | Enforced by |
 |------|-------------|
-| Max 1 `ManualMappingCuration` per (subject_id, object_id) | `rosetta lint` |
-| Cannot re-propose a pair with **any** `HumanCuration` in the log | `rosetta ledger append` + `rosetta lint` |
+| Max 1 `ManualMappingCuration` per (subject_id, object_id) | `rosetta ledger append` (lint gate) |
+| Cannot re-propose a pair with **any** `HumanCuration` in the log | `rosetta ledger append` (lint gate) |
 | `HumanCuration` requires a `ManualMappingCuration` predecessor | `rosetta ledger append` |
 | Once rejected, only an Accreditor can un-reject | Workflow convention |
 | Approved pairs boost subsequent `rosetta suggest` scores | `rosetta suggest` (log integration) |
@@ -130,25 +127,33 @@ To override a prior decision, the Accreditor manually creates a file with a new 
 ## Example session
 
 ```bash
-# 1. Generate candidates (log read automatically from rosetta.toml)
-uv run rosetta suggest nor.emb.json master.emb.json -o candidates.sssom.tsv
+# 1. Generate candidates
+uv run rosetta suggest nor.linkml.yaml master.linkml.yaml \
+  --audit-log audit-log.sssom.tsv -o candidates.sssom.tsv
 
 # 2. Analyst edits candidates.sssom.tsv, marking ManualMappingCuration rows.
 
-# 3. Lint check
-uv run rosetta lint --sssom candidates.sssom.tsv
+# 3. Dry-run lint check (preview without appending)
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  --role analyst --dry-run candidates.sssom.tsv \
+  --source-schema nor.linkml.yaml --master-schema master.linkml.yaml
 
-# 4. Stage analyst proposals
-uv run rosetta ledger append candidates.sssom.tsv
+# 4. Stage analyst proposals (lint gate runs automatically)
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  --role analyst candidates.sssom.tsv \
+  --source-schema nor.linkml.yaml --master-schema master.linkml.yaml
 
 # 5. Generate accreditor work list
-uv run rosetta ledger review -o review.sssom.tsv
+uv run rosetta ledger --audit-log audit-log.sssom.tsv review \
+  -o review.sssom.tsv
 
 # 6. Accreditor edits review.sssom.tsv, marking HumanCuration rows.
 
-# 7. Ingest decisions
-uv run rosetta ledger append review.sssom.tsv
+# 7. Ingest accreditor decisions
+uv run rosetta ledger --audit-log audit-log.sssom.tsv append \
+  --role accreditor review.sssom.tsv \
+  --source-schema nor.linkml.yaml --master-schema master.linkml.yaml
 
 # 8. Check current state
-uv run rosetta ledger status
+uv run rosetta ledger --audit-log audit-log.sssom.tsv status
 ```

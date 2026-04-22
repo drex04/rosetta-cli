@@ -132,21 +132,20 @@ confirm "Done editing? (yes to continue, skip to proceed without edits)" \
 
 info "Step 3 — Stage analyst proposals into audit log (lint gate runs automatically)"
 echo "  Use --dry-run to check for lint errors without appending:"
-echo "    uv run rosetta ledger append --role analyst --dry-run $OUT/candidates.sssom.tsv \\"
-echo "      --source-schema $OUT/nor_radar.linkml.yaml --master-schema $OUT/master_cop.linkml.yaml \\"
-echo "      --audit-log $LOG"
+echo "    uv run rosetta ledger --audit-log $LOG append --role analyst --dry-run \\"
+echo "      $OUT/candidates.sssom.tsv \\"
+echo "      --source-schema $OUT/nor_radar.linkml.yaml --master-schema $OUT/master_cop.linkml.yaml"
 
-run_cmd uv run rosetta ledger append --role analyst "$OUT/candidates.sssom.tsv" \
+run_cmd uv run rosetta ledger --audit-log "$LOG" append --role analyst "$OUT/candidates.sssom.tsv" \
     --source-schema "$OUT/nor_radar.linkml.yaml" \
-    --master-schema "$OUT/master_cop.linkml.yaml" \
-    --audit-log "$LOG"
+    --master-schema "$OUT/master_cop.linkml.yaml"
 ok "Analyst proposals appended to audit log."
 
 # ── Step 4: Generate accreditor work list ─────────────────────────────────────
 
 info "Step 4 — Generate accreditor review list"
 
-run_cmd uv run rosetta ledger review --audit-log "$LOG" -o "$OUT/review.sssom.tsv"
+run_cmd uv run rosetta ledger --audit-log "$LOG" review -o "$OUT/review.sssom.tsv"
 ok "$OUT/review.sssom.tsv"
 
 # ── Pause: Accreditor edits review ───────────────────────────────────────────
@@ -166,10 +165,9 @@ confirm "Done editing? (yes to append decisions, skip to finish without appendin
 
 info "Step 5 — Append accreditor decisions"
 
-run_cmd uv run rosetta ledger append --role accreditor "$OUT/review.sssom.tsv" \
+run_cmd uv run rosetta ledger --audit-log "$LOG" append --role accreditor "$OUT/review.sssom.tsv" \
     --source-schema "$OUT/nor_radar.linkml.yaml" \
-    --master-schema "$OUT/master_cop.linkml.yaml" \
-    --audit-log "$LOG"
+    --master-schema "$OUT/master_cop.linkml.yaml"
 ok "Accreditor decisions appended to audit log."
 
 # ── Step 6: Compile YARRRML mapping artifact ─────────────────────────────────
@@ -231,6 +229,6 @@ echo "  JSON-LD     : $OUT/output.jsonld"
 fi
 echo ""
 echo "  Next steps:"
-echo "    uv run rosetta ledger dump --audit-log '$LOG'     # export approved mappings"
+echo "    uv run rosetta ledger --audit-log '$LOG' dump     # export approved mappings"
 echo "    uv run rosetta suggest '$OUT/nor_radar.linkml.yaml' '$OUT/master_cop.linkml.yaml' \\"
 echo "      --audit-log '$LOG' -o candidates2.sssom.tsv     # re-run suggest"
