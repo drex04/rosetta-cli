@@ -8,17 +8,18 @@ cd rosetta-cli
 uv sync
 ```
 
-All nine commands are then available via `uv run rosetta <cmd>`:
+All five commands are then available via `uv run rosetta <cmd>`:
 
 ```bash
 uv run rosetta ingest --help
-uv run rosetta embed --help
 uv run rosetta suggest --help
-# ...
+uv run rosetta ledger --help
+uv run rosetta compile --help
+uv run rosetta transform --help
 ```
 
-!!! tip "First embed run"
-    The default embedding model (`intfloat/e5-large-v2`, ~1.2 GB) downloads from HuggingFace on the first `rosetta embed` invocation. Subsequent runs use the local cache.
+!!! tip "First suggest run"
+    The default embedding model (`intfloat/e5-large-v2`, ~1.2 GB) downloads from HuggingFace on the first `rosetta suggest` invocation. Subsequent runs use the local cache.
 
 ## Run the bundled demo
 
@@ -31,29 +32,22 @@ bash scripts/pipeline-demo.sh my_run   # custom output directory
 
 The script pauses at each human-in-the-loop step so you can inspect and edit intermediate files. It covers:
 
-1. **Ingest** — three partner schemas (CSV, JSON, YAML) plus a master Turtle ontology.
-2. **Translate** — Norwegian schema titles to English via DeepL (set `DEEPL_API_KEY`; pass-through if unset for English sources).
-3. **Embed** — produce per-slot vectors for each schema.
-4. **Suggest** — rank candidate mappings by cosine similarity.
-5. **Lint** — validate analyst proposals for unit dimensionality and audit-log conflicts.
-6. **Accredit** — append analyst proposals, generate the accreditor work list, append decisions.
-7. **Generate & materialise** — `rosetta compile` then `rosetta transform` compiles an approved SSSOM log into a YARRRML mapping and produces JSON-LD aligned to the master ontology.
+1. **Ingest** — three partner schemas (CSV, JSON, YAML) plus a master Turtle ontology; optional `--translate` for Norwegian titles via DeepL (set `DEEPL_API_KEY`).
+2. **Suggest** — embed slots and rank candidate mappings by cosine similarity.
+3. **Accredit** — `rosetta ledger append` (analyst proposals, with lint gate), generate accreditor work list, append decisions.
+4. **Generate & materialise** — `rosetta compile` then `rosetta transform` compiles an approved SSSOM log into a YARRRML mapping and produces validated JSON-LD aligned to the master ontology.
 
 ## Minimal pipeline
 
-For the impatient — a three-command pipeline that goes from two partner schemas to a ranked candidate list:
+For the impatient — a two-command pipeline that goes from two partner schemas to a ranked candidate list:
 
 ```bash
 # 1. Ingest both sides to LinkML
-uv run rosetta ingest partner.csv       -o partner.linkml.yaml
-uv run rosetta ingest master.ttl        -o master.linkml.yaml --format rdfs
+uv run rosetta ingest partner.csv  -o partner.linkml.yaml
+uv run rosetta ingest master.ttl   -o master.linkml.yaml --format rdfs
 
-# 2. Embed each schema
-uv run rosetta embed   partner.linkml.yaml -o partner.emb.json
-uv run rosetta embed   master.linkml.yaml  -o master.emb.json
-
-# 3. Rank candidate mappings
-uv run rosetta suggest partner.emb.json master.emb.json -o candidates.sssom.tsv
+# 2. Embed slots and rank candidate mappings
+uv run rosetta suggest partner.linkml.yaml master.linkml.yaml -o candidates.sssom.tsv
 ```
 
 Open `candidates.sssom.tsv` in any TSV viewer — the top-K candidates per source field, ranked by cosine score, ready for analyst review.

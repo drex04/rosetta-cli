@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.lint import cli as lint_cli
+from rosetta.cli.ledger import cli as ledger_cli
 from rosetta.core.models import LintReport
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 
@@ -157,15 +157,19 @@ def test_lint_surfaces_recognized_but_unmapped_unit(tmp_path: Path) -> None:
     _write_minimal_schema(master_schema, "master", ["rx_dbm"])
 
     result = CliRunner(mix_stderr=False).invoke(
-        lint_cli,
+        ledger_cli,
         [
-            str(sssom),
             "--audit-log",
             str(audit_log),
+            "append",
+            "--dry-run",
+            "--role",
+            "analyst",
             "--source-schema",
             str(src_schema),
             "--master-schema",
             str(master_schema),
+            str(sssom),
         ],
     )
 

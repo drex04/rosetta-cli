@@ -72,13 +72,8 @@ nav:
   - CLI reference:
       - Overview: cli/index.md
       - rosetta ingest: cli/ingest.md
-      - rosetta translate: cli/translate.md
-      - rosetta embed: cli/embed.md
       - rosetta suggest: cli/suggest.md
-      - rosetta lint: cli/lint.md
+      - rosetta ledger: cli/ledger.md
       - rosetta compile: cli/compile.md
       - rosetta transform: cli/transform.md
-      - rosetta validate: cli/validate.md
-      - rosetta shapes: cli/shapes.md
-      - rosetta ledger: cli/ledger.md
   - Configuration: configuration.md

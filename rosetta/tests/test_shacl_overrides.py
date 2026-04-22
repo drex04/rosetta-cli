@@ -20,10 +20,8 @@ from pathlib import Path
 
 import pytest
 import rdflib
-from click.testing import CliRunner
 from rdflib.namespace import RDF
 
-from rosetta.cli.shapes import cli as shacl_gen_cli
 from rosetta.core.shacl_validate import validate_graph
 from rosetta.core.shapes_loader import load_shapes_from_dir
 
@@ -109,27 +107,23 @@ def test_override_constraint_fires_on_data(tmp_path: Path) -> None:
 
 
 def test_override_survives_regen(tmp_path: Path) -> None:
-    """Re-running ``rosetta-shacl-gen`` writes to ``--output`` and never touches other files."""
+    """Re-running ``generate_shacl`` writes to ``--output`` and never touches other files."""
     override_copy = tmp_path / "override.ttl"
     import shutil
+
+    from rosetta.core.shacl_generator import generate_shacl
 
     shutil.copy(_OVERRIDE_SHAPES, override_copy)
     pre_hash = hashlib.sha256(override_copy.read_bytes()).hexdigest()
 
     regen_output = tmp_path / "regen.shacl.ttl"
-    result = CliRunner().invoke(
-        shacl_gen_cli,
-        [str(_MASTER_SCHEMA), "--output", str(regen_output)],
-    )
-    assert result.exit_code == 0, (
-        f"shacl-gen failed: exit={result.exit_code} output={result.output!r} "
-        f"exception={result.exception!r}"
-    )
-    assert regen_output.exists(), "regen --output file was not written"
+    ttl_content = generate_shacl(_MASTER_SCHEMA)
+    regen_output.write_text(ttl_content, encoding="utf-8")
+    assert regen_output.exists(), "regen output file was not written"
 
     post_hash = hashlib.sha256(override_copy.read_bytes()).hexdigest()
     assert pre_hash == post_hash, (
-        "Override file was modified by rosetta-shacl-gen — regen must only touch --output."
+        "Override file was modified by generate_shacl — regen must only touch --output."
     )
 
 

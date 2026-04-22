@@ -6,16 +6,11 @@ Every command is auto-documented from its Click definition — options, argument
 
 | Tool | Purpose |
 |------|---------|
-| [`rosetta ingest`](ingest.md) | Parse a source schema → emit LinkML YAML |
-| [`rosetta translate`](translate.md) | Normalise non-English titles via DeepL |
-| [`rosetta embed`](embed.md) | Compute per-slot sentence embeddings |
-| [`rosetta suggest`](suggest.md) | Rank candidate mappings by cosine similarity |
-| [`rosetta lint`](lint.md) | Validate analyst proposals against unit and log constraints |
-| [`rosetta ledger`](ledger.md) | Manage the two-role accreditation state machine |
-| [`rosetta validate`](validate.md) | SHACL-validate RDF data (Turtle or JSON-LD) |
+| [`rosetta ingest`](ingest.md) | Parse a source schema → emit LinkML YAML; optionally translate titles, emit master OWL/SHACL |
+| [`rosetta suggest`](suggest.md) | Embed slots and rank candidate mappings by cosine similarity |
+| [`rosetta ledger`](ledger.md) | Manage the two-role accreditation state machine; lint gate on append |
 | [`rosetta compile`](compile.md) | Compile approved mappings to YARRRML |
-| [`rosetta transform`](transform.md) | Materialise a YARRRML mapping into JSON-LD |
-| [`rosetta shapes`](shapes.md) | Auto-generate SHACL shapes from a master LinkML schema |
+| [`rosetta transform`](transform.md) | Materialise a YARRRML mapping into JSON-LD; validates by default |
 
 ## Conventions
 

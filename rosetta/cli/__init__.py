@@ -11,15 +11,10 @@ import click
 
 _LAZY_SUBCOMMANDS: dict[str, str] = {
     "ingest": "rosetta.cli.ingest",
-    "translate": "rosetta.cli.translate",
-    "embed": "rosetta.cli.embed",
     "suggest": "rosetta.cli.suggest",
-    "lint": "rosetta.cli.lint",
-    "validate": "rosetta.cli.validate",
+    "ledger": "rosetta.cli.ledger",
     "compile": "rosetta.cli.compile",
     "transform": "rosetta.cli.transform",
-    "ledger": "rosetta.cli.ledger",
-    "shapes": "rosetta.cli.shapes",
 }
 
 

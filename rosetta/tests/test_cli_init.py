@@ -95,14 +95,9 @@ class TestVerboseQuietConflict:
 
 _SUBCOMMANDS = [
     "ingest",
-    "translate",
-    "embed",
     "suggest",
-    "lint",
     "compile",
     "transform",
-    "validate",
-    "shapes",
     "ledger",
 ]
 

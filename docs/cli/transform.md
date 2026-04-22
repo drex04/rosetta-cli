@@ -48,7 +48,7 @@ rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   -o demo_out/nor_tracks.jsonld
 ```
 
-A warning is emitted to stderr when `--no-validate` is used. Use `rosetta shapes` to generate a shapes directory if you do not already have one.
+A warning is emitted to stderr when `--no-validate` is used.
 
 ## Stdout collision guard
 
@@ -63,5 +63,3 @@ Both `--output` and `--validate-report` can target stdout. Setting both to stdou
 ## See also
 
 - [`rosetta compile`](compile.md) — produce the YARRRML mapping file consumed by `transform`.
-- [`rosetta shapes`](shapes.md) — generate the shapes directory for `--shapes-dir`.
-- [`rosetta validate`](validate.md) — standalone validator for offline validation.

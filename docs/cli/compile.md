@@ -55,4 +55,3 @@ When `--coverage-report` is provided, a JSON file matching the `CoverageReport` 
 ## See also
 
 - [`rosetta transform`](transform.md) — execute the compiled YARRRML mapping against a data file.
-- [`rosetta shapes`](shapes.md) — generate SHACL shapes for validation.

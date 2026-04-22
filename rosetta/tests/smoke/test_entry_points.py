@@ -17,15 +17,10 @@ def _skip_if_not_installed() -> None:
 
 _ALL_SUBCOMMANDS = [
     "ingest",
-    "translate",
-    "embed",
     "suggest",
-    "lint",
-    "validate",
     "compile",
     "transform",
     "ledger",
-    "shapes",
 ]
 
 

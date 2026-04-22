@@ -22,8 +22,8 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
-from rosetta.cli.shapes import cli as shacl_gen_cli
 from rosetta.cli.transform import cli as run_cli
+from rosetta.core.shacl_generator import generate_shacl
 
 pytestmark = [pytest.mark.integration]
 
@@ -229,9 +229,7 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """Two-stage chain: compile+run writes JSON-LD to disk; rosetta validate reads it."""
-    from rosetta.cli.validate import cli as validate_cli
-
+    """Two-stage chain: compile+run writes JSON-LD to disk; validate via core."""
     nor_schema, mc_schema, sssom, csv = _copy_and_patch_schemas(
         tmp_path, nor_linkml_path, master_schema_path, sssom_nor_path, nor_csv_sample_path
     )
@@ -261,27 +259,24 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
     )
     assert jsonld_out.exists() and jsonld_out.stat().st_size > 0, "no JSON-LD bytes"
 
-    # Stage 2: validate the JSON-LD against a permissive shape dir.
+    # Stage 2: validate the JSON-LD against a permissive shape dir via core.
+    import rdflib
+
+    from rosetta.core.shacl_validate import validate_graph
+    from rosetta.core.shapes_loader import load_shapes_from_dir
+
     shapes_dir = tmp_path / "shapes"
     shapes_dir.mkdir()
     (shapes_dir / "permissive.shacl.ttl").write_text(_PERMISSIVE_SHAPE_TTL, encoding="utf-8")
-    report_out = tmp_path / "report.json"
 
-    val_result = CliRunner(mix_stderr=False).invoke(
-        validate_cli,
-        [
-            str(jsonld_out),
-            str(shapes_dir),
-            "--output",
-            str(report_out),
-        ],
-    )
-    assert val_result.exit_code == 0, (
+    data_graph = rdflib.Graph()
+    data_graph.parse(str(jsonld_out), format="json-ld")
+    shapes_graph = load_shapes_from_dir(shapes_dir)
+    val_report = validate_graph(data_graph, shapes_graph)
+    assert val_report.summary.conforms, (
         f"permissive shape should pass JSON-LD output; "
-        f"exit={val_result.exit_code} stderr={val_result.stderr!r}"
+        f"findings={[f.message for f in val_report.findings]}"
     )
-    report = json.loads(report_out.read_text(encoding="utf-8"))
-    assert report["summary"]["conforms"] is True
 
 
 @pytest.mark.slow
@@ -304,10 +299,8 @@ def test_yarrrml_run_validate_with_committed_policy_shapes(
 
     policy_shapes = tmp_path / "shapes"
     policy_shapes.mkdir()
-    gen_result = CliRunner(mix_stderr=False).invoke(
-        shacl_gen_cli, [str(mc_schema), "--output", str(policy_shapes / "shapes.ttl")]
-    )
-    assert gen_result.exit_code == 0, f"shacl-gen failed: {gen_result.stderr}"
+    ttl_content = generate_shacl(mc_schema)
+    (policy_shapes / "shapes.ttl").write_text(ttl_content, encoding="utf-8")
 
     yarrrml_out = _compile_to_yarrrml(tmp_path, sssom, nor_schema, mc_schema)
 

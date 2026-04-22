@@ -209,34 +209,40 @@ def generate_linkml_fixtures() -> None:
 
 
 def generate_shacl_fixtures() -> None:
-    """Run rosetta-shacl-gen on master schema to produce SHACL shapes fixture."""
-    from click.testing import CliRunner
+    """Run generate_shacl on master schema to produce SHACL shapes fixture."""
+    from rosetta.core.shacl_generator import generate_shacl
 
-    from rosetta.cli.shapes import cli as shacl_gen_cli
-
-    runner = CliRunner()
     out = _NATIONS / "master_cop.shapes.ttl"
-    result = runner.invoke(shacl_gen_cli, ["--input", str(_MC_SCHEMA), "--output", str(out)])
-    if result.exit_code != 0:
-        raise RuntimeError(f"shacl-gen failed: {result.output}")
+    ttl_content = generate_shacl(_MC_SCHEMA)
+    out.write_text(ttl_content, encoding="utf-8")
     print(f"  {out.name}")
 
 
 def generate_embed_fixtures() -> None:
-    """Run rosetta embed on both schemas (requires sentence-transformers)."""
-    from click.testing import CliRunner
+    """Run embed on both schemas via core module (requires sentence-transformers)."""
+    import json
 
-    from rosetta.cli.embed import cli as embed_cli
+    import numpy as np
+    from linkml_runtime.loaders import yaml_loader
+    from linkml_runtime.utils.schemaview import SchemaDefinition
 
-    runner = CliRunner()
-    for schema, name in (
+    from rosetta.core.embedding import EmbeddingModel, extract_text_inputs_linkml
+
+    model = EmbeddingModel()
+    for schema_path, name in (
         (_NOR_SCHEMA, "nor_radar.embed.json"),
         (_MC_SCHEMA, "master_cop.embed.json"),
     ):
+        schema_def: SchemaDefinition = yaml_loader.load(
+            str(schema_path), target_class=SchemaDefinition
+        )  # pyright: ignore[reportAssignmentType]
+        inputs = extract_text_inputs_linkml(schema_def)
+        keys = [t[0] for t in inputs]
+        texts = [t[2] for t in inputs]
+        vectors: np.ndarray = np.array(model.encode(texts), dtype=np.float32)
+        result = {k: {"lexical": v.tolist()} for k, v in zip(keys, vectors)}
         out = _NATIONS / name
-        result = runner.invoke(embed_cli, [str(schema), "--output", str(out)])
-        if result.exit_code != 0:
-            raise RuntimeError(f"embed failed: {result.output}")
+        out.write_text(json.dumps(result, indent=2), encoding="utf-8")
         print(f"  {out.name}")
 
 

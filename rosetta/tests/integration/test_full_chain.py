@@ -8,7 +8,6 @@ download the 1.2 GB model.
 from __future__ import annotations
 
 import csv
-import json
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +17,7 @@ from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.ingest import cli as ingest_cli
-from rosetta.cli.lint import cli as lint_cli
+from rosetta.cli.ledger import cli as ledger_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.models import LintReport
 
@@ -100,27 +99,28 @@ def test_full_chain_json_to_lint(
     assert suggest_result.exit_code == 0, f"suggest: {suggest_result.stderr}"
     assert sssom_out.exists()
 
-    # 3. Lint the SSSOM TSV → LintReport JSON.
-    lint_out = tmp_path / "lint.json"
+    # 3. Lint the SSSOM TSV via ledger append --dry-run → LintReport JSON on stdout.
     lint_log = tmp_path / "lint-audit-log.sssom.tsv"
     lint_result = runner.invoke(
-        lint_cli,
+        ledger_cli,
         [
-            str(sssom_out),
-            "--output",
-            str(lint_out),
             "--audit-log",
             str(lint_log),
+            "append",
+            "--dry-run",
+            "--role",
+            "analyst",
             "--source-schema",
             str(stress_yaml),
             "--master-schema",
             str(master_schema_path),
+            str(sssom_out),
         ],
     )
     # Lint exit code is 0 only if no BLOCK findings exist.
     assert lint_result.exit_code == 0, f"lint: {lint_result.stderr}"
 
-    report = LintReport.model_validate_json(lint_out.read_text(encoding="utf-8"))
+    report = LintReport.model_validate_json(lint_result.output)
     # Behavioural invariant: no blocking findings from the generated candidates.
     assert report.summary.block == 0, (
         f"expected zero BLOCK findings, got {report.summary.block}; "
@@ -252,10 +252,3 @@ def test_full_chain_xsd_to_jsonld(
     assert "id" in spec_raw or "source_schema" in spec_raw, (
         f"expected TransformSpec shape, got top-level keys: {list(spec_raw)[:10]}"
     )
-
-
-# ---------------------------------------------------------------------------
-# Guard: ensure we didn't accidentally leave an unused import.
-# ---------------------------------------------------------------------------
-
-_ = json  # referenced via LintReport.model_validate_json above

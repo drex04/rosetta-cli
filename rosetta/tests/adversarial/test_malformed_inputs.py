@@ -13,16 +13,13 @@ drift across interpreter releases.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.embed import cli as embed_cli
 from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.suggest import cli as suggest_cli
-from rosetta.core.models import EmbeddingReport  # noqa: F401  (imported for type-context)
 
 pytestmark = [pytest.mark.integration]
 
@@ -181,20 +178,13 @@ def test_ingest_csv_with_bom_inline(tmp_path: Path) -> None:
 
 
 def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """LinkML master with zero classes → embed exits 1 ("No embeddable nodes").
+    """LinkML master with zero classes/slots → suggest exits 1 ("No embeddable nodes").
 
-    OBSERVED BEHAVIOR: ``rosetta suggest`` takes *embedding JSON* files, not
-    raw LinkML YAML. An empty master schema therefore fails upstream in
-    ``rosetta embed`` with ``Error: No embeddable nodes found in schema.``
-    before ``suggest`` is ever reached — the "empty master" condition is
-    surfaced as an embed failure, not a suggest failure. This is the current
-    behavior; if suggest-level empty-master handling is ever added, update
-    this test to exercise that path.
-
-    The test pins the observed exit 1 + "No embeddable" stderr, plus the
-    behavioral invariant that no embedding JSON file is written.
+    ``rosetta suggest`` embeds internally. An empty master schema (no classes or
+    slots) fails during embedding with ``Error: No embeddable nodes found in schema.``
+    The test pins exit 1 + the "no embeddable" stderr marker, and confirms no
+    output file is written.
     """
-    # Mock LaBSE so the embed call doesn't try to download the model.
     import numpy as np
     import sentence_transformers
 
@@ -209,7 +199,26 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(sentence_transformers, "SentenceTransformer", lambda _name: _FakeLaBSE())
 
-    # Master schema with no `classes:` block (valid LinkML, but empty).
+    # Minimal source schema with one slot so the src side is valid.
+    src_yaml = tmp_path / "src.linkml.yaml"
+    src_yaml.write_text(
+        "id: https://w3id.org/rosetta/adversarial/src\n"
+        "name: src\n"
+        "default_prefix: src\n"
+        "prefixes:\n"
+        "  src: https://w3id.org/rosetta/adversarial/src/\n"
+        "  linkml: https://w3id.org/linkml/\n"
+        "classes:\n"
+        "  Thing:\n"
+        "    slots:\n"
+        "      - field_a\n"
+        "slots:\n"
+        "  field_a:\n"
+        "    range: string\n",
+        encoding="utf-8",
+    )
+
+    # Master schema with no `classes:` or `slots:` block (valid LinkML, but empty).
     master_yaml = tmp_path / "master.linkml.yaml"
     master_yaml.write_text(
         "id: https://w3id.org/rosetta/adversarial/empty_master\n"
@@ -217,12 +226,25 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         "default_prefix: em\n"
         "prefixes:\n"
         "  em: https://w3id.org/rosetta/adversarial/empty_master/\n"
-        "  linkml: https://w3id.org/linkml/\n"
+        "  linkml: https://w3id.org/linkml/\n",
+        encoding="utf-8",
     )
 
-    master_emb = tmp_path / "master.embed.json"
-    runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(embed_cli, [str(master_yaml), "--output", str(master_emb)])
+    dummy_log = tmp_path / "audit-log.sssom.tsv"
+    dummy_log.write_text("")
+    sssom_out = tmp_path / "out.sssom.tsv"
+
+    result = CliRunner(mix_stderr=False).invoke(
+        suggest_cli,
+        [
+            str(src_yaml),
+            str(master_yaml),
+            "--output",
+            str(sssom_out),
+            "--audit-log",
+            str(dummy_log),
+        ],
+    )
 
     # 1. Exit code
     assert result.exit_code == 1, (
@@ -230,36 +252,14 @@ def test_suggest_empty_sssom_master(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         f"stderr={result.stderr!r} stdout={result.output!r}"
     )
 
-    # 2. Stderr substring — "no embeddable" is the CLI-wrapped message
-    assert "no embeddable" in result.stderr.lower() or "embeddable" in result.stderr.lower(), (
-        f"expected 'no embeddable' marker in stderr; got {result.stderr!r}"
+    # 2. Stderr substring — empty-schema error from suggest's embed step.
+    # Observed: "No nodes found in master schema: ..." (suggest embeds internally).
+    combined = (result.stderr or "") + (result.output or "")
+    assert "no nodes found" in combined.lower() or "embeddable" in combined.lower(), (
+        f"expected empty-schema error marker in output; got stderr={result.stderr!r}"
     )
 
-    # 3. Behavioral invariant: no partial embed JSON written
-    assert not master_emb.exists() or master_emb.read_text() == "", (
-        f"partial embedding written: {master_emb.read_text()[:200]!r}"
+    # 3. Behavioral invariant: no partial output written
+    assert not sssom_out.exists() or sssom_out.read_text() == "", (
+        f"partial output written: {sssom_out.read_text()[:200]!r}"
     )
-
-    # Sanity: confirm the downstream suggest call would ALSO fail if given an
-    # empty JSON file, which documents the layered-error behavior.
-    if not master_emb.exists():
-        # Simulate an empty embed file and confirm suggest treats it as error.
-        empty_emb = tmp_path / "empty.embed.json"
-        empty_emb.write_text(json.dumps({}))
-        # Write a minimal valid src embed too
-        src_emb = tmp_path / "src.embed.json"
-        src_emb.write_text(json.dumps({"src/foo": {"lexical": [0.0, 0.0, 0.0, 0.0]}}))
-        dummy_log = tmp_path / "audit-log.sssom.tsv"
-        dummy_log.write_text("")
-        sg = runner.invoke(
-            suggest_cli,
-            [
-                str(src_emb),
-                str(empty_emb),
-                "--audit-log",
-                str(dummy_log),
-                "--output",
-                str(tmp_path / "o.tsv"),
-            ],
-        )
-        assert sg.exit_code == 1, f"suggest with empty master embed: {sg.exit_code} {sg.stderr!r}"

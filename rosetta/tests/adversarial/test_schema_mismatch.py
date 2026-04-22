@@ -21,7 +21,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from rosetta.cli.lint import cli as lint_cli
+from rosetta.cli.ledger import cli as ledger_cli
 from rosetta.cli.suggest import cli as suggest_cli
 from rosetta.core.ledger import parse_sssom_tsv
 from rosetta.core.models import LintReport
@@ -166,17 +166,21 @@ def test_suggest_type_divergence_flagged_by_lint(
     )
     sssom_out.write_text(patched)
 
-    # Run lint over the SSSOM output
+    # Run lint via ledger append --dry-run over the SSSOM output
     lint_result = runner.invoke(
-        lint_cli,
+        ledger_cli,
         [
-            str(sssom_out),
+            "--audit-log",
+            str(dummy_log),
+            "append",
+            "--dry-run",
+            "--role",
+            "analyst",
             "--source-schema",
             str(src_yaml),
             "--master-schema",
             str(master_yaml),
-            "--audit-log",
-            str(dummy_log),
+            str(sssom_out),
         ],
     )
 
