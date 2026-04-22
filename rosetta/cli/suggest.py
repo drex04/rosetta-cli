@@ -159,7 +159,7 @@ def cli(
         except OSError as exc:
             raise click.ClickException(f"Failed to load embedding model: {exc}") from exc
 
-        src_vectors = np.array(embedding_model.encode(src_texts), dtype=np.float32)
+        src_vectors = np.array(embedding_model.encode_query(src_texts), dtype=np.float32)
         master_vectors = np.array(embedding_model.encode(master_texts), dtype=np.float32)
 
         # Extract structural features
@@ -295,6 +295,10 @@ def cli(
                 )
             _ = fh.write(buf.getvalue())
 
-    except (ValueError, OSError, KeyError) as e:
+    except SystemExit:
+        raise
+    except click.ClickException:
+        raise
+    except Exception as e:  # noqa: BLE001
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
