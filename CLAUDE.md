@@ -13,12 +13,6 @@ Whenever a feature is added or modified:
 
 These are mandatory, not optional. A feature is not done until both tests and docs are current.
 
-## Fix-on-Sight
-
-If you find bugs or code quality issues during review, investigation, or any other work, **fix them immediately in the same change**. Do not file follow-up tickets, deferred-items lists, or "revisit later" notes. Every issue surfaced in review must be addressed before the work is considered done.
-
-**This applies to every severity — Critical, Important, Minor, and Nitpick.** Never defer. Never split minor findings into a "later" pass. If a review surfaces a missing test, a doc drift, a stale comment, or a one-line cleanup, fold it into the same commit as the bigger fixes. The cost of opening the file again later is always higher than fixing it now.
-
 ## Code Exploration
 
 Use claude-mem smart tools as the primary tools for understanding code:
@@ -53,7 +47,7 @@ Subcommands: `rosetta ingest`, `rosetta translate`, `rosetta embed`, `rosetta su
 
 ## Conventions
 
-- **Public API surface changes must update README.md _and_ `docs/`** — any change to CLI commands, option names, option placement (e.g. group-level vs subcommand-level), output formats, or exit codes requires matching updates in the README tool section *and* the corresponding `docs/cli/<tool>.md` narrative content. The `docs/cli/*.md` pages auto-render Click `--help` via `mkdocs-click`, so keep the `help=` strings and command docstrings current — they are the source of truth for options.
+- **Public API surface changes must update README.md _and_ `docs/`** — any change to CLI commands, option names, option placement (e.g. group-level vs subcommand-level), output formats, or exit codes requires matching updates in the README tool section _and_ the corresponding `docs/cli/<tool>.md` narrative content. The `docs/cli/*.md` pages auto-render Click `--help` via `mkdocs-click`, so keep the `help=` strings and command docstrings current — they are the source of truth for options.
 - **Docs-as-code is CI-gated** — `uv run mkdocs build --strict` runs in the `docs` CI job and as a pre-commit hook. Broken nav, broken links, and `mkdocs-click` directive failures fail the build. Site deploys from `master` to `https://drex04.github.io/rosetta-cli/` via `.github/workflows/docs.yml`.
 - All tools: read from files or stdin, write to files or stdout (Unix-composable)
 - RDF serialization: Turtle (.ttl) for human artifacts, N-Triples for machine interchange
