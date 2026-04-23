@@ -1682,3 +1682,132 @@ def test_check_datatype_missing_types_no_finding() -> None:
     findings: list[LintFinding] = []
     check_datatype(findings, _dtype_row(None, "integer"))
     assert not findings
+
+
+# ---------------------------------------------------------------------------
+# Dedup on append
+# ---------------------------------------------------------------------------
+
+
+def test_append_analyst_skips_duplicate_triples(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Re-appending the same file should not create duplicate rows."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+    tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+    )
+    runner = CliRunner(mix_stderr=False)
+    cmd = [
+        "--audit-log",
+        str(log_path),
+        "append",
+        "--role",
+        "analyst",
+        "--source-schema",
+        str(source_schema),
+        "--master-schema",
+        str(master_schema),
+        str(tsv),
+    ]
+    # First append
+    result1 = runner.invoke(cli, cmd)
+    assert result1.exit_code == 0, result1.stderr
+    assert len(load_log(log_path)) == 1
+
+    # Second append of same file — should be deduped
+    result2 = runner.invoke(cli, cmd)
+    assert result2.exit_code == 0, result2.stderr
+    assert "skipped 1 duplicate" in result2.stderr
+    assert len(load_log(log_path)) == 1
+
+
+def test_append_dedup_allows_different_justification(
+    tmp_path: Path,
+    source_schema: Path,
+    master_schema: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """HC row for an existing MMC triple is not a duplicate (different justification)."""
+    monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
+    monkeypatch.setattr("rosetta.cli.ledger.check_ingest_row", lambda row, log: None)
+    log_path = tmp_path / "audit-log.sssom.tsv"
+
+    mmc_tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": MMC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+        filename="mmc.sssom.tsv",
+    )
+    hc_tsv = _make_sssom_tsv(
+        tmp_path,
+        [
+            {
+                "subject_id": "src:A",
+                "predicate_id": "skos:exactMatch",
+                "object_id": "mst:B",
+                "mapping_justification": HC_JUSTIFICATION,
+                "confidence": "0.9",
+            },
+        ],
+        filename="hc.sssom.tsv",
+    )
+    runner = CliRunner(mix_stderr=False)
+    # Analyst appends MMC
+    result1 = runner.invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "analyst",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(mmc_tsv),
+        ],
+    )
+    assert result1.exit_code == 0, result1.stderr
+    assert len(load_log(log_path)) == 1
+
+    # Accreditor appends HC for same triple — should NOT be deduped
+    result2 = runner.invoke(
+        cli,
+        [
+            "--audit-log",
+            str(log_path),
+            "append",
+            "--role",
+            "accreditor",
+            "--source-schema",
+            str(source_schema),
+            "--master-schema",
+            str(master_schema),
+            str(hc_tsv),
+        ],
+    )
+    assert result2.exit_code == 0, result2.stderr
+    assert "duplicate" not in result2.stderr
+    assert len(load_log(log_path)) == 2

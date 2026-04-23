@@ -184,9 +184,25 @@ def append_cmd(
             sys.exit(1)
         filtered = valid_rows
 
-    # 7. Append
-    append_log(filtered, log_path)
-    click.echo(f"Appended {len(filtered)} rows, skipped {skipped} non-{role} rows", err=True)
+    # 7. Deduplicate against existing log
+    existing_keys = {
+        (r.subject_id, r.predicate_id, r.object_id, r.mapping_justification) for r in log
+    }
+    deduped = [
+        r
+        for r in filtered
+        if (r.subject_id, r.predicate_id, r.object_id, r.mapping_justification) not in existing_keys
+    ]
+    dup_count = len(filtered) - len(deduped)
+
+    # 8. Append
+    append_log(deduped, log_path)
+    parts = [f"Appended {len(deduped)} rows"]
+    if skipped:
+        parts.append(f"skipped {skipped} non-{role} rows")
+    if dup_count:
+        parts.append(f"skipped {dup_count} duplicate triples")
+    click.echo(", ".join(parts), err=True)
 
 
 @cli.command(
