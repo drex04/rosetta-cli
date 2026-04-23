@@ -1,0 +1,60 @@
+---
+config:
+  layout: dagre
+---
+flowchart TB
+    A["Source schemas<br>source.json, .xsd, .csv, .tsv"] --> n12["rosetta ingest schema_a.json schema_b.xml --master ontology.ttl --translate --lang de<br>TODO: roll translate into this<br>TODO: generate SHACL shapes from --master"]
+    n12 --> B["Normalized and translated schemas<br>schema_en.linkml.yaml"] & n30["SHACL shapes<br>onto.shacl.ttl"]
+    B --> n15["rosetta suggest<br>TODO: roll embed into this<br>"]
+    B -.-> n19["rosetta ledger append<br>TODO: add --role analyst, --role accreditor flags"] & n24["rosetta compile"]
+    n15 --> n4["Candidate mappings<br>candidates.sssom.tsv"]
+    n4 --> n16["User proposes mappings and links typecast / unit conversion functions where required"]
+    n16 --> n19
+    n19 --> n7["Lint passed?"]
+    n7 -- Yes --> n18["Ledger<br>audit-log.sssom.tsv"]
+    n7 -- No --> n16
+    n18 -.-> n15
+    n18 --> n24 & n42["rosetta ledger review"]
+    n24 --> n25["YARRRML<br>source_to_onto.yarrrrml.yaml"]
+    n40["TODO: Analyst edits SHACL shapefile with manual overrides and creates shared functions (e.g. typecasts, unit conversions)"] --> n30
+    n41["TODO: Should Accreditor approve SHACL override, units, and function library?"] --> n30
+    n28["Source data<br>source_data.json, .xml, .csv, .tsv"] --> n29["rosetta transform --validate<br>TODO: make validation default, add opt-out --no-validate"]
+    n25 --> n29
+    n30 --> n29
+    n29 --> n37["Output valid?"]
+    n37 -- Yes --> n35["Validated Linked Data<br>source_data_validated.jsonld"]
+    n37 -- No --> n33["Validation report<br>validation_report.json"]
+    n33 --> n39["TODO: how does user resolve invalid JSON-LD?"]
+    n42 --> n43["review.sssom.tsv"]
+    n43 --> n44["Accreditor reviews mappings proposed by analyst"]
+    n44 --> n19
+    n46["Start"] --> n20["Master ontology<br>ontology.ttl, .owl"] & A & n28
+    n35 --> n47["Stop"]
+    n20 --> n12
+
+    A@{ shape: in-out}
+    n12@{ shape: proc}
+    B@{ shape: in-out}
+    n30@{ shape: in-out}
+    n15@{ shape: proc}
+    n19@{ shape: rect}
+    n24@{ shape: proc}
+    n4@{ shape: in-out}
+    n16@{ shape: manual-input}
+    n7@{ shape: diam}
+    n18@{ shape: stored-data}
+    n42@{ shape: proc}
+    n25@{ shape: in-out}
+    n40@{ shape: manual-input}
+    n41@{ shape: proc}
+    n28@{ shape: in-out}
+    n29@{ shape: proc}
+    n37@{ shape: decision}
+    n35@{ shape: in-out}
+    n33@{ shape: in-out}
+    n39@{ shape: proc}
+    n43@{ shape: in-out}
+    n44@{ shape: manual-input}
+    n46@{ shape: start}
+    n20@{ shape: in-out}
+    n47@{ shape: stop}
