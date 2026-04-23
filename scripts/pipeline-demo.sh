@@ -84,22 +84,17 @@ echo "  Audit log   : $LOG"
 
 info "Step 1 — Ingest schemas → LinkML YAML (with translation and master alignment)"
 
-# Ingest source schema, translating Norwegian labels to English in-line.
+# Ingest source schema with translation, and process the master ontology
+# (generates LinkML YAML + SHACL shapes for the master alongside the source).
 # DEEPL_API_KEY must be set in the environment for --translate to work.
 run_cmd uv run rosetta ingest \
     "$SRC_FIXTURE" \
     --translate --lang NB \
+    --master "$MASTER_FIXTURE" \
     -o "$OUT/nor_radar.linkml.yaml"
 ok "$OUT/nor_radar.linkml.yaml"
-
-# Ingest master ontology, generating SHACL shapes alongside the LinkML YAML.
-run_cmd uv run rosetta ingest \
-    "$MASTER_FIXTURE" \
-    --schema-format rdfs \
-    --master "$MASTER_FIXTURE" \
-    -o "$OUT/master_cop.linkml.yaml"
-ok "$OUT/master_cop.linkml.yaml"
-ok "$OUT/*.shacl.ttl  (shapes generated from master ontology)"
+ok "$OUT/master_cop_ontology.linkml.yaml  (master schema)"
+ok "$OUT/master_cop_ontology.shacl.ttl    (shapes from master ontology)"
 
 # ── Step 2: Suggest ───────────────────────────────────────────────────────────
 
@@ -108,7 +103,7 @@ echo "  (First run downloads the embedding model ~1.2 GB from HuggingFace; subse
 
 run_cmd uv run rosetta suggest \
     "$OUT/nor_radar.linkml.yaml" \
-    "$OUT/master_cop.linkml.yaml" \
+    "$OUT/master_cop_ontology.linkml.yaml" \
     --audit-log "$LOG" \
     -o "$OUT/candidates.sssom.tsv"
 ok "$OUT/candidates.sssom.tsv"
@@ -134,11 +129,11 @@ info "Step 3 — Stage analyst proposals into audit log (lint gate runs automati
 echo "  Use --dry-run to check for lint errors without appending:"
 echo "    uv run rosetta ledger --audit-log $LOG append --role analyst --dry-run \\"
 echo "      $OUT/candidates.sssom.tsv \\"
-echo "      --source-schema $OUT/nor_radar.linkml.yaml --master-schema $OUT/master_cop.linkml.yaml"
+echo "      --source-schema $OUT/nor_radar.linkml.yaml --master-schema $OUT/master_cop_ontology.linkml.yaml"
 
 run_cmd uv run rosetta ledger --audit-log "$LOG" append --role analyst "$OUT/candidates.sssom.tsv" \
     --source-schema "$OUT/nor_radar.linkml.yaml" \
-    --master-schema "$OUT/master_cop.linkml.yaml"
+    --master-schema "$OUT/master_cop_ontology.linkml.yaml"
 ok "Analyst proposals appended to audit log."
 
 # ── Step 4: Generate accreditor work list ─────────────────────────────────────
@@ -167,7 +162,7 @@ info "Step 5 — Append accreditor decisions"
 
 run_cmd uv run rosetta ledger --audit-log "$LOG" append --role accreditor "$OUT/review.sssom.tsv" \
     --source-schema "$OUT/nor_radar.linkml.yaml" \
-    --master-schema "$OUT/master_cop.linkml.yaml"
+    --master-schema "$OUT/master_cop_ontology.linkml.yaml"
 ok "Accreditor decisions appended to audit log."
 
 # ── Step 6: Compile YARRRML mapping artifact ─────────────────────────────────
@@ -178,7 +173,7 @@ echo "  (Requires approved mappings in the audit log from steps 3–5)"
 COMPILE_OK=false
 if run_cmd uv run rosetta compile "$LOG" \
     --source-schema "$OUT/nor_radar.linkml.yaml" \
-    --master-schema "$OUT/master_cop.linkml.yaml" \
+    --master-schema "$OUT/master_cop_ontology.linkml.yaml" \
     --coverage-report "$OUT/coverage.json" \
     --spec-output "$OUT/nor_to_mc.transform.yaml" \
     -o "$OUT/nor_to_mc.yarrrml.yaml"; then
@@ -201,7 +196,7 @@ if $COMPILE_OK; then
     if run_cmd uv run rosetta transform \
         "$OUT/nor_to_mc.yarrrml.yaml" \
         "$SRC_FIXTURE" \
-        --master-schema "$OUT/master_cop.linkml.yaml" \
+        --master-schema "$OUT/master_cop_ontology.linkml.yaml" \
         -o "$OUT/output.jsonld" \
         --workdir "$OUT/morph_workdir"; then
         ok "$OUT/output.jsonld  (materialized JSON-LD, validated against SHACL shapes)"
@@ -230,5 +225,5 @@ fi
 echo ""
 echo "  Next steps:"
 echo "    uv run rosetta ledger --audit-log '$LOG' dump     # export approved mappings"
-echo "    uv run rosetta suggest '$OUT/nor_radar.linkml.yaml' '$OUT/master_cop.linkml.yaml' \\"
+echo "    uv run rosetta suggest '$OUT/nor_radar.linkml.yaml' '$OUT/master_cop_ontology.linkml.yaml' \\"
 echo "      --audit-log '$LOG' -o candidates2.sssom.tsv     # re-run suggest"
