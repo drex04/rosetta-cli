@@ -149,6 +149,10 @@ def append_cmd(
     # 3. Lint gate: block on BLOCK findings
     if has_blocks:
         click.echo(report.model_dump_json(indent=2), err=True)
+        click.echo(
+            "Lint failed: records were not appended. Resolve blocking issues then try again.",
+            err=True,
+        )
         sys.exit(1)
 
     # 4. Print warnings to stderr if any

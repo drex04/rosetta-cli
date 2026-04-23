@@ -206,6 +206,7 @@ def test_slot_class_unreachable(source_view: SchemaView, master_view: SchemaView
     assert m.target_slot_name == "hasLongitude"
     assert m.target_owning_class == "Entity"
     assert m.mapped_target_classes == {"SensorReport"}
+    assert m.target_class_subclasses == ["AirTrack", "Track"]
 
 
 def test_slot_class_reachable(source_view: SchemaView, master_view: SchemaView) -> None:

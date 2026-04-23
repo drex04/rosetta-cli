@@ -26,7 +26,7 @@ _VALID_PREDICATES = {
 MMC = "semapv:ManualMappingCuration"
 HC = "semapv:HumanCuration"
 
-# LinkML numeric types — mismatch triggers datatype_mismatch WARNING
+# LinkML numeric types — cross-category mismatch triggers datatype_mismatch BLOCK
 _NUMERIC_LINKML = {
     "integer",
     "int",
@@ -38,6 +38,10 @@ _NUMERIC_LINKML = {
     "nonNegativeInteger",
     "positiveInteger",
 }
+
+# Integer-family types — casting from float-family to these truncates silently
+_INTEGER_LINKML = {"integer", "int", "long", "short", "nonNegativeInteger", "positiveInteger"}
+_FLOAT_LINKML = {"float", "double", "decimal"}
 
 
 def _check_duplicate_mmc_pairs(findings: list[LintFinding], mmc_rows: list[SSSOMRow]) -> None:
@@ -178,6 +182,25 @@ def unit_not_detected(row_id: str, side: str, name: str, description: str) -> Li
     )
 
 
+def _check_undetected_units(
+    findings: list[LintFinding],
+    row: SSSOMRow,
+    src_iri: str | None,
+    tgt_iri: str | None,
+    src_name: str,
+    tgt_name: str,
+) -> None:
+    """Emit unit_not_detected findings when at least one side has a unit signal."""
+    src_recognized = src_iri is not None or recognized_unit_without_iri(src_name, row.subject_label)
+    tgt_recognized = tgt_iri is not None or recognized_unit_without_iri(tgt_name, row.object_label)
+    if not src_recognized and not tgt_recognized:
+        return
+    if src_iri is None:
+        findings.append(unit_not_detected(row.subject_id, "subject", src_name, row.subject_label))
+    if tgt_iri is None:
+        findings.append(unit_not_detected(row.object_id, "object", tgt_name, row.object_label))
+
+
 def check_units(
     findings: list[LintFinding],
     row: SSSOMRow,
@@ -190,12 +213,7 @@ def check_units(
     tgt_iri = detect_unit(tgt_name, row.object_label)
 
     if src_iri is None or tgt_iri is None:
-        if src_iri is None:
-            findings.append(
-                unit_not_detected(row.subject_id, "subject", src_name, row.subject_label)
-            )
-        if tgt_iri is None:
-            findings.append(unit_not_detected(row.object_id, "object", tgt_name, row.object_label))
+        _check_undetected_units(findings, row, src_iri, tgt_iri, src_name, tgt_name)
         return
 
     compat = units_compatible(src_iri, tgt_iri, qudt_graph)
@@ -238,8 +256,10 @@ def check_units(
 
 
 def check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
-    """Append a datatype_mismatch WARNING if numeric vs non-numeric mismatch detected."""
+    """Append datatype findings: BLOCK for numeric/non-numeric, WARNING for narrowing casts."""
     if row.subject_datatype is None or row.object_datatype is None:
+        return
+    if row.subject_datatype == row.object_datatype:
         return
     src_numeric = row.subject_datatype in _NUMERIC_LINKML
     tgt_numeric = row.object_datatype in _NUMERIC_LINKML
@@ -247,12 +267,26 @@ def check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
         findings.append(
             LintFinding(
                 rule="datatype_mismatch",
-                severity="WARNING",
+                severity="BLOCK",
                 source_uri=row.subject_id,
                 target_uri=row.object_id,
                 message=f"Datatype mismatch: {row.subject_datatype} vs {row.object_datatype}",
             )
         )
+    elif src_numeric and tgt_numeric:
+        if row.subject_datatype in _FLOAT_LINKML and row.object_datatype in _INTEGER_LINKML:
+            findings.append(
+                LintFinding(
+                    rule="datatype_narrowing",
+                    severity="WARNING",
+                    source_uri=row.subject_id,
+                    target_uri=row.object_id,
+                    message=(
+                        f"Narrowing cast: {row.subject_datatype} → {row.object_datatype} "
+                        f"may silently truncate decimal values"
+                    ),
+                )
+            )
 
 
 def _check_reachability(
@@ -285,8 +319,12 @@ def _check_reachability(
                     f"Slot '{mismatch.target_slot_name}' belongs to class "
                     f"'{mismatch.target_owning_class}' which is not reachable from any "
                     f"mapped class ({', '.join(sorted(mismatch.mapped_target_classes))}). "
-                    f"Map the source class to '{mismatch.target_owning_class}' or one of "
-                    f"its subclasses."
+                    f"Map the source class to '{mismatch.target_owning_class}'"
+                    + (
+                        f" or a subclass: {', '.join(mismatch.target_class_subclasses)}."
+                        if mismatch.target_class_subclasses
+                        else "."
+                    )
                 ),
             )
         )

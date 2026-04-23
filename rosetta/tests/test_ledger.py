@@ -22,6 +22,7 @@ from rosetta.core.ledger import (
     parse_sssom_tsv,
     query_pending,
 )
+from rosetta.core.lint import check_datatype
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 
 # ---------------------------------------------------------------------------
@@ -1268,6 +1269,7 @@ def test_append_lint_gate_block(
     )
     assert result.exit_code == 1
     assert not log_path.exists() or not load_log(log_path)
+    assert "Lint failed: records were not appended" in result.stderr
 
 
 def test_append_lint_gate_warning_proceeds(
@@ -1623,3 +1625,60 @@ def test_append_role_plus_dry_run(
     # JSON report on stdout
     assert "findings" in result.stdout
     assert "summary" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# check_datatype unit tests
+# ---------------------------------------------------------------------------
+
+
+def _dtype_row(subject_datatype: str | None, object_datatype: str | None) -> SSSOMRow:
+    return SSSOMRow(
+        subject_id="src:x",
+        predicate_id="skos:exactMatch",
+        object_id="mst:y",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.9,
+        subject_datatype=subject_datatype,
+        object_datatype=object_datatype,
+    )
+
+
+def test_check_datatype_numeric_vs_nonnumeric_blocks() -> None:
+    """Numeric vs non-numeric → BLOCK."""
+    findings: list[LintFinding] = []
+    check_datatype(findings, _dtype_row("integer", "string"))
+    assert len(findings) == 1
+    assert findings[0].rule == "datatype_mismatch"
+    assert findings[0].severity == "BLOCK"
+
+
+def test_check_datatype_narrowing_warns() -> None:
+    """Float-family → integer-family → WARNING (silent truncation risk)."""
+    findings: list[LintFinding] = []
+    check_datatype(findings, _dtype_row("double", "integer"))
+    assert len(findings) == 1
+    assert findings[0].rule == "datatype_narrowing"
+    assert findings[0].severity == "WARNING"
+    assert "truncate" in findings[0].message
+
+
+def test_check_datatype_widening_no_finding() -> None:
+    """Integer-family → float-family → no finding (lossless)."""
+    findings: list[LintFinding] = []
+    check_datatype(findings, _dtype_row("integer", "double"))
+    assert not findings
+
+
+def test_check_datatype_same_type_no_finding() -> None:
+    """Same type → no finding."""
+    findings: list[LintFinding] = []
+    check_datatype(findings, _dtype_row("float", "float"))
+    assert not findings
+
+
+def test_check_datatype_missing_types_no_finding() -> None:
+    """Missing datatypes → no finding."""
+    findings: list[LintFinding] = []
+    check_datatype(findings, _dtype_row(None, "integer"))
+    assert not findings

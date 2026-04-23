@@ -94,6 +94,7 @@ class SlotClassMismatch:
     target_slot_name: str
     target_owning_class: str
     mapped_target_classes: set[str]
+    target_class_subclasses: list[str]
 
 
 def _classify_row_for_reachability(
@@ -152,13 +153,19 @@ def check_slot_class_reachability(
     if not mapped_classes or not slot_rows:
         return []
 
-    return [
-        SlotClassMismatch(
-            row=row,
-            target_slot_name=slot_name,
-            target_owning_class=owner,
-            mapped_target_classes=mapped_classes.copy(),
-        )
-        for row, slot_name, owner in slot_rows
-        if nearest_mapped_ancestor(owner, mapped_classes, master_view) is None
-    ]
+    mismatches: list[SlotClassMismatch] = []
+    for row, slot_name, owner in slot_rows:
+        if nearest_mapped_ancestor(owner, mapped_classes, master_view) is None:
+            subclasses = sorted(
+                master_view.class_descendants(owner, reflexive=False)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            )
+            mismatches.append(
+                SlotClassMismatch(
+                    row=row,
+                    target_slot_name=slot_name,
+                    target_owning_class=owner,
+                    mapped_target_classes=mapped_classes.copy(),
+                    target_class_subclasses=subclasses,
+                )
+            )
+    return mismatches

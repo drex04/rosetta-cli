@@ -99,20 +99,11 @@ def test_suggest_type_divergence_flagged_by_lint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Source ``speed_kts: integer`` vs master ``speed_kts: string`` → lint
-    emits a ``datatype_mismatch`` WARNING.
-
-    OBSERVED-BEHAVIOR NOTE: Plan 18-03 Task 3 originally proposed
-    ``integer`` vs ``float`` for the type divergence. Production's
-    ``_NUMERIC_LINKML`` set (``rosetta/cli/lint.py`` line 33) treats both
-    as numeric, so numeric/numeric pairs do NOT trigger
-    ``datatype_mismatch``. This test uses ``integer`` vs ``string`` — the
-    minimal numeric-vs-non-numeric mismatch that the rule actually fires
-    on. If ``_NUMERIC_LINKML`` or ``_check_datatype`` changes (e.g. adds
-    numeric-granularity comparisons), update this test deliberately.
+    emits a ``datatype_mismatch`` BLOCK.
 
     Pinned observed values:
     - ``suggest.exit_code == 0``
-    - ``lint.exit_code == 0`` (WARNING-only findings; no BLOCK ⇒ exit 0)
+    - ``lint.exit_code == 1`` (BLOCK finding ⇒ exit 1)
     - at least one finding has ``rule == "datatype_mismatch"``
     """
     _install_fake_labse(monkeypatch)
@@ -184,11 +175,9 @@ def test_suggest_type_divergence_flagged_by_lint(
         ],
     )
 
-    # 1. Exit code — observed: 0 (WARNING-only, no BLOCK).
-    # Pin the observed value so a future severity-to-exit-code change breaks
-    # this test intentionally.
-    assert lint_result.exit_code == 0, (
-        f"lint exit drift: expected 0 (WARNING-only), got {lint_result.exit_code}; "
+    # 1. Exit code — datatype_mismatch is BLOCK severity ⇒ exit 1.
+    assert lint_result.exit_code == 1, (
+        f"lint exit drift: expected 1 (BLOCK finding), got {lint_result.exit_code}; "
         f"stderr={lint_result.stderr!r}"
     )
 
