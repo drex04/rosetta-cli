@@ -329,7 +329,7 @@ def test_run_validate_pass_exits_0_and_emits_jsonld(
         lambda *a, **kw: conforming_report,
     )
     monkeypatch.setattr(
-        "rosetta.cli.transform.load_shapes_from_dir",
+        "rosetta.cli.transform.load_shapes",
         lambda _p: rdflib.Graph(),
     )
 
@@ -340,7 +340,7 @@ def test_run_validate_pass_exits_0_and_emits_jsonld(
             str(dummy_data),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
         ],
     )
@@ -389,7 +389,7 @@ def test_run_validate_fail_exits_1_no_jsonld(
         lambda *a, **kw: failing_report,
     )
     monkeypatch.setattr(
-        "rosetta.cli.transform.load_shapes_from_dir",
+        "rosetta.cli.transform.load_shapes",
         lambda _p: rdflib.Graph(),
     )
 
@@ -400,7 +400,7 @@ def test_run_validate_fail_exits_1_no_jsonld(
             str(dummy_data),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
             "--validate-report",
             str(report_path),
@@ -446,29 +446,29 @@ def test_run_stdout_collision_output_and_validate_report(
 
 
 # ---------------------------------------------------------------------------
-# --shapes-dir / --no-validate guards
+# --shapes / --no-validate guards
 # ---------------------------------------------------------------------------
 
 
-def test_run_missing_both_shapes_dir_and_no_validate_exits_2(
+def test_run_missing_both_shapes_and_no_validate_exits_2(
     dummy_yarrrml: Path,
     dummy_data: Path,
 ) -> None:
-    """Neither --shapes-dir nor --no-validate provided → UsageError exit 2."""
+    """Neither --shapes nor --no-validate provided → UsageError exit 2."""
     result = CliRunner(mix_stderr=False).invoke(
         cli,
         [str(dummy_yarrrml), str(dummy_data), "--master-schema", str(_MC_SCHEMA)],
     )
     assert result.exit_code == 2, f"expected exit 2; got {result.exit_code}: {result.stderr!r}"
-    assert "--shapes-dir" in result.stderr or "required" in result.stderr
+    assert "--shapes" in result.stderr or "required" in result.stderr
 
 
-def test_run_shapes_dir_and_no_validate_mutually_exclusive_exits_2(
+def test_run_shapes_and_no_validate_mutually_exclusive_exits_2(
     tmp_path: Path,
     dummy_yarrrml: Path,
     dummy_data: Path,
 ) -> None:
-    """--shapes-dir and --no-validate together → UsageError exit 2."""
+    """--shapes and --no-validate together → UsageError exit 2."""
     shapes_dir = tmp_path / "shapes"
     shapes_dir.mkdir()
     result = CliRunner(mix_stderr=False).invoke(
@@ -478,7 +478,7 @@ def test_run_shapes_dir_and_no_validate_mutually_exclusive_exits_2(
             str(dummy_data),
             "--master-schema",
             str(_MC_SCHEMA),
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
             "--no-validate",
         ],

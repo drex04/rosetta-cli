@@ -64,19 +64,34 @@ def load_shapes_from_dir(shapes_dir: Path) -> rdflib.Graph:
     - Sorts file list (alphabetical by full path) for deterministic merge order.
     - For each file: parses as Turtle, counts ``sh:NodeShape`` + ``sh:PropertyShape``
       triples; if zero, emits a stderr warning but still merges (open-world
-      principle — user explicitly put it in ``--shapes-dir``).
+      principle — user explicitly put it in ``--shapes``).
     - Raises ``ValueError`` if no ``.ttl`` files are found at all, or if any
       ``.ttl`` file fails to parse (error message includes the offending path
       so users do not get an unattributed rdflib trace).
     """
     if not shapes_dir.is_dir():
-        raise ValueError(f"--shapes-dir {shapes_dir} is not a directory (or does not exist).")
+        raise ValueError(f"--shapes {shapes_dir} is not a directory (or does not exist).")
 
     ttl_files = _walk_ttl_files(shapes_dir)
     if not ttl_files:
-        raise ValueError(f"--shapes-dir {shapes_dir} contained no .ttl files (recursive walk).")
+        raise ValueError(f"--shapes {shapes_dir} contained no .ttl files (recursive walk).")
 
     merged = rdflib.Graph()
     for f in ttl_files:
         merged += _parse_single_shapes_file(f)
     return merged
+
+
+def load_shapes(shapes_path: Path) -> rdflib.Graph:
+    """Load SHACL shapes from a file or directory.
+
+    If ``shapes_path`` is a file, parse it directly as Turtle.
+    If ``shapes_path`` is a directory, delegate to :func:`load_shapes_from_dir`.
+    """
+    if not shapes_path.exists():
+        raise ValueError(f"--shapes {shapes_path} does not exist.")
+
+    if shapes_path.is_file():
+        return _parse_single_shapes_file(shapes_path)
+
+    return load_shapes_from_dir(shapes_path)

@@ -84,7 +84,7 @@ def test_stdout_collision_output_and_validate_report(
             str(tmp_path / "master.yaml"),  # doesn't need to exist for step-0 guard
             "--validate-report",
             "-",
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
         ],
     )
@@ -119,7 +119,7 @@ def test_stdout_collision_explicit_output_dash_and_validate_report_dash(
             "-",
             "--validate-report",
             "-",
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
         ],
     )
@@ -204,7 +204,7 @@ def test_validate_no_partial_jsonld_on_violation(
             str(mc_dst),
             "-o",
             str(jsonld_out),
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
             "--validate-report",
             str(report_out),

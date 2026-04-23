@@ -12,20 +12,29 @@ Materializes a YARRRML mapping against a concrete data file via [morph-kgc](http
 
 ## SHACL validation
 
-Every `transform` invocation must explicitly declare its validation intent. Pass `--shapes-dir` to enable inline SHACL validation, or `--no-validate` to opt out. Passing neither (or both) is a usage error (exit 2).
+Every `transform` invocation must explicitly declare its validation intent. Pass `--shapes` to enable inline SHACL validation, or `--no-validate` to opt out. Passing neither (or both) is a usage error (exit 2).
 
-When `--shapes-dir` is provided, SHACL validation runs against the in-memory materialized graph **before** emitting JSON-LD. On any violation, JSON-LD emission is blocked, the validation report is written to `--validate-report` (or stderr), and the process exits 1.
+`--shapes` accepts a single `.ttl` file or a directory of `.ttl` files (walked recursively). When provided, SHACL validation runs against the in-memory materialized graph **before** emitting JSON-LD. On any violation, JSON-LD emission is blocked, the validation report is written to `--validate-report` (or stderr), and the process exits 1.
 
 When `--no-validate` is provided, validation is skipped and a warning is emitted to stderr to record the opt-out in the audit trail.
 
 ## Examples
 
-### With SHACL validation (recommended)
+### With SHACL validation — directory of shapes (recommended)
 
 ```bash
 rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   --master-schema demo_out/master_cop.linkml.yaml \
-  --shapes-dir rosetta/policies/shacl/ \
+  --shapes rosetta/policies/shacl/ \
+  -o demo_out/nor_tracks.jsonld
+```
+
+### With SHACL validation — single shapes file
+
+```bash
+rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
+  --master-schema demo_out/master_cop.linkml.yaml \
+  --shapes master_cop.shapes.ttl \
   -o demo_out/nor_tracks.jsonld
 ```
 
@@ -34,7 +43,7 @@ rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
 ```bash
 rosetta transform demo_out/nor_to_mc.yarrrml.yml demo_out/nor_radar.csv \
   --master-schema demo_out/master_cop.linkml.yaml \
-  --shapes-dir rosetta/policies/shacl/ \
+  --shapes rosetta/policies/shacl/ \
   -o demo_out/nor_tracks.jsonld \
   --validate-report report.json
 ```
@@ -58,7 +67,7 @@ Both `--output` and `--validate-report` can target stdout. Setting both to stdou
 
 - `0` — success. JSON-LD emitted. Empty materialized graph (0 triples) is not an error — a warning prints to stderr.
 - `1` — runtime error or SHACL validation failure.
-- `2` — Click validation error (missing required option, `--shapes-dir`/`--no-validate` conflict, stdout collision).
+- `2` — usage error (missing `--shapes`/`--no-validate`, both provided, stdout collision).
 
 ## See also
 

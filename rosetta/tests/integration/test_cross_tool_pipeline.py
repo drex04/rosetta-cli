@@ -313,11 +313,11 @@ def test_shacl_gen_to_transform_validate(
     sssom_nor_path: Path,
     nor_csv_sample_path: Path,
 ) -> None:
-    """generate_shacl → transform --shapes-dir: shapes validate materialized JSON-LD.
+    """generate_shacl → transform --shapes: shapes validate materialized JSON-LD.
 
     Tests the shacl-gen -> validate seam using the consolidated commands:
     `generate_shacl` (core, same logic as `ingest --master`) for SHACL generation,
-    `transform --shapes-dir` for validation.
+    `transform --shapes` for validation.
     Exit 0 (conformant) or 1 (violations) are both valid — the assertion is
     that transform can parse the generated SHACL without crashing.
     """
@@ -375,7 +375,7 @@ def test_shacl_gen_to_transform_validate(
             str(mc_schema),
             "-o",
             str(jsonld_out),
-            "--shapes-dir",
+            "--shapes",
             str(shapes_dir),
             "--workdir",
             str(tmp_path / "wd"),

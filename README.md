@@ -28,7 +28,7 @@ All tools are available via `uv run rosetta <command>` after syncing.
 | `suggest`   | Rank candidate mappings by similarity; embeds schemas on-the-fly (no pre-computed embedding files needed) |
 | `ledger`    | Manage the append-only audit log: `append --role analyst\|accreditor` (with built-in lint gate), `review`, `dump` |
 | `compile`   | Compile approved mappings from the audit log → YARRRML       |
-| `transform` | Materialise YARRRML → JSON-LD; validates against SHACL by default (`--no-validate` to skip, `--shapes-dir` for custom shapes) |
+| `transform` | Materialise YARRRML → JSON-LD; validates against SHACL by default (`--no-validate` to skip, `--shapes` for custom shapes) |
 
 Run `uv run rosetta <command> --help` for options and usage.
 

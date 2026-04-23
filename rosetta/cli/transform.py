@@ -13,7 +13,7 @@ import yaml  # for YAMLError
 from rosetta.core.io import open_output
 from rosetta.core.rml_runner import graph_to_jsonld, run_materialize
 from rosetta.core.shacl_validate import validate_graph
-from rosetta.core.shapes_loader import load_shapes_from_dir
+from rosetta.core.shapes_loader import load_shapes
 
 
 @click.command(
@@ -23,7 +23,7 @@ from rosetta.core.shapes_loader import load_shapes_from_dir
       --master-schema master.linkml.yaml -o output.jsonld
 
   rosetta -v transform mapping.yarrrml.yaml data.json --master-schema master.linkml.yaml \\
-      --shapes-dir rosetta/policies/ -o output.jsonld"""
+      --shapes rosetta/policies/ -o output.jsonld"""
 )
 @click.argument("mapping_file", type=click.Path(exists=True, dir_okay=False))
 @click.argument("source_file", type=click.Path(exists=True, dir_okay=False))
@@ -44,14 +44,14 @@ from rosetta.core.shapes_loader import load_shapes_from_dir
     help="Path to the master LinkML schema (.yaml/.yml). Required for JSON-LD context generation.",
 )
 @click.option(
-    "--shapes-dir",
-    type=click.Path(exists=True, file_okay=False),
+    "--shapes",
+    type=click.Path(exists=True),
     default=None,
     help=(
-        "Directory containing SHACL shape .ttl files for validation. When provided, "
-        "validates the in-memory RDF graph before JSON-LD emission. On any violation: "
-        "write the validation report (stderr or --validate-report) and exit 1 "
-        "with no JSON-LD output."
+        "SHACL shape file (.ttl) or directory of .ttl files for validation. When "
+        "provided, validates the in-memory RDF graph before JSON-LD emission. On "
+        "any violation: write the validation report (stderr or --validate-report) "
+        "and exit 1 with no JSON-LD output."
     ),
 )
 @click.option(
@@ -87,7 +87,7 @@ def cli(
     source_file: str,
     output: str | None,
     master_schema: str,
-    shapes_dir: str | None,
+    shapes: str | None,
     no_validate: bool,
     workdir: str | None,
     context_output: str | None,
@@ -110,11 +110,11 @@ def cli(
             "use a file path for one of them."
         )
 
-    # 0b. Validate --shapes-dir / --no-validate mutual exclusion.
-    if shapes_dir is not None and no_validate:
-        raise click.UsageError("--shapes-dir and --no-validate are mutually exclusive")
-    if shapes_dir is None and not no_validate:
-        raise click.UsageError("--shapes-dir is required unless --no-validate is passed")
+    # 0b. Validate --shapes / --no-validate mutual exclusion.
+    if shapes is not None and no_validate:
+        raise click.UsageError("--shapes and --no-validate are mutually exclusive")
+    if shapes is None and not no_validate:
+        raise click.UsageError("--shapes is required unless --no-validate is passed")
 
     # 1. Read YARRRML mapping file.
     try:
@@ -155,9 +155,9 @@ def cli(
             #     a violation aborts with no partial output written anywhere.
             if no_validate:
                 click.echo("Warning: SHACL validation bypassed via --no-validate", err=True)
-            elif shapes_dir is not None:
+            elif shapes is not None:
                 try:
-                    shapes_g = load_shapes_from_dir(Path(shapes_dir))
+                    shapes_g = load_shapes(Path(shapes))
                 except ValueError as exc:
                     raise click.UsageError(str(exc)) from exc
 
