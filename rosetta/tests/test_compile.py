@@ -312,14 +312,16 @@ def test_build_spec_class_derivations_is_list() -> None:
     assert isinstance(spec.class_derivations, list)
 
 
-def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
+def test_build_spec_emits_function_call_for_m_to_ft() -> None:
     from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
+    from rosetta.core.function_library import FunctionLibrary
     from rosetta.core.ledger import parse_sssom_tsv
 
     rows = parse_sssom_tsv(_NOR_SSSOM)
     src = cast(SchemaDefinition, yaml_loader.load(str(_NOR_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
     mst = cast(SchemaDefinition, yaml_loader.load(str(_MC_SCHEMA), target_class=SchemaDefinition))  # pyright: ignore[reportUnknownMemberType]
+    library = FunctionLibrary.load_builtins()
     spec, _cov = build_spec(
         rows,
         src,
@@ -327,12 +329,13 @@ def test_build_spec_emits_unit_conversion_for_m_to_ft() -> None:
         source_schema_path=str(_NOR_SCHEMA.resolve()),
         target_schema_path=str(_MC_SCHEMA.resolve()),
         force=True,
+        function_library=library,
     )
     track = next(cd for cd in spec.class_derivations if cd.name == "Track")  # pyright: ignore[reportOptionalIterable]
     alt = track.slot_derivations["hasAltitudeFt"]  # pyright: ignore[reportOptionalSubscript]
-    assert alt.unit_conversion is not None  # pyright: ignore[reportAttributeAccessIssue]
-    assert alt.unit_conversion.source_unit == "meter"  # pyright: ignore[reportAttributeAccessIssue]
-    assert alt.unit_conversion.target_unit == "foot"  # pyright: ignore[reportAttributeAccessIssue]
+    assert alt.function_call is not None  # pyright: ignore[reportAttributeAccessIssue]
+    assert "meterToFoot" in alt.function_call.function_id  # pyright: ignore[reportAttributeAccessIssue]
+    assert alt.function_call.parameter_predicate is not None  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def test_build_spec_errors_on_unresolvable_without_force(
@@ -552,6 +555,108 @@ def test_coverage_report_rejects_extra_fields() -> None:
             rows_after_predicate_filter=0,
             rows_after_justification_filter=0,
         )
+
+
+# ====== build_slot_derivation unit tests ======
+
+
+def _mk_slot_mapping(**row_overrides: object) -> _SlotMapping:
+    row = _mkrow(**row_overrides)
+    return _SlotMapping(
+        source_slot_name="src_slot",
+        source_owning_class="SrcClass",
+        target_slot_name="tgt_slot",
+        target_owning_class="TgtClass",
+        row=row,
+    )
+
+
+def test_build_slot_derivation_emits_function_call_for_typecast() -> None:
+    from rosetta.core.function_library import FunctionLibrary
+    from rosetta.core.transform_builder import build_slot_derivation
+
+    library = FunctionLibrary.load_builtins()
+    mapping = _mk_slot_mapping(conversion_function="grel:math_round")
+    sd = build_slot_derivation(mapping, library=library)
+    assert sd.function_call is not None  # pyright: ignore[reportAttributeAccessIssue]
+    assert "grel.ttl#math_round" in sd.function_call.function_id  # pyright: ignore[reportAttributeAccessIssue]
+    assert sd.function_call.parameter_predicate is not None  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_build_slot_derivation_no_function_call_when_empty() -> None:
+    from rosetta.core.function_library import FunctionLibrary
+    from rosetta.core.transform_builder import build_slot_derivation
+
+    library = FunctionLibrary.load_builtins()
+    mapping = _mk_slot_mapping(conversion_function=None)
+    sd = build_slot_derivation(mapping, library=library)
+    assert sd.function_call is None  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_build_slot_derivation_no_function_call_when_no_library() -> None:
+    from rosetta.core.transform_builder import build_slot_derivation
+
+    mapping = _mk_slot_mapping(conversion_function="rfns:meterToFoot")
+    sd = build_slot_derivation(mapping)
+    assert sd.function_call is None  # pyright: ignore[reportAttributeAccessIssue]
+
+
+def test_build_spec_function_call_roundtrips_through_yaml(
+    dummy_schema_paths: tuple[Path, Path],
+) -> None:
+    from linkml_runtime.dumpers import yaml_dumper  # type: ignore[import-untyped]
+    from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
+
+    from rosetta.core.function_library import FunctionLibrary
+
+    src_path, tgt_path = dummy_schema_paths
+    src = _mkschema("src", {"Widget": ["alpha"]}, {"alpha": "string"})
+    mst = _mkschema("mst", {"Thing": ["beta"]}, {"beta": "string"})
+    rows = [
+        _mkrow(subject_id="src:Widget", object_id="mst:Thing"),
+        _mkrow(
+            subject_id="src:alpha",
+            object_id="mst:beta",
+            conversion_function="grel:math_round",
+        ),
+    ]
+    library = FunctionLibrary.load_builtins()
+    spec, _cov = build_spec(
+        rows,
+        src,
+        mst,
+        source_schema_path=src_path,
+        target_schema_path=tgt_path,
+        force=False,
+        function_library=library,
+    )
+    yaml_text: str = yaml_dumper.dumps(spec)  # pyright: ignore[reportUnknownMemberType]
+    reloaded = cast(
+        TransformationSpecification,
+        yaml_loader.loads(yaml_text, target_class=TransformationSpecification),  # pyright: ignore[reportUnknownMemberType]
+    )
+    cds = reloaded.class_derivations or []
+    iter_cds: object = cds.values() if isinstance(cds, dict) else cds
+    fun_id: str | None = None
+    for cd in iter_cds:  # pyright: ignore[reportUnknownVariableType]
+        sds = getattr(cd, "slot_derivations", None) or {}
+        sd_iter: object = sds.values() if isinstance(sds, dict) else sds
+        for sd in sd_iter:  # pyright: ignore[reportUnknownVariableType]
+            fc = getattr(sd, "function_call", None)
+            if fc is not None:
+                fun_id = str(getattr(fc, "function_id", ""))
+    assert fun_id is not None, "No function_call found in roundtripped spec"
+    assert "grel.ttl#math_round" in fun_id
+
+
+def test_build_slot_derivation_unknown_curie_raises_clean_error() -> None:
+    from rosetta.core.function_library import FunctionLibrary
+    from rosetta.core.transform_builder import build_slot_derivation
+
+    library = FunctionLibrary.load_builtins()
+    mapping = _mk_slot_mapping(conversion_function="bogus:nonExistent")
+    with pytest.raises(ValueError, match="bogus:nonExistent"):
+        build_slot_derivation(mapping, library=library)
 
 
 # ====== CLI integration tests ======

@@ -8,39 +8,21 @@ from typing import Any, cast  # noqa: F401
 
 from linkml_map.datamodel.transformer_model import (
     ClassDerivation,
+    FunctionCallConfiguration,
     KeyVal,
     SlotDerivation,
     TransformationSpecification,
-    UnitConversionConfiguration,
 )
 from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.utils.schemaview import SchemaView
 
+from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION
 from rosetta.core.models import CoverageReport, SSSOMRow
 from rosetta.core.schema_utils import (
     build_slot_owner_index,
     local_name,
     nearest_mapped_ancestor,
-)
-from rosetta.core.unit_detect import detect_unit
-
-# Linear unit-conversion pairs supported by the forked YarrrmlCompiler's
-# LINEAR_CONVERSION_FUN_IDS table (compiler/yarrrml_compiler.py). Only pairs
-# in this set trigger UnitConversionConfiguration emission; unknown pairs
-# fall through to passthrough references. Keep in sync with the fork.
-#
-# Keys are QUDT IRIs (the output of detect_unit() since Phase 17). Values
-# are the short-name strings the fork uses to look up UDFs.
-_QUDT_TO_FORK_UNIT: dict[str, str] = {
-    "unit:M": "meter",
-    "unit:FT": "foot",
-}
-_LINEAR_CONVERSION_PAIRS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("unit:M", "unit:FT"),
-        ("unit:FT", "unit:M"),
-    }
 )
 
 # ---------------------------------------------------------------------------
@@ -104,8 +86,6 @@ class _SlotMapping:
     target_slot_name: str
     target_owning_class: str
     row: SSSOMRow
-    source_unit: str | None = None
-    target_unit: str | None = None
 
 
 @dataclass
@@ -137,19 +117,15 @@ def _owning_class(index: dict[str, str], slot_name: str, schema_name: str) -> st
 def _build_slot_mapping(
     src_slot: Any, mst_slot: Any, row: SSSOMRow, ctx: _ClassifyContext
 ) -> _SlotMapping:
-    """Assemble a _SlotMapping with owning classes + detected units."""
+    """Assemble a _SlotMapping with owning classes."""
     owner_src = _owning_class(ctx.src_slot_owners, str(src_slot.name), "source")
     owner_mst = _owning_class(ctx.mst_slot_owners, str(mst_slot.name), "master")
-    src_desc = str(getattr(src_slot, "description", "") or "")
-    mst_desc = str(getattr(mst_slot, "description", "") or "")
     return _SlotMapping(
         source_slot_name=str(src_slot.name),
         source_owning_class=owner_src,
         target_slot_name=str(mst_slot.name),
         target_owning_class=owner_mst,
         row=row,
-        source_unit=detect_unit(str(src_slot.name), src_desc),
-        target_unit=detect_unit(str(mst_slot.name), mst_desc),
     )
 
 
@@ -224,34 +200,38 @@ def build_class_derivation(
     )
 
 
-def build_slot_derivation(m: _SlotMapping) -> SlotDerivation:
+def build_slot_derivation(
+    m: _SlotMapping, *, library: FunctionLibrary | None = None
+) -> SlotDerivation:
     """Build a SlotDerivation from a _SlotMapping classification.
 
-    Unit conversion: when both source and target units are detected (via
-    detect_unit on slot name + description), differ, and the pair appears in
-    _LINEAR_CONVERSION_PAIRS, emit UnitConversionConfiguration(source_unit=...,
-    target_unit=...). The fork's YarrrmlCompiler reads these and emits a GREL
-    expression from its LINEAR_GREL_CONVERSIONS table. Unknown pairs and
-    same-unit pairs fall through to passthrough references.
-
-    Datatypes are resolved from the LinkML schema by the YarrrmlCompiler,
-    not from the SSSOM audit log — the schema is the authoritative source.
+    When the SSSOM row carries a conversion_function CURIE and a FunctionLibrary
+    is provided, resolve it to a FunctionCallConfiguration via the library.
+    Unknown CURIEs (not declared in the library) raise ValueError with a
+    diagnostic message. Rows without conversion_function fall through to a
+    passthrough reference.
     """
-    unit_conv: UnitConversionConfiguration | None = None
-    if (
-        m.source_unit
-        and m.target_unit
-        and m.source_unit != m.target_unit
-        and (m.source_unit, m.target_unit) in _LINEAR_CONVERSION_PAIRS
-    ):
-        unit_conv = UnitConversionConfiguration(
-            source_unit=_QUDT_TO_FORK_UNIT[m.source_unit],
-            target_unit=_QUDT_TO_FORK_UNIT[m.target_unit],
-        )
+    fn_call: FunctionCallConfiguration | None = None
+    if m.row.conversion_function and library is not None:
+        try:
+            fn_iri = library.resolve_curie(m.row.conversion_function)
+            param_curie = library.get_parameter_predicate(m.row.conversion_function)
+            raw_out = library.get_output_type(m.row.conversion_function)
+            fn_call = FunctionCallConfiguration(
+                function_id=fn_iri,
+                parameter_predicate=library.resolve_curie(param_curie),
+                output_datatype=library.resolve_curie(raw_out) if raw_out else None,
+            )
+        except KeyError:
+            raise ValueError(
+                f"conversion_function {m.row.conversion_function!r} on row "
+                f"{m.row.record_id!r} is not declared in the FunctionLibrary. "
+                f"Check rosetta.toml [conversions] or the FnO Turtle declarations."
+            )
     return SlotDerivation(
         name=m.target_slot_name,
         populated_from=m.source_slot_name,
-        unit_conversion=unit_conv,
+        function_call=fn_call,
     )
 
 
@@ -381,6 +361,7 @@ def _collect_mappings(
     slot_mappings: list[_SlotMapping],
     composite_derivations: list[tuple[str, SlotDerivation]],
     coverage: CoverageReport,
+    function_library: FunctionLibrary | None = None,
 ) -> tuple[dict[str, list[SlotDerivation]], dict[str, str]]:
     """Build slots_by_target_class and source_for_target from all mapping kinds.
 
@@ -398,7 +379,7 @@ def _collect_mappings(
 
     for sm in slot_mappings:
         slots_by_target_class.setdefault(sm.target_owning_class, []).append(
-            build_slot_derivation(sm)
+            build_slot_derivation(sm, library=function_library)
         )
         # NOTE: source_for_target is NOT populated here — only explicit class-level
         # mapping rows may register a class. The F7 guard below catches any slot
@@ -469,8 +450,6 @@ def _remap_to_mapped_classes(
                 target_slot_name=sm.target_slot_name,
                 target_owning_class=nearest,
                 row=sm.row,
-                source_unit=sm.source_unit,
-                target_unit=sm.target_unit,
             )
         remapped_slots.append(sm)
 
@@ -488,6 +467,7 @@ def _assemble_class_derivations(
     composite_derivations: list[tuple[str, SlotDerivation]],
     coverage: CoverageReport,
     master_view: SchemaView,
+    function_library: FunctionLibrary | None = None,
 ) -> list[ClassDerivation]:
     """Group slot derivations under their owning ClassDerivation.
 
@@ -504,7 +484,7 @@ def _assemble_class_derivations(
     )
 
     slots_by_target_class, source_for_target = _collect_mappings(
-        class_mappings, slot_mappings, composite_derivations, coverage
+        class_mappings, slot_mappings, composite_derivations, coverage, function_library
     )
 
     # F7: every target class referenced by any slot must have a class-level mapping.
@@ -601,6 +581,7 @@ def build_spec(
     include_manual: bool = False,
     force: bool = False,
     prefiltered: tuple[list[SSSOMRow], dict[str, list[SSSOMRow]]] | None = None,
+    function_library: FunctionLibrary | None = None,
 ) -> tuple[TransformationSpecification, CoverageReport]:
     """Top-level orchestrator. Pure-function style; all I/O is caller's job.
 
@@ -656,7 +637,12 @@ def build_spec(
         groups, master_view, ctx.mst_slot_owners, coverage
     )
     class_derivations = _assemble_class_derivations(
-        class_mappings, slot_mappings, composite_derivations, coverage, master_view
+        class_mappings,
+        slot_mappings,
+        composite_derivations,
+        coverage,
+        master_view,
+        function_library,
     )
 
     spec = TransformationSpecification(

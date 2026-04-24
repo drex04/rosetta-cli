@@ -21,6 +21,7 @@ import logging
 import shutil
 import tempfile
 from collections.abc import Iterator
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -30,67 +31,21 @@ from linkml.generators.jsonldcontextgen import ContextGenerator  # type: ignore[
 
 _DATA_FILE_PLACEHOLDER: str = "$(DATA_FILE)"
 
-# Python source for the UDF file written into work_dir. The forked
-# YarrrmlCompiler emits function refs at these stable IRIs when a
-# SlotDerivation carries a linear unit_conversion (see
-# LINEAR_CONVERSION_FUN_IDS in the fork's yarrrml_compiler.py).
-# morph-kgc prepends its own `udf` decorator at load time; our file only
-# needs `@udf(fun_id=..., value=...)` + the function body.
-_ROSETTA_UDF_NS: str = "https://rosetta.interop/udf/"
-_GREL_VALUE_PARAM_IRI: str = "http://users.ugent.be/~bjdmeest/function/grel.ttl#valueParameter"
-_UDF_SOURCE: str = f'''"""Auto-written by rosetta-cli rml_runner. Do not edit in place."""
-
-
-@udf(
-    fun_id="{_ROSETTA_UDF_NS}meter_to_foot",
-    value="{_GREL_VALUE_PARAM_IRI}",
-)
-def meter_to_foot(value):
-    return float(value) * 3.28084
-
-
-@udf(
-    fun_id="{_ROSETTA_UDF_NS}foot_to_meter",
-    value="{_GREL_VALUE_PARAM_IRI}",
-)
-def foot_to_meter(value):
-    return float(value) * 0.3048
-
-
-@udf(
-    fun_id="{_ROSETTA_UDF_NS}kilogram_to_pound",
-    value="{_GREL_VALUE_PARAM_IRI}",
-)
-def kilogram_to_pound(value):
-    return float(value) * 2.20462
-
-
-@udf(
-    fun_id="{_ROSETTA_UDF_NS}celsius_to_fahrenheit",
-    value="{_GREL_VALUE_PARAM_IRI}",
-)
-def celsius_to_fahrenheit(value):
-    return float(value) * 1.8 + 32.0
-
-
-@udf(
-    fun_id="{_ROSETTA_UDF_NS}kelvin_to_celsius",
-    value="{_GREL_VALUE_PARAM_IRI}",
-)
-def kelvin_to_celsius(value):
-    return float(value) - 273.15
-'''
-
 
 def _write_udf_file(work_dir: Path) -> Path:
-    """Write the rosetta UDF Python module into ``work_dir`` and return its path.
+    """Copy the rosetta UDF Python module into ``work_dir`` and return its path.
 
     morph-kgc loads this file via the INI ``udfs=<path>`` option and
     registers each ``@udf``-decorated function under its ``fun_id`` IRI.
     """
     udf_path = work_dir / "rosetta_udfs.py"
     try:
-        udf_path.write_text(_UDF_SOURCE, encoding="utf-8")
+        source = (
+            files("rosetta.functions")
+            .joinpath("unit_conversion_udfs.py")
+            .read_text(encoding="utf-8")
+        )
+        udf_path.write_text(source, encoding="utf-8")
     except OSError as exc:
         raise RuntimeError(f"Failed to write UDF file to {udf_path}: {exc}") from exc
     return udf_path

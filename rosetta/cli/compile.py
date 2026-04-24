@@ -13,6 +13,7 @@ from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView  # type: ignore[import-untyped]
 
+from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.io import open_output
 from rosetta.core.ledger import parse_sssom_tsv
 from rosetta.core.transform_builder import build_spec, filter_rows
@@ -142,6 +143,7 @@ def cli(
         sys.exit(1)
 
     # 6. Build TransformSpec (prefiltered= avoids a second O(n) filter_rows pass)
+    library = FunctionLibrary.load_builtins()
     try:
         spec, coverage = build_spec(
             rows,
@@ -152,6 +154,7 @@ def cli(
             include_manual=False,
             force=False,
             prefiltered=(remaining, excluded),
+            function_library=library,
         )
     except ValueError as exc:
         click.echo(f"Error: {exc}", err=True)

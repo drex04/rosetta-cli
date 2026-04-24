@@ -10,9 +10,10 @@ This test walks the full pipeline:
 
 Design notes:
   1. Unit conversion end-to-end (Plan 16-03 truth #3): `hoyde_m` (meters) →
-     `hasAltitudeFt` (feet). transform_builder.build_slot_derivation detects
-     the m→ft pair via detect_unit() on slot names + descriptions, emits
-     UnitConversionConfiguration(source_unit="meter", target_unit="foot"),
+     `hasAltitudeFt` (feet). The SSSOM row for this mapping carries a
+     `conversion_function` column value (`rfns:meterToFoot`), which
+     transform_builder.build_slot_derivation resolves via FunctionLibrary into
+     a FunctionCallConfiguration(function_id="...meterToFoot", ...),
      which the fork's YarrrmlCompiler compiles to GREL
      `value.toNumber() * 3.28084`. morph-kgc evaluates the GREL at materialization
      time. The assertion below checks the converted numeric values with
@@ -227,9 +228,9 @@ def test_e2e_nor_radar_csv_to_jsonld(
                             continue
         return out
 
-    # hoyde_m (meters) → hasAltitudeFt (feet): transform_builder.build_slot_derivation
-    # detects the m→ft pair and emits UnitConversionConfiguration; the fork's
-    # YarrrmlCompiler compiles it to GREL `value.toNumber() * 3.28084` which
+    # hoyde_m (meters) → hasAltitudeFt (feet): the SSSOM conversion_function column
+    # value (rfns:meterToFoot) → FunctionCallConfiguration via FunctionLibrary →
+    # fork's YarrrmlCompiler compiles it to GREL `value.toNumber() * 3.28084` →
     # morph-kgc evaluates at materialization time.
     # Source altitudes: 4100, 2500, 1800 meters → expected feet values below.
     observed_values = _collect_numeric(typed_entries, ("hasAltitudeFt", "hasAltitude"))
@@ -246,6 +247,6 @@ def test_e2e_nor_radar_csv_to_jsonld(
     assert converted_hits, (
         "No observed value matches expected converted altitudes "
         f"{sorted(expected_feet)!r}; observed={sorted(observed_values)!r}. "
-        "This suggests the m→ft unit_conversion is not flowing through "
-        "build_slot_derivation → YarrrmlCompiler → GREL → morph-kgc."
+        "This suggests the m→ft conversion_function is not flowing through "
+        "FunctionCallConfiguration → YarrrmlCompiler → GREL → morph-kgc."
     )
