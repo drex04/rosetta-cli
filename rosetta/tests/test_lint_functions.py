@@ -180,6 +180,29 @@ def test_check_units_no_function_still_warns(qudt_graph: rdflib.Graph) -> None:
     assert warn_findings[0].severity == "WARNING"
 
 
+def test_check_units_no_library_with_function_warns(qudt_graph: rdflib.Graph) -> None:
+    """library=None + conversion_function set → WARNING (no silent pass-through)."""
+    row = _make_row(
+        subject_id="src:altitude_m",
+        object_id="tgt:altitude_ft",
+        subject_label="altitude_m",
+        object_label="altitude_ft",
+        conversion_function="rfns:meterToFoot",
+    )
+    findings: list[LintFinding] = []
+    check_units(findings, row, qudt_graph, library=None)
+    warn_findings = [f for f in findings if f.rule == "unit_conversion_required"]
+    assert len(warn_findings) == 1
+    assert warn_findings[0].severity == "WARNING"
+
+
+def test_populate_empty_policies(library: FunctionLibrary) -> None:
+    """Empty policies dict → conversion_function stays None."""
+    row = _make_row(subject_datatype="float", object_datatype="integer")
+    populate_conversion_functions([row], {}, library)
+    assert row.conversion_function is None
+
+
 # ---------------------------------------------------------------------------
 # populate_conversion_functions tests
 # ---------------------------------------------------------------------------

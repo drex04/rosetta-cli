@@ -255,8 +255,8 @@ def check_units(
         )
     elif compat is True:
         if src_iri != tgt_iri:
-            if row.conversion_function is not None:
-                if library is not None and not library.has_function(row.conversion_function):
+            if row.conversion_function is not None and library is not None:
+                if not library.has_function(row.conversion_function):
                     findings.append(
                         LintFinding(
                             rule="undeclared_function",

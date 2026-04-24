@@ -59,7 +59,7 @@ def _noop_lint(
     master_schema: str | Path,
     *,
     strict: bool = False,
-    library: object = None,
+    library: object | None = None,
 ) -> LintReport:
     return LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0))
 
@@ -71,7 +71,7 @@ def _proposals_only_lint(
     master_schema: str | Path,
     *,
     strict: bool = False,
-    library: object = None,
+    library: object | None = None,
 ) -> LintReport:
     findings = check_sssom_proposals(rows, log)
     summary = LintSummary(
