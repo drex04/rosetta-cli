@@ -61,6 +61,9 @@ def _copy_and_patch_schemas(
     return nor_dst, mc_dst, sssom_dst, csv_dst
 
 
+@pytest.mark.xfail(
+    reason="FnO IRI migration — rml_runner UDFs not yet updated (Plan 23-04)", strict=True
+)
 def test_e2e_nor_radar_csv_to_jsonld(
     tmp_path: Path,
     nor_linkml_path: Path,

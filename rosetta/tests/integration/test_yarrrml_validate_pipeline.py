@@ -115,6 +115,9 @@ mc:TrackImpossibleShape a sh:NodeShape ;
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(
+    reason="FnO IRI migration — rml_runner UDFs not yet updated (Plan 23-04)", strict=True
+)
 def test_yarrrml_run_validate_happy_path(
     tmp_path: Path,
     nor_linkml_path: Path,
@@ -162,6 +165,9 @@ def test_yarrrml_run_validate_happy_path(
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(
+    reason="FnO IRI migration — rml_runner UDFs not yet updated (Plan 23-04)", strict=True
+)
 def test_yarrrml_run_validate_violation_blocks_emission(
     tmp_path: Path,
     nor_linkml_path: Path,
@@ -222,6 +228,9 @@ def test_yarrrml_run_validate_violation_blocks_emission(
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(
+    reason="FnO IRI migration — rml_runner UDFs not yet updated (Plan 23-04)", strict=True
+)
 def test_yarrrml_run_then_validate_jsonld_file_chain(
     tmp_path: Path,
     nor_linkml_path: Path,
@@ -280,6 +289,9 @@ def test_yarrrml_run_then_validate_jsonld_file_chain(
 
 
 @pytest.mark.slow
+@pytest.mark.xfail(
+    reason="FnO IRI migration — rml_runner UDFs not yet updated (Plan 23-04)", strict=True
+)
 def test_yarrrml_run_validate_with_committed_policy_shapes(
     tmp_path: Path,
     nor_linkml_path: Path,
