@@ -43,6 +43,7 @@ packages = ["rosetta"]
 [tool.hatch.build.targets.wheel.force-include]
 "rosetta/functions/typecasts.fno.ttl" = "rosetta/functions/typecasts.fno.ttl"
 "rosetta/functions/unit-conversions.fno.ttl" = "rosetta/functions/unit-conversions.fno.ttl"
+"rosetta/functions/unit_conversion_udfs.py" = "rosetta/functions/unit_conversion_udfs.py"
 
 [tool.ruff]
 line-length = 100

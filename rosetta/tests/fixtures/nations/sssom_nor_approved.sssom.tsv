@@ -14,8 +14,8 @@ nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		ha
 nor_radar:lengdegrad	skos:exactMatch	mc:hasLongitude	semapv:HumanCuration	0.9		hasLongitude	2026-04-16	r003
 nor_radar:hoyde_m	skos:exactMatch	mc:hasAltitudeFt	semapv:HumanCuration	0.9		hasAltitudeFt	2026-04-16	r004							rfns:meterToFoot
 nor_radar:hastighet_kmh	skos:exactMatch	mc:hasSpeed	semapv:HumanCuration	0.9		hasSpeed	2026-04-16	r005
-nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006a			composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]
-nor_radar:lengdegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006b			composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]
+nor_radar:breddegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006a			composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]	
+nor_radar:lengdegrad	skos:exactMatch	mc:hasLatitude	semapv:HumanCuration	0.9		hasLatitude	2026-04-16	r006b			composed entity expression	composed entity expression	grp-geo-1	[{breddegrad},{lengdegrad}]	
 nor_radar:avstand_km	skos:closeMatch	mc:hasRange	semapv:HumanCuration	0.9		hasRange	2026-04-16	r007
 nor_radar:peiling_grader	skos:narrowMatch	mc:hasBearing	semapv:HumanCuration	0.9		hasBearing	2026-04-16	r008
 nor_radar:signalstyrke_dbm	owl:differentFrom	mc:hasConfidence	semapv:HumanCuration	0.9		hasConfidence	2026-04-16	r009
