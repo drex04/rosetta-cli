@@ -35,8 +35,8 @@ def foot_to_meter(value: str) -> float:
     return float(value) * 0.3048
 
 
-@udf(fun_id=f"{_RFNS}kilogramToPound", value=_GREL_VALUE)
-def kilogram_to_pound(value: str) -> float:
+@udf(fun_id=f"{_RFNS}kgToPound", value=_GREL_VALUE)
+def kg_to_pound(value: str) -> float:
     """Convert kilograms to pounds."""
     return float(value) * 2.20462
 
