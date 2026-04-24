@@ -1,0 +1,47 @@
+@prefix fno:     <https://w3id.org/function/ontology#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rfns:    <https://rosetta.interop/functions#> .
+
+rfns:meterToFoot
+    a fno:Function ;
+    fno:name "Meter to Foot" ;
+    dcterms:description "Convert meters to feet (factor: 3.28084)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .
+
+rfns:footToMeter
+    a fno:Function ;
+    fno:name "Foot to Meter" ;
+    dcterms:description "Convert feet to meters (factor: 0.3048)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .
+
+rfns:kgToPound
+    a fno:Function ;
+    fno:name "Kilogram to Pound" ;
+    dcterms:description "Convert kilograms to pounds (factor: 2.20462)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .
+
+rfns:poundToKg
+    a fno:Function ;
+    fno:name "Pound to Kilogram" ;
+    dcterms:description "Convert pounds to kilograms (divisor: 2.20462)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .
+
+rfns:celsiusToFahrenheit
+    a fno:Function ;
+    fno:name "Celsius to Fahrenheit" ;
+    dcterms:description "Convert Celsius to Fahrenheit (C * 1.8 + 32)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .
+
+rfns:kelvinToCelsius
+    a fno:Function ;
+    fno:name "Kelvin to Celsius" ;
+    dcterms:description "Convert Kelvin to Celsius (K - 273.15)" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate rfns:value ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate rfns:result ; fno:type xsd:decimal ] ) .

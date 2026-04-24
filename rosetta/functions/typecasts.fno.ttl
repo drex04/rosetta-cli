@@ -1,0 +1,40 @@
+@prefix fno:     <https://w3id.org/function/ontology#> .
+@prefix grel:    <http://users.ugent.be/~bjdmeest/function/grel.ttl#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+grel:math_round
+    a fno:Function ;
+    fno:name "round" ;
+    dcterms:description "Round to nearest integer" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate grel:p_dec_n ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate grel:o_number ; fno:type xsd:integer ] ) .
+
+grel:math_floor
+    a fno:Function ;
+    fno:name "floor" ;
+    dcterms:description "Floor to integer" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate grel:p_dec_n ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate grel:o_number ; fno:type xsd:integer ] ) .
+
+grel:math_ceil
+    a fno:Function ;
+    fno:name "ceil" ;
+    dcterms:description "Ceiling to integer" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate grel:p_dec_n ; fno:type xsd:decimal ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate grel:o_number ; fno:type xsd:integer ] ) .
+
+grel:string_toNumber
+    a fno:Function ;
+    fno:name "toNumber" ;
+    dcterms:description "Parse string to number" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate grel:p_any_e ; fno:type xsd:string ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate grel:o_number ; fno:type xsd:double ] ) .
+
+grel:string_toString
+    a fno:Function ;
+    fno:name "toString" ;
+    dcterms:description "Convert any value to string" ;
+    fno:expects ( [ a fno:Parameter ; fno:predicate grel:p_any_e ; fno:type xsd:anySimpleType ] ) ;
+    fno:returns ( [ a fno:Output ; fno:predicate grel:o_str ; fno:type xsd:string ] ) .

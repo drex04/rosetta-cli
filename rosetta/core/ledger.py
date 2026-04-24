@@ -35,7 +35,27 @@ _OPTIONAL_STR_FIELDS = (
     "object_type",
     "mapping_group_id",
     "composition_expr",
+    "conversion_function",
 )
+
+# Explicit 15-column header for backward-compat with pre-conversion_function files.
+_SSSOM_COLUMNS_V15: list[str] = [
+    "subject_id",
+    "predicate_id",
+    "object_id",
+    "mapping_justification",
+    "confidence",
+    "subject_label",
+    "object_label",
+    "mapping_date",
+    "record_id",
+    "subject_datatype",
+    "object_datatype",
+    "subject_type",
+    "object_type",
+    "mapping_group_id",
+    "composition_expr",
+]
 
 
 def _parse_mapping_date(raw_date: str) -> datetime | None:
@@ -62,13 +82,14 @@ def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
 
 
 def _validate_sssom_header(header: list[str], path: Path) -> None:
-    """Raise ValueError if *header* does not exactly match SSSOM_COLUMNS."""
-    if header != SSSOM_COLUMNS:
-        raise ValueError(
-            f"SSSOM file {path} has wrong columns.\n"
-            f"  Expected ({len(SSSOM_COLUMNS)}): {SSSOM_COLUMNS}\n"
-            f"  Got      ({len(header)}): {header}"
-        )
+    """Raise ValueError if *header* does not match current or v15 columns."""
+    if header in (SSSOM_COLUMNS, _SSSOM_COLUMNS_V15):
+        return
+    raise ValueError(
+        f"SSSOM file {path} has wrong columns.\n"
+        f"  Expected ({len(SSSOM_COLUMNS)}): {SSSOM_COLUMNS}\n"
+        f"  Got      ({len(header)}): {header}"
+    )
 
 
 def _parse_sssom_rows(data_lines: list[str], path: Path) -> list[SSSOMRow]:
@@ -125,29 +146,53 @@ def load_log(path: Path) -> list[SSSOMRow]:
     return parse_sssom_tsv(path)
 
 
+def _detect_existing_columns(path: Path) -> list[str]:
+    """Read the first non-comment line of an existing SSSOM file to determine column schema.
+
+    Returns SSSOM_COLUMNS (16-col) or _SSSOM_COLUMNS_V15 (15-col).
+    Defaults to SSSOM_COLUMNS if the file is empty/absent or unrecognised.
+    """
+    if not path.exists() or path.stat().st_size == 0:
+        return SSSOM_COLUMNS
+    text = path.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if not line.startswith("#"):
+            cols = line.split("\t")
+            if cols == _SSSOM_COLUMNS_V15:
+                return _SSSOM_COLUMNS_V15
+            return SSSOM_COLUMNS
+    return SSSOM_COLUMNS
+
+
 def append_log(rows: list[SSSOMRow], path: Path) -> None:
     """Append rows to the log. Creates file + SSSOM header if absent.
 
     Stamps mapping_date (utcnow ISO 8601) and record_id (uuid4) on each row.
     Calls path.parent.mkdir(parents=True, exist_ok=True) before opening.
     Uses csv.writer so field values containing tabs are safely quoted.
+
+    When appending to an existing 15-column file, writes 15-column rows to
+    preserve consistency. New files always use the current 16-column schema.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(UTC).isoformat()
     write_header = not path.exists() or path.stat().st_size == 0
+
+    # Determine which column schema matches the existing file (or use current for new files).
+    active_columns = SSSOM_COLUMNS if write_header else _detect_existing_columns(path)
 
     with path.open("a", encoding="utf-8", newline="") as fh:
         if write_header:
             fh.write(SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
         if write_header:
-            writer.writerow(SSSOM_COLUMNS)
+            writer.writerow(active_columns)
 
         for row in rows:
             mapping_date = row.mapping_date.isoformat() if row.mapping_date else now
             record_id = row.record_id or str(uuid.uuid4())
             writer.writerow(
-                [_row_value_for_column(row, col, mapping_date, record_id) for col in SSSOM_COLUMNS]
+                [_row_value_for_column(row, col, mapping_date, record_id) for col in active_columns]
             )
 
 

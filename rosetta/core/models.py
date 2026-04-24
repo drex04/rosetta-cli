@@ -115,6 +115,7 @@ class SSSOMRow(BaseModel):
     object_type: str | None = None
     mapping_group_id: str | None = None
     composition_expr: str | None = None
+    conversion_function: str | None = None
 
 
 SSSOM_COLUMNS: list[str] = list(SSSOMRow.model_fields.keys())

@@ -488,3 +488,53 @@ Five commands cover the same workflow with fewer steps and less room for user er
 
 **Requirements:** REQ-CMD-CONSOLIDATION-01
 
+---
+
+## Phase 23: Generic FnO Function Mechanism
+**Goal:** Replace all hardcoded conversion logic with a generic FnO (Function Ontology)
+function mechanism. Users declare typecast and unit conversion functions via FnO IRIs in
+`rosetta.toml`; `rosetta suggest` pre-populates a `conversion_function` column on SSSOM
+candidates; the lint gate validates function type compatibility; `rosetta compile` emits
+language-agnostic YARRRML `function:` blocks portable between morph-kgc and RMLMapper.
+Migrate existing unit conversions from hardcoded GREL to FnO. Support user-defined custom
+functions via FnO Turtle declarations + Python UDF implementations.
+
+Design doc: `.planning/designs/2026-04-24-datatype-conversions.md`
+
+**Delivers (split across 5 plans):**
+
+### 23-01: FnO function library + FunctionLibrary loader
+- FnO Turtle declarations for builtin typecasts (GREL) and unit conversions (rfns:)
+- Static Python UDF file for unit conversion implementations
+- `FunctionLibrary` class: loads FnO Turtle, provides type signature queries
+- `SSSOMRow.conversion_function` field + SSSOM column extension
+- `rosetta.toml` `[conversions]` config parsing
+
+### 23-02: Fork model extension + compiler generification
+- `FunctionCallConfiguration` class in `transformer_model.yaml`
+- `function_call` field on `SlotDerivation`
+- YARRRML compiler: generic function emission (delete hardcoded GREL)
+- `unit_conversion` → `function_call` deprecation bridge
+
+### 23-03: Lint gate + suggest population
+- `check_datatype()` rewrite with function-aware validation
+- `check_units()` update with function-aware validation
+- `rosetta suggest` reads `[conversions]`, populates `conversion_function`
+- Integration tests for suggest → lint → append with function references
+
+### 23-04: Transform builder migration + E2E
+- `build_slot_derivation()` rewrite: `FunctionCallConfiguration` from SSSOM row
+- Delete `_LINEAR_CONVERSION_PAIRS`, `_QUDT_TO_FORK_UNIT` dicts
+- `rml_runner.py` loads static UDF file instead of generating inline
+- E2E tests: typecast + unit conversion roundtrips
+
+### 23-05: Custom functions + docs
+- User-defined FnO Turtle declarations
+- User-defined Python UDF registration
+- `rosetta.toml` `[functions]` config for custom library paths
+- Documentation updates (type-handling.md, functions.md, CLI docs, README)
+
+**Dependencies:** Phase 22 (Command Consolidation) must be complete first.
+
+**Requirements:** REQ-FNO-FUNCTIONS-01
+

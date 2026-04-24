@@ -25,3 +25,12 @@ strict = false
 
 [ledger]
 log = "audit-log.sssom.tsv"
+
+[conversions]
+# Type-pair policies: "source_linkml_type:target_linkml_type" = "FnO function CURIE"
+# "float:integer" = "grel:math_round"
+# "string:double" = "grel:string_toNumber"
+
+[conversions.units]
+# Unit-pair policies: "source_qudt:target_qudt" = "FnO function CURIE"
+# "unit:M:unit:FT" = "rfns:meterToFoot"

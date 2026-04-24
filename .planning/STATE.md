@@ -3,21 +3,21 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: CLI UX Refactor
 status: in_progress
-last_updated: "2026-04-21T08:00:00.000Z"
+last_updated: "2026-04-24T08:00:00.000Z"
 progress:
-  total_phases: 20
-  completed_phases: 19
-  total_plans: 31
-  completed_plans: 27
+  total_phases: 23
+  completed_phases: 22
+  total_plans: 36
+  completed_plans: 31
 ---
 
 # State
 
 ## Current Position
 
-- **Phase:** 20 (UX Refactor — CLI Standardization) — **in progress**
-- **Plan:** 20-01 (Entry point unification) — ready
-- **Status:** 4 plans created. Design approved 2026-04-21. Single `rosetta` parent group, compile/run split, option standardization, pipeline citizenship.
+- **Phase:** 23 (Generic FnO Function Mechanism) — **planning**
+- **Plan:** 23-01 (FnO function library + FunctionLibrary loader) — ready for review
+- **Status:** Design approved 2026-04-24. 5 plans scoped. Plan 23-01 written, awaiting plan-review.
 
 ## Phase Progress
 
@@ -42,7 +42,10 @@ progress:
 | 17 | QUDT-native unit detection (quantulum3 + pint) | Complete |
 | 18 | Integration & E2E Test Hardening | Complete |
 | 19 | SHACL validation refactor | Complete |
-| 20 | UX Refactor — CLI Standardization | In Progress |
+| 20 | UX Refactor — CLI Standardization | Complete |
+| 21 | HumanCuration Filtering (lint + suggest) | Complete |
+| 22 | Command Consolidation | Complete |
+| 23 | Generic FnO Function Mechanism | Planning |
 
 ## Phase 1 Completion
 

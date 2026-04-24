@@ -64,3 +64,23 @@ def get_config_value(
 
     # Config file
     return config.get(section, {}).get(key)
+
+
+def load_conversion_policies(config: dict[str, Any]) -> dict[str, str]:
+    """Return a merged dict of type-pair and unit-pair conversion policies.
+
+    Keys are "source:target" strings (e.g., "float:integer" or "unit:M:unit:FT").
+    Values are FnO function CURIEs (e.g., "grel:math_round").
+    """
+    conversions = config.get("conversions", {})
+    result: dict[str, str] = {}
+    # Top-level pairs (skip sub-tables like "units" using isinstance check)
+    for key, value in conversions.items():
+        if isinstance(value, str):
+            result[key] = value
+    # Unit pairs from nested table
+    unit_pairs = conversions.get("units", {})
+    for key, value in unit_pairs.items():
+        if isinstance(value, str):
+            result[key] = value
+    return result

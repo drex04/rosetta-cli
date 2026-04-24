@@ -1765,3 +1765,145 @@ def test_append_dedup_allows_different_justification(
     assert result2.exit_code == 0, result2.stderr
     assert "duplicate" not in result2.stderr
     assert len(load_log(log_path)) == 2
+
+
+# ---------------------------------------------------------------------------
+# conversion_function field — Task 4
+# ---------------------------------------------------------------------------
+
+
+def test_sssom_columns_includes_conversion_function() -> None:
+    from rosetta.core.models import SSSOM_COLUMNS
+
+    assert "conversion_function" in SSSOM_COLUMNS
+    assert len(SSSOM_COLUMNS) == 16
+
+
+def test_sssom_row_with_conversion_function() -> None:
+    from rosetta.core.models import SSSOMRow
+
+    row = SSSOMRow(
+        subject_id="src:field1",
+        predicate_id="skos:exactMatch",
+        object_id="tgt:field1",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.95,
+        conversion_function="grel:math_round",
+    )
+    assert row.conversion_function == "grel:math_round"
+
+
+def test_parse_old_15col_sssom(tmp_path: Path) -> None:
+    """15-column SSSOM files parse with conversion_function=None."""
+    from rosetta.core.ledger import _SSSOM_COLUMNS_V15, parse_sssom_tsv
+
+    log_path = tmp_path / "old.sssom.tsv"
+    header = "\t".join(_SSSOM_COLUMNS_V15)
+    data_row = "\t".join(
+        [
+            "src:a",
+            "skos:exactMatch",
+            "tgt:a",
+            "semapv:ManualMappingCuration",
+            "0.8",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+    log_path.write_text(f"# comment\n{header}\n{data_row}\n", encoding="utf-8")
+    rows = parse_sssom_tsv(log_path)
+    assert len(rows) == 1
+    assert rows[0].conversion_function is None
+
+
+def test_roundtrip_16col_sssom(tmp_path: Path) -> None:
+    """Write row with conversion_function, re-read, verify preserved."""
+    from rosetta.core.ledger import append_log, parse_sssom_tsv
+    from rosetta.core.models import SSSOMRow
+
+    row = SSSOMRow(
+        subject_id="src:x",
+        predicate_id="skos:exactMatch",
+        object_id="tgt:x",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.9,
+        conversion_function="grel:math_round",
+    )
+    log_path = tmp_path / "log.sssom.tsv"
+    append_log([row], log_path)
+    rows = parse_sssom_tsv(log_path)
+    assert len(rows) == 1
+    assert rows[0].conversion_function == "grel:math_round"
+
+
+def test_append_to_existing_15col_stays_consistent(tmp_path: Path) -> None:
+    """Appending to 15-col file doesn't corrupt it with mixed-width rows."""
+    from rosetta.core.ledger import _SSSOM_COLUMNS_V15, append_log, parse_sssom_tsv
+    from rosetta.core.models import SSSOMRow
+
+    log_path = tmp_path / "log.sssom.tsv"
+    # Write a minimal 15-col file manually
+    header = "\t".join(_SSSOM_COLUMNS_V15)
+    data_row = "\t".join(
+        [
+            "src:a",
+            "skos:exactMatch",
+            "tgt:a",
+            "semapv:ManualMappingCuration",
+            "0.8",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        ]
+    )
+    log_path.write_text(f"# comment\n{header}\n{data_row}\n", encoding="utf-8")
+
+    # Append a new row via append_log
+    new_row = SSSOMRow(
+        subject_id="src:b",
+        predicate_id="skos:exactMatch",
+        object_id="tgt:b",
+        mapping_justification="semapv:ManualMappingCuration",
+        confidence=0.75,
+        conversion_function="grel:math_floor",  # will be dropped in 15-col mode
+    )
+    append_log([new_row], log_path)
+
+    # All data lines (non-comment) must have exactly 15 tab-separated fields
+    lines = [
+        ln for ln in log_path.read_text(encoding="utf-8").splitlines() if not ln.startswith("#")
+    ]
+    for line in lines:
+        assert len(line.split("\t")) == 15, f"Line has wrong column count: {line}"
+
+    # Parse succeeds and returns 2 rows with conversion_function=None
+    rows = parse_sssom_tsv(log_path)
+    assert len(rows) == 2
+    assert all(r.conversion_function is None for r in rows)
+
+
+def test_validate_header_wrong_count_raises(tmp_path: Path) -> None:
+    """14 or 17 column headers raise ValueError."""
+    import pytest
+
+    from rosetta.core.ledger import parse_sssom_tsv
+
+    bad_path = tmp_path / "bad.sssom.tsv"
+    bad_path.write_text("col1\tcol2\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        parse_sssom_tsv(bad_path)

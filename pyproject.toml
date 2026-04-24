@@ -40,6 +40,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["rosetta"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"rosetta/functions/typecasts.fno.ttl" = "rosetta/functions/typecasts.fno.ttl"
+"rosetta/functions/unit-conversions.fno.ttl" = "rosetta/functions/unit-conversions.fno.ttl"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
