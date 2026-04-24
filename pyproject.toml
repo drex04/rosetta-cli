@@ -100,4 +100,4 @@ exclude_dirs = ["rosetta/tests"]
 skips = []
 
 [tool.uv.sources]
-linkml-map = { git = "https://github.com/drex04/linkml-map.git", rev = "42a9317" }
+linkml-map = { git = "https://github.com/drex04/linkml-map.git", rev = "975d277" }
