@@ -1607,13 +1607,13 @@ def test_check_datatype_numeric_vs_nonnumeric_blocks() -> None:
     assert findings[0].severity == "BLOCK"
 
 
-def test_check_datatype_narrowing_warns() -> None:
-    """Float-family → integer-family → WARNING (silent truncation risk)."""
+def test_check_datatype_narrowing_blocks() -> None:
+    """Float-family → integer-family → BLOCK (would truncate decimal values)."""
     findings: list[LintFinding] = []
     check_datatype(findings, _dtype_row("double", "integer"))
     assert len(findings) == 1
     assert findings[0].rule == "datatype_narrowing"
-    assert findings[0].severity == "WARNING"
+    assert findings[0].severity == "BLOCK"
     assert "truncate" in findings[0].message
 
 

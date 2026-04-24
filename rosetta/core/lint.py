@@ -256,7 +256,7 @@ def check_units(
 
 
 def check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
-    """Append datatype findings: BLOCK for numeric/non-numeric, WARNING for narrowing casts."""
+    """Append datatype findings: BLOCK for numeric/non-numeric and narrowing casts."""
     if row.subject_datatype is None or row.object_datatype is None:
         return
     if row.subject_datatype == row.object_datatype:
@@ -278,12 +278,12 @@ def check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
             findings.append(
                 LintFinding(
                     rule="datatype_narrowing",
-                    severity="WARNING",
+                    severity="BLOCK",
                     source_uri=row.subject_id,
                     target_uri=row.object_id,
                     message=(
                         f"Narrowing cast: {row.subject_datatype} → {row.object_datatype} "
-                        f"may silently truncate decimal values"
+                        f"would truncate decimal values"
                     ),
                 )
             )

@@ -42,6 +42,12 @@ rosetta compile audit-log.sssom.tsv \
   --spec-output demo_out/nor_to_mc.transform.yaml
 ```
 
+## Datatype handling
+
+The YARRRML compiler resolves XSD datatypes from the **master LinkML schema**, not from the SSSOM audit log. For each target slot with a non-string range (e.g., `double`, `integer`, `datetime`), the compiled YARRRML includes a `datatype:` declaration that tells morph-kgc to tag literals with the correct XSD type.
+
+See [Datatype handling](../concepts/type-handling.md) for the full type flow, lint rules, and how to resolve type mismatches.
+
 ## Coverage report
 
 When `--coverage-report` is provided, a JSON file matching the `CoverageReport` Pydantic model is written. Fields include: row-stage counts, resolved and unresolved class/slot mappings, datatype mismatches, composite-group resolution status, and required master slots that remain unmapped.

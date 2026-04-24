@@ -60,7 +60,7 @@ Pass one or more schema files directly — `suggest` handles embedding internall
 
 ### 3. Accredit — the two-role state machine with lint gate
 
-[`rosetta ledger`](../cli/ledger.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. When appending analyst proposals, a lint gate checks for physical-unit dimension mismatches, datatype incompatibilities, duplicate proposals, and conflicts with prior decisions. Pass `--strict` to treat warnings as blocks. See [Accreditation workflow](accreditation.md) for the full state machine.
+[`rosetta ledger`](../cli/ledger.md) manages the Analyst-proposes / Accreditor-approves workflow through an append-only audit log. When appending analyst proposals, a lint gate checks for physical-unit dimension mismatches, [datatype incompatibilities](type-handling.md#lint-gate-rules) (including narrowing casts like float→integer), duplicate proposals, and conflicts with prior decisions. Pass `--strict` to treat warnings as blocks. See [Accreditation workflow](accreditation.md) for the full state machine.
 
 ### 4. Compile — approved mappings to YARRRML
 

@@ -69,6 +69,7 @@ nav:
   - Concepts:
       - The pipeline: concepts/pipeline.md
       - Accreditation workflow: concepts/accreditation.md
+      - Datatype handling: concepts/type-handling.md
   - CLI reference:
       - Overview: cli/index.md
       - rosetta ingest: cli/ingest.md

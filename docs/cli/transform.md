@@ -18,6 +18,8 @@ Every `transform` invocation must explicitly declare its validation intent. Pass
 
 When `--no-validate` is provided, validation is skipped and a warning is emitted to stderr to record the opt-out in the audit trail.
 
+Datatype validation failures (e.g., "Value is not Literal with datatype xsd:double") typically mean the source value was emitted as a plain string instead of a typed literal. See [Datatype handling](../concepts/type-handling.md) for causes and fixes.
+
 ## Examples
 
 ### With SHACL validation — directory of shapes (recommended)

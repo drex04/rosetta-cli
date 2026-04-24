@@ -18,7 +18,7 @@ For the conceptual flow and state machine, see [Accreditation workflow](../conce
 
 Requires `--role` (analyst or accreditor), `--source-schema`, and `--master-schema`. The append pipeline:
 
-1. **Lint gate** — runs lint checks on all rows in the file (before role filtering). Any `BLOCK`-severity finding rejects the entire append; nothing is written. `WARNING`-severity findings are printed to stderr and the append continues.
+1. **Lint gate** — runs lint checks on all rows in the file (before role filtering). Any `BLOCK`-severity finding rejects the entire append; nothing is written. `WARNING`-severity findings are printed to stderr and the append continues. Lint checks include unit-dimension mismatches, [datatype compatibility](../concepts/type-handling.md#lint-gate-rules), duplicate proposals, and conflicts with prior decisions.
 2. **Role filtering** — after lint passes, only the rows matching the role are written:
    - `--role analyst` — accepts only `ManualMappingCuration` rows; `HumanCuration` rows trigger a `BLOCK`.
    - `--role accreditor` — accepts only `HumanCuration` rows; `ManualMappingCuration` rows are silently skipped.
