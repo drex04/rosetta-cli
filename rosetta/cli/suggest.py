@@ -15,7 +15,7 @@ from rosetta.core.embedding import EmbeddingModel, extract_text_inputs_linkml
 from rosetta.core.features import extract_structural_features_linkml
 from rosetta.core.io import open_output
 from rosetta.core.ledger import DATETIME_MIN, load_log
-from rosetta.core.models import SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, SSSOMRow
 from rosetta.core.similarity import filter_decided_suggestions, rank_suggestions
 
 _SSSOM_HEADER_LINES = [
@@ -25,24 +25,6 @@ _SSSOM_HEADER_LINES = [
     "# curie_map:",
     "#   skos: http://www.w3.org/2004/02/skos/core#",
     "#   semapv: https://w3id.org/semapv/vocab/",
-]
-
-_SSSOM_COLUMNS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-    "subject_datatype",
-    "object_datatype",
-    "subject_type",
-    "object_type",
-    "mapping_group_id",
-    "composition_expr",
 ]
 
 
@@ -272,7 +254,7 @@ def cli(
 
             buf = io.StringIO()
             writer = csv.writer(buf, delimiter="\t", lineterminator="\n")
-            _ = writer.writerow(_SSSOM_COLUMNS)
+            _ = writer.writerow(SSSOM_COLUMNS)
             for row in sssom_rows:
                 _ = writer.writerow(
                     [

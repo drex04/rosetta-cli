@@ -610,8 +610,8 @@ def test_cli_exit_1_on_empty_filtered(tmp_path: Path) -> None:
         "#   mc: http://rosetta.interop/master-cop/\n"
         "#   skos: http://www.w3.org/2004/02/skos/core#\n"
         "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
-        "deu_radar:foo\tskos:exactMatch\tmc:bar\tsemapv:HumanCuration\t0.9\t\tbar\t2026-04-16\tr010\t\t\t\t\n"
+        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_datatype\tobject_datatype\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
+        "deu_radar:foo\tskos:exactMatch\tmc:bar\tsemapv:HumanCuration\t0.9\t\tbar\t2026-04-16\tr010\t\t\t\t\t\t\n"
     )
     sssom_file = tmp_path / "empty.sssom.tsv"
     sssom_file.write_text(sssom_content)
@@ -642,9 +642,9 @@ def test_cli_filters_by_source_prefix(tmp_path: Path) -> None:
         "#   mc: http://rosetta.interop/master-cop/\n"
         "#   skos: http://www.w3.org/2004/02/skos/core#\n"
         "#   semapv: https://w3id.org/semapv/vocab/\n"
-        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
-        "nor_radar:Observation\tskos:exactMatch\tmc:Track\tsemapv:HumanCuration\t0.9\t\tTrack\t2026-04-16\tr001\t\t\t\t\n"
-        "deu_radar:Entity\tskos:exactMatch\tmc:Track\tsemapv:HumanCuration\t0.9\t\tTrack\t2026-04-16\tr002\t\t\t\t\n"
+        "subject_id\tpredicate_id\tobject_id\tmapping_justification\tconfidence\tsubject_label\tobject_label\tmapping_date\trecord_id\tsubject_datatype\tobject_datatype\tsubject_type\tobject_type\tmapping_group_id\tcomposition_expr\n"
+        "nor_radar:Observation\tskos:exactMatch\tmc:Track\tsemapv:HumanCuration\t0.9\t\tTrack\t2026-04-16\tr001\t\t\t\t\t\t\n"
+        "deu_radar:Entity\tskos:exactMatch\tmc:Track\tsemapv:HumanCuration\t0.9\t\tTrack\t2026-04-16\tr002\t\t\t\t\t\t\n"
     )
     sssom_file = tmp_path / "mixed.sssom.tsv"
     sssom_file.write_text(sssom_content)

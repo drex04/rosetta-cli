@@ -11,7 +11,6 @@ import click
 
 from rosetta.core.io import open_output
 from rosetta.core.ledger import (
-    AUDIT_LOG_COLUMNS,
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
     SSSOM_HEADER,
@@ -23,7 +22,7 @@ from rosetta.core.ledger import (
     query_pending,
 )
 from rosetta.core.lint import run_lint
-from rosetta.core.models import LintReport, LintSummary, SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, LintReport, LintSummary, SSSOMRow
 
 
 @click.group(
@@ -50,7 +49,7 @@ def _row_to_tsv_cell(row: SSSOMRow, col: str) -> str:
     """Serialise a single SSSOMRow field to its TSV cell representation.
 
     Mirrors the column-driven serialisation used by core.accredit.append_log so
-    review/dump emit values for every AUDIT_LOG_COLUMNS entry, not just the
+    review/dump emit values for every SSSOM_COLUMNS entry, not just the
     first nine.
     """
     if col == "mapping_date":
@@ -65,9 +64,9 @@ def _write_sssom_tsv(rows: list[SSSOMRow], out: IO[str]) -> None:
     """Write SSSOM header block + column header + rows to out."""
     out.write(SSSOM_HEADER)
     writer = csv.writer(out, delimiter="\t", lineterminator="\n")
-    writer.writerow(AUDIT_LOG_COLUMNS)
+    writer.writerow(SSSOM_COLUMNS)
     for row in rows:
-        writer.writerow([_row_to_tsv_cell(row, col) for col in AUDIT_LOG_COLUMNS])
+        writer.writerow([_row_to_tsv_cell(row, col) for col in SSSOM_COLUMNS])
 
 
 @cli.command(

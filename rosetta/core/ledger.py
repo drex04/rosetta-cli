@@ -4,35 +4,18 @@ from __future__ import annotations
 
 import csv
 import io
-import os
 import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rosetta.core.models import SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, SSSOMRow
 
 MMC_JUSTIFICATION = "semapv:ManualMappingCuration"
 HC_JUSTIFICATION = "semapv:HumanCuration"
 
 # Sentinel for datetime comparisons — tz-aware, sorts before any real audit date.
 DATETIME_MIN = datetime(1, 1, 1, tzinfo=UTC)
-
-AUDIT_LOG_COLUMNS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-    "subject_type",
-    "object_type",
-    "mapping_group_id",
-    "composition_expr",
-]
 
 SSSOM_HEADER = """\
 # sssom_version: https://w3id.org/sssom/spec/0.15
@@ -63,10 +46,7 @@ def _parse_mapping_date(raw_date: str) -> datetime | None:
 
 
 def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
-    """Construct a SSSOMRow from a raw DictReader row dict.
-
-    # SYNC: must match AUDIT_LOG_COLUMNS order in this module.
-    """
+    """Construct a SSSOMRow from a raw DictReader row dict."""
     optional = {field: (raw.get(field) or None) for field in _OPTIONAL_STR_FIELDS}
     return SSSOMRow(
         subject_id=raw.get("subject_id", ""),
@@ -81,22 +61,13 @@ def _parse_sssom_row(raw: dict[str, str]) -> SSSOMRow:
     )
 
 
-_REQUIRED_SSSOM_COLUMNS = (
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-)
-
-
 def _validate_sssom_header(header: list[str], path: Path) -> None:
-    """Raise ValueError if *header* is missing any required SSSOM column."""
-    missing = [col for col in _REQUIRED_SSSOM_COLUMNS if col not in header]
-    if missing:
+    """Raise ValueError if *header* does not exactly match SSSOM_COLUMNS."""
+    if header != SSSOM_COLUMNS:
         raise ValueError(
-            f"SSSOM file {path} header is missing required column(s): "
-            f"{', '.join(missing)}. Found {len(header)} columns: {header!r}"
+            f"SSSOM file {path} has wrong columns.\n"
+            f"  Expected ({len(SSSOM_COLUMNS)}): {SSSOM_COLUMNS}\n"
+            f"  Got      ({len(header)}): {header}"
         )
 
 
@@ -121,17 +92,8 @@ def _parse_sssom_rows(data_lines: list[str], path: Path) -> list[SSSOMRow]:
 def parse_sssom_tsv(path: Path) -> list[SSSOMRow]:
     """Parse a SSSOM TSV file. Returns [] if file absent.
 
-    Skips malformed rows (bad float, csv parse error) with a stderr warning.
-    Reads all 13 audit-log columns using `.get()` defaults; tolerates 9-column
-    (pre-16-00 audit log), 11-column (post-Phase-15 suggest output with datatype),
-    and 13-column (post-16-00 audit log) inputs. Missing optional columns yield
-    `None` on the resulting `SSSOMRow`.
-
-    Raises `ValueError` if the header is missing any of the core SSSOM columns
-    (`subject_id`, `predicate_id`, `object_id`, `mapping_justification`,
-    `confidence`). A short-column header was previously tolerated and the
-    empty-string fallthrough surfaced downstream as a confusing duplicate-pair
-    error; the explicit header check now fails fast at the parse boundary.
+    Raises ``ValueError`` if the header does not exactly match
+    ``SSSOM_COLUMNS`` (derived from the ``SSSOMRow`` Pydantic model).
     """
     if not path.exists():
         return []
@@ -163,55 +125,13 @@ def load_log(path: Path) -> list[SSSOMRow]:
     return parse_sssom_tsv(path)
 
 
-def _migrate_audit_log_if_needed(path: Path) -> None:
-    """If the audit log at *path* has fewer columns than AUDIT_LOG_COLUMNS,
-    rewrite it atomically with the current column list, padding legacy rows
-    with empty strings. No-op if file is absent, empty, or already current shape.
-
-    Atomicity: write to <path>.tmp; os.replace(tmp, path). Crash-safe on POSIX.
-    Wider-than-current files (future downgrade scenario) are left unchanged.
-    """
-    if not path.exists() or path.stat().st_size == 0:
-        return
-
-    lines = path.read_text(encoding="utf-8").splitlines()
-    comment_lines = [ln for ln in lines if ln.startswith("#")]
-    data_lines = [ln for ln in lines if not ln.startswith("#")]
-    if not data_lines:
-        return
-
-    existing_header = data_lines[0].split("\t")
-    if len(existing_header) >= len(AUDIT_LOG_COLUMNS):
-        return  # already current or wider — downgrade not supported, no-op
-
-    _write_migrated_audit_log(path, comment_lines, data_lines)
-
-
-def _write_migrated_audit_log(path: Path, comment_lines: list[str], data_lines: list[str]) -> None:
-    """Atomic rewrite: temp file with new header + padded rows, then os.replace."""
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with tmp.open("w", encoding="utf-8", newline="") as fh:
-        for ln in comment_lines:
-            fh.write(ln + "\n")
-        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
-        writer.writerow(AUDIT_LOG_COLUMNS)
-        # Re-parse against the OLD header so values land in their matching
-        # new column positions; any unrecognised legacy columns are dropped.
-        old_reader = csv.DictReader(io.StringIO("\n".join(data_lines)), delimiter="\t")
-        for raw_row in old_reader:
-            writer.writerow([raw_row.get(col, "") or "" for col in AUDIT_LOG_COLUMNS])
-    os.replace(tmp, path)
-
-
 def append_log(rows: list[SSSOMRow], path: Path) -> None:
     """Append rows to the log. Creates file + SSSOM header if absent.
 
     Stamps mapping_date (utcnow ISO 8601) and record_id (uuid4) on each row.
-    Migrates stale (< 13-column) audit logs atomically before appending.
     Calls path.parent.mkdir(parents=True, exist_ok=True) before opening.
     Uses csv.writer so field values containing tabs are safely quoted.
     """
-    _migrate_audit_log_if_needed(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(UTC).isoformat()
     write_header = not path.exists() or path.stat().st_size == 0
@@ -221,17 +141,13 @@ def append_log(rows: list[SSSOMRow], path: Path) -> None:
             fh.write(SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
         if write_header:
-            writer.writerow(AUDIT_LOG_COLUMNS)
+            writer.writerow(SSSOM_COLUMNS)
 
         for row in rows:
-            # Stamp date and UUID if not already set
             mapping_date = row.mapping_date.isoformat() if row.mapping_date else now
             record_id = row.record_id or str(uuid.uuid4())
             writer.writerow(
-                [
-                    _row_value_for_column(row, col, mapping_date, record_id)
-                    for col in AUDIT_LOG_COLUMNS
-                ]
+                [_row_value_for_column(row, col, mapping_date, record_id) for col in SSSOM_COLUMNS]
             )
 
 

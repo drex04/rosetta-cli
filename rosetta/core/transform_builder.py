@@ -227,15 +227,15 @@ def build_class_derivation(
 def build_slot_derivation(m: _SlotMapping) -> SlotDerivation:
     """Build a SlotDerivation from a _SlotMapping classification.
 
-    GA3: if subject_datatype and object_datatype both present and differ,
-    set range=object_datatype (target datatype).
-
     Unit conversion: when both source and target units are detected (via
     detect_unit on slot name + description), differ, and the pair appears in
     _LINEAR_CONVERSION_PAIRS, emit UnitConversionConfiguration(source_unit=...,
     target_unit=...). The fork's YarrrmlCompiler reads these and emits a GREL
     expression from its LINEAR_GREL_CONVERSIONS table. Unknown pairs and
     same-unit pairs fall through to passthrough references.
+
+    Datatypes are resolved from the LinkML schema by the YarrrmlCompiler,
+    not from the SSSOM audit log — the schema is the authoritative source.
     """
     unit_conv: UnitConversionConfiguration | None = None
     if (
@@ -248,14 +248,9 @@ def build_slot_derivation(m: _SlotMapping) -> SlotDerivation:
             source_unit=_QUDT_TO_FORK_UNIT[m.source_unit],
             target_unit=_QUDT_TO_FORK_UNIT[m.target_unit],
         )
-    dtype_range: str | None = None
-    if m.row.subject_datatype and m.row.object_datatype:
-        if m.row.subject_datatype != m.row.object_datatype:
-            dtype_range = m.row.object_datatype
     return SlotDerivation(
         name=m.target_slot_name,
         populated_from=m.source_slot_name,
-        range=dtype_range,
         unit_conversion=unit_conv,
     )
 

@@ -144,8 +144,8 @@ def _cell(row: Any, col: str) -> str:
 
 def _write_sssom_approved(path: Path, rows: list[dict[str, object]]) -> Path:
     """Write SSSOM TSV using real SSSOMRow models for format consistency."""
-    from rosetta.core.ledger import AUDIT_LOG_COLUMNS, SSSOM_HEADER
-    from rosetta.core.models import SSSOMRow
+    from rosetta.core.ledger import SSSOM_HEADER
+    from rosetta.core.models import SSSOM_COLUMNS, SSSOMRow
 
     built: list[SSSOMRow] = []
     for r in rows:
@@ -166,9 +166,9 @@ def _write_sssom_approved(path: Path, rows: list[dict[str, object]]) -> Path:
     with path.open("w", encoding="utf-8", newline="") as fh:
         fh.write(SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
-        writer.writerow(AUDIT_LOG_COLUMNS)
+        writer.writerow(SSSOM_COLUMNS)
         for row in built:
-            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
+            writer.writerow([_cell(row, col) for col in SSSOM_COLUMNS])
     return path
 
 

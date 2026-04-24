@@ -26,8 +26,8 @@ from rosetta.cli.ingest import cli as ingest_cli
 from rosetta.cli.ledger import cli as accredit_cli
 from rosetta.cli.ledger import cli as ledger_cli
 from rosetta.cli.suggest import cli as suggest_cli
-from rosetta.core.ledger import AUDIT_LOG_COLUMNS, SSSOM_HEADER, parse_sssom_tsv
-from rosetta.core.models import LintReport
+from rosetta.core.ledger import SSSOM_HEADER, parse_sssom_tsv
+from rosetta.core.models import SSSOM_COLUMNS, LintReport
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -93,7 +93,7 @@ def test_embed_suggest_compile_format_compatibility(
     with approved.open("w", encoding="utf-8", newline="") as fh:
         fh.write(SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
-        writer.writerow(AUDIT_LOG_COLUMNS)
+        writer.writerow(SSSOM_COLUMNS)
         for row in suggest_rows:
             writer.writerow(
                 [

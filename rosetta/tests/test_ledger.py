@@ -23,7 +23,7 @@ from rosetta.core.ledger import (
     query_pending,
 )
 from rosetta.core.lint import check_datatype
-from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, LintFinding, LintReport, LintSummary, SSSOMRow
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,23 +55,17 @@ def _make_sssom_tsv(
 ) -> Path:
     path = tmp_path / filename
     header = "# sssom_version: https://w3id.org/sssom/spec/0.15\n# mapping_set_id: test\n"
-    cols = [
-        "subject_id",
-        "predicate_id",
-        "object_id",
-        "mapping_justification",
-        "confidence",
-        "subject_label",
-        "object_label",
-        "mapping_date",
-        "record_id",
-    ]
     with path.open("w") as f:
         f.write(header)
-        writer = csv.DictWriter(f, fieldnames=cols, delimiter="\t", extrasaction="ignore")
+        writer = csv.DictWriter(
+            f,
+            fieldnames=SSSOM_COLUMNS,
+            delimiter="\t",
+            extrasaction="ignore",
+        )
         writer.writeheader()
         for row in rows:
-            writer.writerow({c: row.get(c, "") for c in cols})
+            writer.writerow({c: row.get(c, "") for c in SSSOM_COLUMNS})
     return path
 
 
@@ -931,13 +925,12 @@ def test_accredit_audit_log_composite_round_trip(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Task 4b — Backward-compat parse (9-col and 11-col audit log shapes)
+# Task 4b — Strict column validation
 # ---------------------------------------------------------------------------
 
 
-def test_accredit_audit_log_backward_compat(tmp_path: Path) -> None:
-    """Pre-16-00 audit log shapes (9-col and 11-col) parse cleanly with composite fields = None."""
-    # 9-column (pre-Phase-15 audit log shape)
+def test_load_log_rejects_9col_file(tmp_path: Path) -> None:
+    """A 9-column SSSOM file is rejected with a descriptive error."""
     log_9 = tmp_path / "old_9col.sssom.tsv"
     log_9.write_text(
         SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
@@ -946,15 +939,12 @@ def test_accredit_audit_log_backward_compat(tmp_path: Path) -> None:
         "2026-04-01T00:00:00+00:00\trec-1\n",
         encoding="utf-8",
     )
-    loaded_9 = load_log(log_9)
-    assert len(loaded_9) == 1
-    assert loaded_9[0].subject_type is None
-    assert loaded_9[0].object_type is None
-    assert loaded_9[0].mapping_group_id is None
-    assert loaded_9[0].composition_expr is None
-    assert loaded_9[0].subject_datatype is None
+    with pytest.raises(ValueError, match="wrong columns"):
+        load_log(log_9)
 
-    # 11-column (post-Phase-15 suggest output shape, fed into parse_sssom_tsv)
+
+def test_load_log_rejects_11col_file(tmp_path: Path) -> None:
+    """An 11-column SSSOM file is rejected with a descriptive error."""
     log_11 = tmp_path / "old_11col.sssom.tsv"
     log_11.write_text(
         SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
@@ -964,12 +954,8 @@ def test_accredit_audit_log_backward_compat(tmp_path: Path) -> None:
         "2026-04-01T00:00:00+00:00\trec-1\tinteger\tdouble\n",
         encoding="utf-8",
     )
-    loaded_11 = load_log(log_11)
-    assert len(loaded_11) == 1
-    assert loaded_11[0].subject_datatype == "integer"
-    assert loaded_11[0].object_datatype == "double"
-    assert loaded_11[0].mapping_group_id is None
-    assert loaded_11[0].composition_expr is None
+    with pytest.raises(ValueError, match="wrong columns"):
+        load_log(log_11)
 
 
 # ---------------------------------------------------------------------------
@@ -977,8 +963,8 @@ def test_accredit_audit_log_backward_compat(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_accredit_append_log_migrates_9col_file(tmp_path: Path) -> None:
-    """Appending to an existing 9-col audit log rewrites it to 13 columns atomically."""
+def test_load_log_rejects_stale_9col_file(tmp_path: Path) -> None:
+    """A 9-column audit log raises ValueError with a descriptive message."""
     log = tmp_path / "audit.sssom.tsv"
     log.write_text(
         SSSOM_HEADER + "subject_id\tpredicate_id\tobject_id\tmapping_justification\t"
@@ -987,40 +973,13 @@ def test_accredit_append_log_migrates_9col_file(tmp_path: Path) -> None:
         "2026-04-01T00:00:00+00:00\trec-1\n",
         encoding="utf-8",
     )
-    new_row = SSSOMRow(
-        subject_id="src:c",
-        predicate_id="skos:exactMatch",
-        object_id="mst:d",
-        mapping_justification="semapv:HumanCuration",
-        confidence=1.0,
-        mapping_group_id="grp-1",
-        composition_expr='{a} + "," + {b}',
-        object_type="composed entity expression",
-    )
-    append_log([new_row], log)
-
-    # File header now has 13 columns.
-    data_lines = [ln for ln in log.read_text().splitlines() if not ln.startswith("#")]
-    header = data_lines[0].split("\t")
-    assert len(header) == 13
-    assert header[-4:] == ["subject_type", "object_type", "mapping_group_id", "composition_expr"]
-
-    # Legacy row preserved; composite fields None.
-    loaded = load_log(log)
-    assert len(loaded) == 2
-    legacy = next(r for r in loaded if r.subject_id == "src:a")
-    new = next(r for r in loaded if r.subject_id == "src:c")
-    assert legacy.mapping_group_id is None
-    assert legacy.composition_expr is None
-    assert new.mapping_group_id == "grp-1"
-    assert new.composition_expr == '{a} + "," + {b}'
-    assert new.object_type == "composed entity expression"
+    with pytest.raises(ValueError, match="wrong columns"):
+        load_log(log)
 
 
-def test_accredit_append_log_no_migration_on_current_shape(tmp_path: Path) -> None:
-    """Appending to an already-13-col file performs no rewrite."""
+def test_append_log_second_append_succeeds(tmp_path: Path) -> None:
+    """Appending twice to a current-shape file works without errors."""
     log = tmp_path / "audit.sssom.tsv"
-    # Seed with a fresh (current-shape) file.
     append_log(
         [
             SSSOMRow(
@@ -1033,8 +992,6 @@ def test_accredit_append_log_no_migration_on_current_shape(tmp_path: Path) -> No
         ],
         log,
     )
-    mtime_before = log.stat().st_mtime_ns
-    # Second append — no migration should occur, just a standard append.
     append_log(
         [
             SSSOMRow(
@@ -1047,11 +1004,8 @@ def test_accredit_append_log_no_migration_on_current_shape(tmp_path: Path) -> No
         ],
         log,
     )
-    # Two data rows, same 13-col header, no .tmp sibling left behind.
-    assert not (log.with_suffix(log.suffix + ".tmp")).exists()
     loaded = load_log(log)
     assert len(loaded) == 2
-    _ = mtime_before  # referenced to satisfy linters
 
 
 # ---------------------------------------------------------------------------

@@ -117,6 +117,9 @@ class SSSOMRow(BaseModel):
     composition_expr: str | None = None
 
 
+SSSOM_COLUMNS: list[str] = list(SSSOMRow.model_fields.keys())
+
+
 # --- Validate ---
 
 
@@ -126,8 +129,10 @@ class ValidationFinding(BaseModel):
     focus_node: str
     severity: Literal["Violation", "Warning", "Info"]
     constraint: str
+    property_path: str | None = None
+    value: str | None = None
     source_shape: str | None = None
-    message: str | None = None  # sh:resultMessage is optional per SHACL spec
+    message: str | None = None
 
 
 class ValidationSummary(BaseModel):

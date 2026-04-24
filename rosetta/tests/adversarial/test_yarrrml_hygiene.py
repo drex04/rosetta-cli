@@ -9,7 +9,7 @@ adversarial test exercises the opposite contract: when the typo is present,
 ``linkml.generators.jsonldcontextgen.ContextGenerator``) rather than crashing
 opaquely, and it does not leave partial JSON-LD output behind.
 
-The test builds minimal inline LinkML schemas plus a 13-column SSSOM approval
+The test builds minimal inline LinkML schemas plus an SSSOM approval
 log so the pipeline reaches the ContextGenerator stage where the typo bites.
 """
 
@@ -25,6 +25,7 @@ from click.testing import CliRunner
 
 from rosetta.cli.compile import cli as compile_cli
 from rosetta.cli.transform import cli as run_cli
+from rosetta.core.models import SSSOM_COLUMNS
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -40,31 +41,15 @@ _SSSOM_HEADER = """\
 #   semapv: https://w3id.org/semapv/vocab/
 """
 
-_SSSOM_COLS = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-    "subject_type",
-    "object_type",
-    "mapping_group_id",
-    "composition_expr",
-]
-
 
 def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
-    """Write a 13-column SSSOM TSV with the standard audit-log header."""
+    """Write an SSSOM TSV with the standard audit-log header."""
     with path.open("w", encoding="utf-8") as f:
         f.write(_SSSOM_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLS, delimiter="\t", extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
+            writer.writerow({c: row.get(c, "") for c in SSSOM_COLUMNS})
 
 
 def _source_schema_body() -> dict[str, Any]:

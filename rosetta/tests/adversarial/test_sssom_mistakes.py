@@ -26,7 +26,7 @@ from click.testing import CliRunner
 from rosetta.cli.ledger import cli as accredit_cli
 from rosetta.core.ledger import HC_JUSTIFICATION, MMC_JUSTIFICATION
 from rosetta.core.lint import check_sssom_proposals
-from rosetta.core.models import LintReport, LintSummary, SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, LintReport, LintSummary, SSSOMRow
 
 pytestmark = [pytest.mark.integration]
 
@@ -80,21 +80,6 @@ def _proposals_only_lint(
     return LintReport(findings=findings, summary=summary)
 
 
-# Full 13-column audit-log SSSOM shape (post-Phase 16-00).
-# Matches rosetta/tests/integration/test_accredit_pipeline.py — kept local so
-# this adversarial suite has zero cross-file test helper coupling.
-_SSSOM_COLUMNS: list[str] = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
-
 _SSSOM_FILE_HEADER: str = (
     "# sssom_version: https://w3id.org/sssom/spec/0.15\n"
     "# mapping_set_id: http://rosetta.interop/test-adversarial\n"
@@ -106,14 +91,14 @@ _SSSOM_FILE_HEADER: str = (
 
 
 def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
-    """Write a valid 9-of-13-column SSSOM TSV (the rest default to empty)."""
+    """Write an SSSOM TSV with the canonical column set."""
     path = tmp_path / name
     with path.open("w", encoding="utf-8") as f:
         f.write(_SSSOM_FILE_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         for r in rows:
-            writer.writerow({c: r.get(c, "") for c in _SSSOM_COLUMNS})
+            writer.writerow({c: r.get(c, "") for c in SSSOM_COLUMNS})
     return path
 
 
@@ -175,13 +160,7 @@ def test_accredit_duplicate_mmc(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
 
 def test_accredit_wrong_column_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """TSV header missing required SSSOM columns → exit 1, clear diagnostic, no log write.
-
-    `parse_sssom_tsv` raises `ValueError` at the parse boundary when the header
-    lacks any of the 5 required SSSOM columns (subject_id, predicate_id, object_id,
-    mapping_justification, confidence). The CLI catches the exception and emits
-    a clean error naming the missing columns. No log file is created.
-    """
+    """TSV header with wrong columns → exit 1, clear diagnostic, no log write."""
     monkeypatch.setattr("rosetta.cli.ledger.run_lint", _noop_lint)
     log_path = tmp_path / "audit-log.sssom.tsv"
     src = _schema_file(tmp_path, "src.yaml")
@@ -211,11 +190,8 @@ def test_accredit_wrong_column_count(tmp_path: Path, monkeypatch: pytest.MonkeyP
         ],
     )
 
-    assert result.exit_code == 1, (
-        f"expected exit 1 on missing required columns; got {result.exit_code}"
-    )
-    assert "missing required" in result.stderr.lower()
-    assert "confidence" in result.stderr or "mapping_justification" in result.stderr
+    assert result.exit_code == 1, f"expected exit 1 on wrong columns; got {result.exit_code}"
+    assert "wrong columns" in result.stderr.lower()
     assert not log_path.exists(), "log file must not be created on a rejected append"
 
 

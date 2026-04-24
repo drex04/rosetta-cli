@@ -1797,8 +1797,8 @@ wheels = [
 
 [[package]]
 name = "linkml-map"
-version = "0.0.0.post323.dev0+15068"
-source = { git = "https://github.com/drex04/linkml-map.git?rev=00150683e9ad03cefa00e3c0e2d55f0e3cc6df9f#00150683e9ad03cefa00e3c0e2d55f0e3cc6df9f" }
+version = "0.0.0.post324.dev0+6ce4dc3"
+source = { git = "https://github.com/drex04/linkml-map.git?rev=6ce4dc3#6ce4dc32628df0dad575c68d59814ee64e84a54a" }
 dependencies = [
     { name = "asteval" },
     { name = "click" },
@@ -3746,7 +3746,7 @@ requires-dist = [
     { name = "deepl", specifier = ">=1.30,<2" },
     { name = "genson", specifier = ">=1.3" },
     { name = "linkml", specifier = ">=1.10" },
-    { name = "linkml-map", git = "https://github.com/drex04/linkml-map.git?rev=00150683e9ad03cefa00e3c0e2d55f0e3cc6df9f" },
+    { name = "linkml-map", git = "https://github.com/drex04/linkml-map.git?rev=6ce4dc3" },
     { name = "morph-kgc", specifier = "==2.10.0" },
     { name = "numpy", specifier = ">=2.4" },
     { name = "pint", specifier = ">=0.25" },

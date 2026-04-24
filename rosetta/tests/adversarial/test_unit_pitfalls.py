@@ -21,7 +21,7 @@ import pytest
 from click.testing import CliRunner
 
 from rosetta.cli.ledger import cli as ledger_cli
-from rosetta.core.models import LintReport
+from rosetta.core.models import SSSOM_COLUMNS, LintReport
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
 
 pytestmark = [pytest.mark.integration]
@@ -87,31 +87,20 @@ _SSSOM_HEADER: str = (
     "#   semapv: https://w3id.org/semapv/vocab/\n"
     "#   skos: http://www.w3.org/2004/02/skos/core#\n"
 )
-_SSSOM_COLS: list[str] = [
-    "subject_id",
-    "predicate_id",
-    "object_id",
-    "mapping_justification",
-    "confidence",
-    "subject_label",
-    "object_label",
-    "mapping_date",
-    "record_id",
-]
 
 
 def _write_sssom(path: Path, rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8") as f:
         f.write(_SSSOM_HEADER)
-        writer = csv.DictWriter(f, fieldnames=_SSSOM_COLS, delimiter="\t", extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=SSSOM_COLUMNS, delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         for row in rows:
-            writer.writerow({c: row.get(c, "") for c in _SSSOM_COLS})
+            writer.writerow({c: row.get(c, "") for c in SSSOM_COLUMNS})
 
 
 def _write_empty_audit_log(path: Path) -> None:
     path.write_text(
-        _SSSOM_HEADER + "\t".join(_SSSOM_COLS) + "\n",
+        _SSSOM_HEADER + "\t".join(SSSOM_COLUMNS) + "\n",
         encoding="utf-8",
     )
 

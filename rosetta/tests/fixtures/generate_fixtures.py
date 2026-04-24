@@ -19,8 +19,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rosetta.core.ledger import AUDIT_LOG_COLUMNS, parse_sssom_tsv
-from rosetta.core.models import SSSOMRow
+from rosetta.core.ledger import parse_sssom_tsv
+from rosetta.core.models import SSSOM_COLUMNS, SSSOMRow
 
 _NATIONS = Path(__file__).parent / "nations"
 _NOR_SCHEMA = _NATIONS / "nor_radar.linkml.yaml"
@@ -155,9 +155,9 @@ def generate_approved_sssom() -> Path:
     with out.open("w", encoding="utf-8", newline="") as fh:
         fh.write(_SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
-        writer.writerow(AUDIT_LOG_COLUMNS)
+        writer.writerow(SSSOM_COLUMNS)
         for row in rows:
-            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
+            writer.writerow([_cell(row, col) for col in SSSOM_COLUMNS])
     return out
 
 

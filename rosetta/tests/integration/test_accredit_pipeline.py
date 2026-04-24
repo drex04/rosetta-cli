@@ -17,13 +17,12 @@ from click.testing import CliRunner
 
 from rosetta.cli.ledger import cli as accredit_cli
 from rosetta.core.ledger import (
-    AUDIT_LOG_COLUMNS,
     HC_JUSTIFICATION,
     MMC_JUSTIFICATION,
     SSSOM_HEADER,
     load_log,
 )
-from rosetta.core.models import LintReport, LintSummary, SSSOMRow
+from rosetta.core.models import SSSOM_COLUMNS, LintReport, LintSummary, SSSOMRow
 
 pytestmark = [pytest.mark.integration]
 
@@ -85,9 +84,9 @@ def _write_sssom(tmp_path: Path, rows: list[dict[str, str]], name: str) -> Path:
     with path.open("w", encoding="utf-8", newline="") as fh:
         fh.write(SSSOM_HEADER)
         writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
-        writer.writerow(AUDIT_LOG_COLUMNS)
+        writer.writerow(SSSOM_COLUMNS)
         for row in built:
-            writer.writerow([_cell(row, col) for col in AUDIT_LOG_COLUMNS])
+            writer.writerow([_cell(row, col) for col in SSSOM_COLUMNS])
     return path
 
 
