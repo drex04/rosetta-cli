@@ -32,20 +32,22 @@ from linkml.generators.jsonldcontextgen import ContextGenerator  # type: ignore[
 _DATA_FILE_PLACEHOLDER: str = "$(DATA_FILE)"
 
 
-def _write_udf_file(work_dir: Path) -> Path:
-    """Copy the rosetta UDF Python module into ``work_dir`` and return its path.
+def _write_udf_file(work_dir: Path, extra_udf_paths: list[Path] | None = None) -> Path:
+    """Concatenate builtin + custom UDF modules into ``work_dir`` and return the path.
 
     morph-kgc loads this file via the INI ``udfs=<path>`` option and
     registers each ``@udf``-decorated function under its ``fun_id`` IRI.
     """
     udf_path = work_dir / "rosetta_udfs.py"
     try:
-        source = (
+        parts: list[str] = [
             files("rosetta.functions")
             .joinpath("unit_conversion_udfs.py")
             .read_text(encoding="utf-8")
-        )
-        udf_path.write_text(source, encoding="utf-8")
+        ]
+        for extra in extra_udf_paths or []:
+            parts.append(extra.read_text(encoding="utf-8"))
+        udf_path.write_text("\n\n".join(parts), encoding="utf-8")
     except OSError as exc:
         raise RuntimeError(f"Failed to write UDF file to {udf_path}: {exc}") from exc
     return udf_path
@@ -104,6 +106,7 @@ def run_materialize(
     yarrrml_text: str,
     data_path: Path,
     work_dir: Path | None = None,
+    extra_udf_paths: list[Path] | None = None,
 ) -> Iterator[rdflib.Graph]:
     """Materialize ``yarrrml_text`` against ``data_path`` into an ``rdflib.Graph``.
 
@@ -137,7 +140,7 @@ def run_materialize(
         except OSError as exc:
             raise RuntimeError(f"Failed to write mapping file to {mapping_path}: {exc}") from exc
 
-        udf_path = _write_udf_file(effective_dir)
+        udf_path = _write_udf_file(effective_dir, extra_udf_paths)
         ini_string = _build_ini(mapping_path, udf_path=udf_path)
         graph: rdflib.Graph = morph_kgc.materialize(ini_string)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         yield graph

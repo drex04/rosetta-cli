@@ -26,6 +26,10 @@ strict = false
 [ledger]
 log = "audit-log.sssom.tsv"
 
+[functions]
+# declarations = ["my_functions.fno.ttl"]
+# udfs = ["my_udfs.py"]
+
 [conversions]
 # Type-pair policies: "source_linkml_type:target_linkml_type" = "FnO function CURIE"
 # "float:integer" = "grel:math_round"

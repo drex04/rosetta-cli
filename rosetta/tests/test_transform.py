@@ -187,7 +187,7 @@ def test_run_with_workdir_supplied(
 
     @contextlib.contextmanager
     def _capture(
-        yarrrml_text: str, data_path: Path, work_dir: Path | None
+        yarrrml_text: str, data_path: Path, work_dir: Path | None, **kwargs: object
     ) -> Iterator[rdflib.Graph]:
         captured["work_dir"] = work_dir
         if work_dir is not None:

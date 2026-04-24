@@ -105,6 +105,12 @@ Common causes of datatype validation failures:
 - **Missing `datatype:` in YARRRML** — the value was emitted as a plain string instead of a typed literal. Fixed by ensuring the master schema declares the correct `range` on the slot.
 - **Invalid value for the declared type** — e.g., `"hello"^^xsd:double`. Fix the source data or the schema type declaration.
 
+## Function mechanism
+
+Type and unit conversions are implemented through the FnO function mechanism.
+See [Functions](functions.md) for the full list of builtin functions and
+instructions for adding custom transformations.
+
 ## See also
 
 - [`rosetta ledger`](../cli/ledger.md) — the lint gate that checks type compatibility

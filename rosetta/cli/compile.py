@@ -13,6 +13,7 @@ from linkml_runtime.linkml_model import SchemaDefinition
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 from linkml_runtime.utils.schemaview import SchemaView  # type: ignore[import-untyped]
 
+from rosetta.core.config import load_config, load_function_config
 from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.io import open_output
 from rosetta.core.ledger import parse_sssom_tsv
@@ -142,8 +143,20 @@ def cli(
         click.echo(msg, err=True)
         sys.exit(1)
 
-    # 6. Build TransformSpec (prefiltered= avoids a second O(n) filter_rows pass)
+    # 6. Load function library (builtins + custom declarations from rosetta.toml)
+    config = load_config()
+    try:
+        fn_config = load_function_config(config)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     library = FunctionLibrary.load_builtins()
+    for decl_path in fn_config["declarations"]:
+        try:
+            library.add_declarations(decl_path)
+        except ValueError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
     try:
         spec, coverage = build_spec(
             rows,

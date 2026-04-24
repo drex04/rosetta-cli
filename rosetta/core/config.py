@@ -66,6 +66,24 @@ def get_config_value(
     return config.get(section, {}).get(key)
 
 
+def load_function_config(config: dict[str, Any]) -> dict[str, list[Path]]:
+    """Return custom FnO declaration and UDF file paths from ``[functions]``."""
+    fns = config.get("functions", {})
+    decls: list[Path] = []
+    for p in fns.get("declarations", []):
+        path = Path(p)
+        if not path.exists():
+            raise ValueError(f"Custom FnO declaration not found: {path}")
+        decls.append(path)
+    udfs: list[Path] = []
+    for p in fns.get("udfs", []):
+        path = Path(p)
+        if not path.exists():
+            raise ValueError(f"Custom UDF file not found: {path}")
+        udfs.append(path)
+    return {"declarations": decls, "udfs": udfs}
+
+
 def load_conversion_policies(config: dict[str, Any]) -> dict[str, str]:
     """Return a merged dict of type-pair and unit-pair conversion policies.
 

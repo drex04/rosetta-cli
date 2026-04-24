@@ -9,6 +9,7 @@ from typing import IO
 
 import click
 
+from rosetta.core.config import load_config, load_function_config
 from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.io import open_output
 from rosetta.core.ledger import (
@@ -126,14 +127,29 @@ def append_cmd(
         sys.exit(1)
     log = load_log(log_path)
 
-    # 1. Run lint on ALL unfiltered candidates
+    # 1. Load function library (builtins + custom declarations from rosetta.toml)
+    config = load_config()
+    try:
+        fn_config = load_function_config(config)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    library = FunctionLibrary.load_builtins()
+    for decl_path in fn_config["declarations"]:
+        try:
+            library.add_declarations(decl_path)
+        except ValueError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
+
+    # 2. Run lint on ALL unfiltered candidates
     report = run_lint(
         incoming,
         log,
         source_schema,
         master_schema,
         strict=strict,
-        library=FunctionLibrary.load_builtins(),
+        library=library,
     )
 
     # For accreditor, HC rows are expected — strip hc_in_candidates findings

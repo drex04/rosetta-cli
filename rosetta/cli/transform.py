@@ -10,6 +10,7 @@ from pathlib import Path
 import click
 import yaml  # for YAMLError
 
+from rosetta.core.config import load_config, load_function_config
 from rosetta.core.io import open_output
 from rosetta.core.rml_runner import graph_to_jsonld, run_materialize
 from rosetta.core.shacl_validate import validate_graph
@@ -116,14 +117,22 @@ def cli(
     if shapes is None and not no_validate:
         raise click.UsageError("--shapes is required unless --no-validate is passed")
 
-    # 1. Read YARRRML mapping file.
+    # 1. Load custom UDF paths from rosetta.toml
+    config = load_config()
+    try:
+        fn_config = load_function_config(config)
+    except ValueError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    # 2. Read YARRRML mapping file.
     try:
         yarrrml_text = Path(mapping_file).read_text(encoding="utf-8")
     except OSError as exc:
         click.echo(f"Error reading mapping file {mapping_file}: {exc}", err=True)
         sys.exit(1)
 
-    # 2. Resolve workdir with writability probe.
+    # 3. Resolve workdir with writability probe.
     resolved_workdir: Path | None
     if workdir:
         resolved_workdir = Path(workdir).resolve()
@@ -138,13 +147,15 @@ def cli(
     else:
         resolved_workdir = None
 
-    # 3. Materialize + (optionally validate) + frame as JSON-LD.
+    # 4. Materialize + (optionally validate) + frame as JSON-LD.
     data_path = Path(source_file)
     master_schema_path = Path(master_schema).resolve()
     context_out_path = Path(context_output).resolve() if context_output else None
 
     try:
-        with run_materialize(yarrrml_text, data_path, resolved_workdir) as graph:
+        with run_materialize(
+            yarrrml_text, data_path, resolved_workdir, extra_udf_paths=fn_config["udfs"]
+        ) as graph:
             if len(graph) == 0:
                 click.echo(
                     "Warning: materialization produced 0 triples; check data file and mappings",
@@ -179,7 +190,7 @@ def cli(
                     )
                     sys.exit(1)
 
-            # 3b. Frame graph as JSON-LD.
+            # 4b. Frame graph as JSON-LD.
             jsonld_bytes = graph_to_jsonld(
                 graph, master_schema_path, context_output=context_out_path
             )
@@ -202,7 +213,7 @@ def cli(
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
 
-    # 4. Write JSON-LD to file or stdout.
+    # 5. Write JSON-LD to file or stdout.
     if output and output != "-":
         try:
             Path(output).write_bytes(jsonld_bytes)

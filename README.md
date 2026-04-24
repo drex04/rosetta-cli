@@ -79,6 +79,18 @@ See `scripts/pipeline-demo.sh` for an interactive walkthrough with real fixtures
 | `rosetta validate` | `rosetta transform` (validates by default) |
 | `rosetta shapes` | `rosetta ingest --master <ontology>` |
 
+## Custom functions
+
+Extend rosetta with custom FnO functions for domain-specific transformations.
+Declare type signatures in `.fno.ttl` files and implement as Python UDFs.
+See [docs/concepts/functions.md](docs/concepts/functions.md) for details.
+
+```toml
+[functions]
+declarations = ["my_functions.fno.ttl"]
+udfs = ["my_udfs.py"]
+```
+
 ## Documentation
 
 Full documentation — CLI reference, pipeline walkthrough, accreditation guide, and configuration:

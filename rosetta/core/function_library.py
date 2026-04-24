@@ -50,7 +50,10 @@ class FunctionLibrary:
 
     def add_declarations(self, path: Path) -> None:
         """Parse *path* as FnO Turtle and merge into this library."""
-        self._graph.parse(data=path.read_text(), format="turtle")
+        try:
+            self._graph.parse(data=path.read_text(encoding="utf-8"), format="turtle")
+        except Exception as exc:
+            raise ValueError(f"Failed to parse FnO declaration {path}: {exc}") from exc
         self._rebuild_index()
 
     def _rebuild_index(self) -> None:
