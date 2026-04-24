@@ -11,10 +11,13 @@ import numpy as np
 from linkml_runtime.linkml_model import SchemaDefinition  # type: ignore[import-untyped]
 from linkml_runtime.loaders import yaml_loader  # type: ignore[import-untyped]
 
+from rosetta.core.config import load_config, load_conversion_policies
 from rosetta.core.embedding import EmbeddingModel, extract_text_inputs_linkml
 from rosetta.core.features import extract_structural_features_linkml
+from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.io import open_output
 from rosetta.core.ledger import DATETIME_MIN, load_log
+from rosetta.core.lint import populate_conversion_functions
 from rosetta.core.models import SSSOM_COLUMNS, SSSOMRow
 from rosetta.core.similarity import filter_decided_suggestions, rank_suggestions
 
@@ -247,6 +250,11 @@ def cli(
                     )
                 )
 
+        config = load_config()
+        library = FunctionLibrary.load_builtins()
+        policies = load_conversion_policies(config)
+        populate_conversion_functions(sssom_rows, policies, library)
+
         # Write SSSOM TSV
         with open_output(output) as fh:
             for line in _SSSOM_HEADER_LINES:
@@ -273,6 +281,7 @@ def cli(
                         row.object_type or "",
                         row.mapping_group_id or "",
                         row.composition_expr or "",
+                        row.conversion_function or "",
                     ]
                 )
             _ = fh.write(buf.getvalue())

@@ -9,6 +9,7 @@ from typing import IO
 
 import click
 
+from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.io import open_output
 from rosetta.core.ledger import (
     HC_JUSTIFICATION,
@@ -126,7 +127,14 @@ def append_cmd(
     log = load_log(log_path)
 
     # 1. Run lint on ALL unfiltered candidates
-    report = run_lint(incoming, log, source_schema, master_schema, strict=strict)
+    report = run_lint(
+        incoming,
+        log,
+        source_schema,
+        master_schema,
+        strict=strict,
+        library=FunctionLibrary.load_builtins(),
+    )
 
     # For accreditor, HC rows are expected — strip hc_in_candidates findings
     if role == "accreditor":

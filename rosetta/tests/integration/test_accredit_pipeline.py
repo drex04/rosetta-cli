@@ -49,6 +49,7 @@ def _noop_lint(
     master_schema: str | Path,
     *,
     strict: bool = False,
+    library: object = None,
 ) -> LintReport:
     return LintReport(findings=[], summary=LintSummary(block=0, warning=0, info=0))
 

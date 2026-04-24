@@ -5,6 +5,7 @@ from pathlib import Path
 import rdflib
 from linkml_runtime.utils.schemaview import SchemaView
 
+from rosetta.core.function_library import FunctionLibrary
 from rosetta.core.models import LintFinding, LintReport, LintSummary, SSSOMRow
 from rosetta.core.schema_utils import check_slot_class_reachability
 from rosetta.core.unit_detect import detect_unit, recognized_unit_without_iri
@@ -42,6 +43,27 @@ _NUMERIC_LINKML = {
 # Integer-family types — casting from float-family to these truncates silently
 _INTEGER_LINKML = {"integer", "int", "long", "short", "nonNegativeInteger", "positiveInteger"}
 _FLOAT_LINKML = {"float", "double", "decimal"}
+
+_XSD_TO_LINKML: dict[str, set[str]] = {
+    "integer": _INTEGER_LINKML,
+    "int": _INTEGER_LINKML,
+    "long": _INTEGER_LINKML,
+    "double": _FLOAT_LINKML,
+    "float": _FLOAT_LINKML,
+    "decimal": _FLOAT_LINKML,
+    "string": {"string"},
+    "boolean": {"boolean"},
+}
+
+
+def _function_output_covers_target(fn_output: str, target: str | None) -> bool:
+    """Return True if the XSD output type of a function covers the LinkML target datatype."""
+    if target is None:
+        return False
+    if fn_output == target:
+        return True
+    family = _XSD_TO_LINKML.get(fn_output)
+    return target in family if family else False
 
 
 def _check_duplicate_mmc_pairs(findings: list[LintFinding], mmc_rows: list[SSSOMRow]) -> None:
@@ -205,6 +227,7 @@ def check_units(
     findings: list[LintFinding],
     row: SSSOMRow,
     qudt_graph: rdflib.Graph,
+    library: FunctionLibrary | None = None,
 ) -> None:
     """Append unit-related findings for a single SSSOM row."""
     src_name = unit_label(row.subject_id, row.subject_label)
@@ -232,16 +255,44 @@ def check_units(
         )
     elif compat is True:
         if src_iri != tgt_iri:
-            findings.append(
-                LintFinding(
-                    rule="unit_conversion_required",
-                    severity="WARNING",
-                    source_uri=row.subject_id,
-                    target_uri=row.object_id,
-                    message=f"Same dimension, different units: {src_label} vs {tgt_label}",
-                    fnml_suggestion=suggest_fnml(src_iri, tgt_iri, qudt_graph),
+            if row.conversion_function is not None:
+                if library is not None and not library.has_function(row.conversion_function):
+                    findings.append(
+                        LintFinding(
+                            rule="undeclared_function",
+                            severity="BLOCK",
+                            source_uri=row.subject_id,
+                            target_uri=row.object_id,
+                            message=(
+                                f"conversion_function '{row.conversion_function}' "
+                                f"not in function library"
+                            ),
+                        )
+                    )
+                    return
+                findings.append(
+                    LintFinding(
+                        rule="unit_conversion_covered",
+                        severity="INFO",
+                        source_uri=row.subject_id,
+                        target_uri=row.object_id,
+                        message=(
+                            f"Unit conversion {src_label} → {tgt_label} "
+                            f"covered by {row.conversion_function}"
+                        ),
+                    )
                 )
-            )
+            else:
+                findings.append(
+                    LintFinding(
+                        rule="unit_conversion_required",
+                        severity="WARNING",
+                        source_uri=row.subject_id,
+                        target_uri=row.object_id,
+                        message=f"Same dimension, different units: {src_label} vs {tgt_label}",
+                        fnml_suggestion=suggest_fnml(src_iri, tgt_iri, qudt_graph),
+                    )
+                )
         # else: identical units — no finding
     else:
         # compat is None → dimension vector missing
@@ -255,38 +306,93 @@ def check_units(
         )
 
 
-def check_datatype(findings: list[LintFinding], row: SSSOMRow) -> None:
-    """Append datatype findings: BLOCK for numeric/non-numeric and narrowing casts."""
-    if row.subject_datatype is None or row.object_datatype is None:
-        return
-    if row.subject_datatype == row.object_datatype:
-        return
-    src_numeric = row.subject_datatype in _NUMERIC_LINKML
-    tgt_numeric = row.object_datatype in _NUMERIC_LINKML
-    if src_numeric != tgt_numeric:
+def _check_datatype_conversion_coverage(
+    findings: list[LintFinding],
+    row: SSSOMRow,
+    library: FunctionLibrary | None,
+) -> bool:
+    """Return True if conversion_function handles the mismatch (finding appended)."""
+    if row.conversion_function is None or library is None:
+        return False
+    if not library.has_function(row.conversion_function):
         findings.append(
             LintFinding(
-                rule="datatype_mismatch",
+                rule="undeclared_function",
                 severity="BLOCK",
                 source_uri=row.subject_id,
                 target_uri=row.object_id,
-                message=f"Datatype mismatch: {row.subject_datatype} vs {row.object_datatype}",
+                message=f"conversion_function '{row.conversion_function}' not in function library",
             )
         )
-    elif src_numeric and tgt_numeric:
-        if row.subject_datatype in _FLOAT_LINKML and row.object_datatype in _INTEGER_LINKML:
+        return True
+    out_type = library.get_output_type(row.conversion_function)
+    if out_type is not None:
+        out_base = out_type.removeprefix("xsd:")
+        if _function_output_covers_target(out_base, row.object_datatype):
             findings.append(
                 LintFinding(
-                    rule="datatype_narrowing",
-                    severity="BLOCK",
+                    rule="datatype_covered_by_function",
+                    severity="INFO",
                     source_uri=row.subject_id,
                     target_uri=row.object_id,
                     message=(
-                        f"Narrowing cast: {row.subject_datatype} → {row.object_datatype} "
-                        f"would truncate decimal values"
+                        f"Datatype mismatch covered by {row.conversion_function} "
+                        f"(output: {out_type})"
                     ),
                 )
             )
+            return True
+    return False
+
+
+def _datatype_mismatch_rule(row: SSSOMRow) -> tuple[str, str] | None:
+    """Return (rule, message) if a datatype mismatch exists, else None."""
+    if row.subject_datatype is None or row.object_datatype is None:
+        return None
+    if row.subject_datatype == row.object_datatype:
+        return None
+    src_numeric = row.subject_datatype in _NUMERIC_LINKML
+    tgt_numeric = row.object_datatype in _NUMERIC_LINKML
+    if src_numeric != tgt_numeric:
+        return (
+            "datatype_mismatch",
+            f"Datatype mismatch: {row.subject_datatype} vs {row.object_datatype}",
+        )
+    if (
+        src_numeric
+        and tgt_numeric
+        and row.subject_datatype in _FLOAT_LINKML
+        and row.object_datatype in _INTEGER_LINKML
+    ):
+        return (
+            "datatype_narrowing",
+            f"Narrowing cast: {row.subject_datatype} → {row.object_datatype} "
+            f"would truncate decimal values",
+        )
+    return None
+
+
+def check_datatype(
+    findings: list[LintFinding],
+    row: SSSOMRow,
+    library: FunctionLibrary | None = None,
+) -> None:
+    """Append datatype findings: BLOCK for numeric/non-numeric and narrowing casts."""
+    mismatch = _datatype_mismatch_rule(row)
+    if mismatch is None:
+        return
+    if _check_datatype_conversion_coverage(findings, row, library):
+        return
+    rule, message = mismatch
+    findings.append(
+        LintFinding(
+            rule=rule,
+            severity="BLOCK",
+            source_uri=row.subject_id,
+            target_uri=row.object_id,
+            message=message,
+        )
+    )
 
 
 def _check_reachability(
@@ -330,13 +436,17 @@ def _check_reachability(
         )
 
 
-def _check_units_and_datatypes(findings: list[LintFinding], confirmed_rows: list[SSSOMRow]) -> None:
+def _check_units_and_datatypes(
+    findings: list[LintFinding],
+    confirmed_rows: list[SSSOMRow],
+    library: FunctionLibrary | None = None,
+) -> None:
     try:
         qudt_graph = load_qudt_graph()
         for row in confirmed_rows:
             try:
-                check_units(findings, row, qudt_graph)
-                check_datatype(findings, row)
+                check_units(findings, row, qudt_graph, library=library)
+                check_datatype(findings, row, library=library)
             except Exception as exc:  # noqa: BLE001
                 findings.append(
                     LintFinding(
@@ -370,6 +480,7 @@ def run_lint(
     master_schema: str | Path,
     *,
     strict: bool = False,
+    library: FunctionLibrary | None = None,
 ) -> LintReport:
     """Run the full lint pipeline and return a LintReport."""
     findings: list[LintFinding] = []
@@ -377,6 +488,34 @@ def run_lint(
 
     confirmed_rows = [r for r in rows if r.mapping_justification in {MMC, HC}]
     _check_reachability(findings, confirmed_rows, source_schema, master_schema)
-    _check_units_and_datatypes(findings, confirmed_rows)
+    _check_units_and_datatypes(findings, confirmed_rows, library=library)
 
     return _build_report(findings, strict=strict)
+
+
+def _resolve_policy(
+    row: SSSOMRow, policies: dict[str, str], library: FunctionLibrary
+) -> str | None:
+    """Return the FnO CURIE from policies matching this row, or None."""
+    if row.subject_datatype and row.object_datatype:
+        fn = policies.get(f"{row.subject_datatype}:{row.object_datatype}")
+        if fn and library.has_function(fn):
+            return fn
+    src_iri = detect_unit(unit_label(row.subject_id, row.subject_label), row.subject_label)
+    tgt_iri = detect_unit(unit_label(row.object_id, row.object_label), row.object_label)
+    if src_iri and tgt_iri:
+        fn = policies.get(f"{src_iri}:{tgt_iri}")
+        if fn and library.has_function(fn):
+            return fn
+    return None
+
+
+def populate_conversion_functions(
+    rows: list[SSSOMRow],
+    policies: dict[str, str],
+    library: FunctionLibrary,
+) -> None:
+    """Set conversion_function on rows from config policies where not already set."""
+    for row in rows:
+        if row.conversion_function is None:
+            row.conversion_function = _resolve_policy(row, policies, library)
