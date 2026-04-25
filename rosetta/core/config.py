@@ -84,6 +84,21 @@ def load_function_config(config: dict[str, Any]) -> dict[str, list[Path]]:
     return {"declarations": decls, "udfs": udfs}
 
 
+def build_function_library(config: dict[str, Any]) -> tuple[Any, dict[str, list[Path]]]:
+    """Build a FunctionLibrary with builtins + custom declarations from config.
+
+    Returns ``(library, fn_config)`` so callers can also access UDF paths.
+    Raises ``ValueError`` on missing/malformed files.
+    """
+    from rosetta.core.function_library import FunctionLibrary
+
+    fn_config = load_function_config(config)
+    library = FunctionLibrary.load_builtins()
+    for decl_path in fn_config["declarations"]:
+        library.add_declarations(decl_path)
+    return library, fn_config
+
+
 def load_conversion_policies(config: dict[str, Any]) -> dict[str, str]:
     """Return a merged dict of type-pair and unit-pair conversion policies.
 
